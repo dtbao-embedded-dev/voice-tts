@@ -66,11 +66,12 @@ curl -X POST http://127.0.0.1:8760/api/tts/stream \
 - **The first launch downloads the model** (HuggingFace cache, `~/.cache/huggingface`).
   The window shows *Đang tải model…* until it is ready. This applies to a source
   checkout only.
-- **The packaged build is one self-contained `VoiceTTS.exe`** (~650 MB): the runtime,
-  the web view and the model weights are all inside it, and it points `HF_HOME` at its
-  own copy with `HF_HUB_OFFLINE=1`, so it never touches the network. The price is that
-  a one-file build unpacks itself into `%TEMP%` on *every* launch — 10-30 s before the
-  window appears, longer the first time while Defender scans it.
+- **The packaged build is one self-contained `VoiceTTS.exe`** (~400 MB): the runtime,
+  the web view and both model repos (backbone + audio codec) are inside it, and it
+  points `HF_HOME` at its own copy with `HF_HUB_OFFLINE=1`, so it never touches the
+  network. The price is that a one-file build unpacks itself into `%TEMP%` on *every*
+  launch — measured ~10 s from launch to *Sẵn sàng* here, longer on a cold machine
+  while Defender scans it.
 - **The voices are licensed for non-commercial use only.** Bundling them into the exe
   redistributes them; check the VieNeu terms before handing the file to anyone.
 - **The UI is black and white, dark only.** There is no light variant and no theme
