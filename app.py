@@ -210,6 +210,10 @@ def main() -> None:
 
     import webview
 
+    # WebView2 cancels every download while this is off - that is why "Lưu WAV"
+    # used to do nothing at all. With it on, the platform shows its Save dialog.
+    webview.settings["ALLOW_DOWNLOADS"] = True
+
     _, port, _ = start_server(args.port)
     webview.create_window(
         "Voice TTS",

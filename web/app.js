@@ -378,6 +378,9 @@ els.saveBtn.addEventListener('click', () => {
   a.href = url;
   a.download = `voice-tts-${Date.now()}.wav`;
   a.click();
+  // The save dialog is native, so the page never hears how it ended; say what
+  // was handed over rather than claiming a file exists.
+  setStatus(speaking ? 'speaking' : 'ready', 'Đã gửi file WAV sang hộp thoại lưu');
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 });
 
