@@ -65,6 +65,8 @@ def main() -> int:
     info = get_json(f"{base}/api/voices")
     voices = info["voices"]
     assert voices, "no preset voices reported"
+    # The UI sizes its field from this, so it has to be the limit the API enforces.
+    assert info["maxChars"] == app.MAX_CHARS == 20_000, f"maxChars: {info['maxChars']}"
     print(f"voices: {len(voices)} presets, default={info['default']!r}")
 
     raw, rate = post_stream(base, MIXED_TEXT, info["default"])

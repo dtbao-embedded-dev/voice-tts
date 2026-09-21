@@ -8,6 +8,8 @@ Desktop app that reads mixed Vietnamese/English text aloud, powered by
   outside the editor.
 - **Backend** — Python (FastAPI + uvicorn) bound to a loopback port, streaming
   48 kHz audio as it is generated.
+- **Limit** — 20 000 characters per request, enforced by the backend and reported to
+  the UI by `/api/voices`, so the field and the counter never drift from it.
 - **Model** — v3 Turbo is bilingual, so Vietnamese and English mix freely inside one
   sentence; no language tagging or manual splitting is needed.
 
@@ -40,7 +42,7 @@ Running `app.py` directly works too:
 | Endpoint | Response |
 | --- | --- |
 | `GET /api/status` | `{"state": "loading" \| "ready" \| "error"}` while the model warms up |
-| `GET /api/voices` | 25 preset voices with region, gender and description |
+| `GET /api/voices` | 25 preset voices with region, gender and description, plus `maxChars` |
 | `POST /api/tts/stream` | raw float32 LE mono at 48 kHz, streamed as it is generated |
 
 ```

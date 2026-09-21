@@ -10,6 +10,7 @@ backend (FastAPI on a loopback port) and the application entry point.
 from __future__ import annotations
 
 import argparse
+import os
 import socket
 import sys
 import threading
@@ -24,11 +25,19 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 SAMPLE_RATE = 48_000
-MAX_CHARS = 5_000
+MAX_CHARS = 20_000
 
 # PyInstaller unpacks bundled data next to the executable, not next to this file.
 BASE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 WEB_DIR = BASE_DIR / "web"
+
+# The packaged build carries the model cache inside it. Point HuggingFace at that
+# copy and keep it off the network, so a fresh machine never waits on a download.
+# A source checkout has no such directory and keeps using the user's own cache.
+# This runs at import time, long before `vieneu` pulls in huggingface_hub.
+if (BASE_DIR / "hf").is_dir():
+    os.environ["HF_HOME"] = str(BASE_DIR / "hf")
+    os.environ["HF_HUB_OFFLINE"] = "1"
 
 
 @asynccontextmanager
@@ -129,7 +138,12 @@ def status() -> dict:
 
 @app.get("/api/voices")
 def voices() -> dict:
-    return {"voices": preset_voices(), "default": default_voice(), "sampleRate": SAMPLE_RATE}
+    return {
+        "voices": preset_voices(),
+        "default": default_voice(),
+        "sampleRate": SAMPLE_RATE,
+        "maxChars": MAX_CHARS,
+    }
 
 
 @app.post("/api/tts/stream")
