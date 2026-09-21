@@ -301,7 +301,14 @@ async function speak() {
 
       // Copy into a fresh buffer: Float32Array needs a 4-byte-aligned offset.
       const samples = new Float32Array(joined.buffer.slice(0, usable));
-      recorded.push(samples);
+      // The tape is kept as Int16. At the 20 000-character limit this is 20+
+      // minutes of audio; float32 would hold twice as much of it in memory
+      // and the WAV is 16-bit either way.
+      const pcm = new Int16Array(samples.length);
+      for (let i = 0; i < samples.length; i++) {
+        pcm[i] = Math.max(-1, Math.min(1, samples[i])) * 32767;
+      }
+      recorded.push(pcm);
       total += samples.length;
 
       const buf = ac.createBuffer(1, samples.length, recordedRate);
@@ -359,9 +366,7 @@ function toWav(chunks, rate) {
 
   let off = 44;
   for (const chunk of chunks) {
-    for (let i = 0; i < chunk.length; i++, off += 2) {
-      view.setInt16(off, Math.max(-1, Math.min(1, chunk[i])) * 32767, true);
-    }
+    for (let i = 0; i < chunk.length; i++, off += 2) view.setInt16(off, chunk[i], true);
   }
   return new Blob([buf], { type: 'audio/wav' });
 }
@@ -373,6 +378,9 @@ els.saveBtn.addEventListener('click', () => {
   a.href = url;
   a.download = `voice-tts-${Date.now()}.wav`;
   a.click();
+  // The save dialog is native, so the page never hears how it ended; say what
+  // was handed over rather than claiming a file exists.
+  setStatus(speaking ? 'speaking' : 'ready', 'Đã gửi file WAV sang hộp thoại lưu');
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 });
 
@@ -385,9 +393,14 @@ function setStatus(state, text) {
 
 els.playBtn.addEventListener('click', () => (speaking ? stop() : speak()));
 
-els.text.addEventListener('input', () => {
-  els.count.textContent = `${els.text.value.length} / ${els.text.maxLength}`;
-});
+function renderCount() {
+  // The limit arrives with /api/voices; until then report the length alone
+  // rather than the browser's "no limit" sentinel.
+  const max = els.text.maxLength;
+  els.count.textContent = max > 0 ? `${els.text.value.length} / ${max}` : `${els.text.value.length}`;
+}
+
+els.text.addEventListener('input', renderCount);
 
 // Ctrl+Enter is the commit gesture; Escape stops.
 addEventListener('keydown', (e) => {
@@ -414,6 +427,9 @@ async function boot() {
   }
 
   const info = await (await fetch('/api/voices')).json();
+  // The backend owns the limit; the field and the counter follow it.
+  els.text.maxLength = info.maxChars;
+  renderCount();
   voices = info.voices;
   renderVoices();
   pickVoice(info.default);

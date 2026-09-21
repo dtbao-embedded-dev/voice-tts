@@ -8,6 +8,8 @@ Desktop app that reads mixed Vietnamese/English text aloud, powered by
   outside the editor.
 - **Backend** — Python (FastAPI + uvicorn) bound to a loopback port, streaming
   48 kHz audio as it is generated.
+- **Limit** — 20 000 characters per request, enforced by the backend and reported to
+  the UI by `/api/voices`, so the field and the counter never drift from it.
 - **Model** — v3 Turbo is bilingual, so Vietnamese and English mix freely inside one
   sentence; no language tagging or manual splitting is needed.
 
@@ -25,7 +27,7 @@ done, so later runs start in seconds.
 | --- | --- |
 | `python docs/scripts/tool-build.py` | set up if needed, then launch the app |
 | `python docs/scripts/tool-build.py --check` | run the smoke test |
-| `python docs/scripts/tool-build.py --package` | build `dist/VoiceTTS/` with PyInstaller |
+| `python docs/scripts/tool-build.py --package` | build `dist/VoiceTTS.exe`, model included |
 | `python docs/scripts/tool-build.py --setup` | prepare the environment and stop |
 
 Running `app.py` directly works too:
@@ -40,7 +42,7 @@ Running `app.py` directly works too:
 | Endpoint | Response |
 | --- | --- |
 | `GET /api/status` | `{"state": "loading" \| "ready" \| "error"}` while the model warms up |
-| `GET /api/voices` | 25 preset voices with region, gender and description |
+| `GET /api/voices` | 25 preset voices with region, gender and description, plus `maxChars` |
 | `POST /api/tts/stream` | raw float32 LE mono at 48 kHz, streamed as it is generated |
 
 ```
@@ -62,9 +64,18 @@ curl -X POST http://127.0.0.1:8760/api/tts/stream \
 - **No GPU is required.** The default install is the torch-free ONNX build, and
   streaming runs on the CPU engine either way. `int8` precision is used for speed.
 - **The first launch downloads the model** (HuggingFace cache, `~/.cache/huggingface`).
-  The window shows *Đang tải model…* until it is ready.
-- **The packaged build does not bundle the model** — it downloads on first launch,
-  which keeps `dist/` small enough to move around.
+  The window shows *Đang tải model…* until it is ready. This applies to a source
+  checkout only.
+- **The packaged build is one self-contained `VoiceTTS.exe`** (~400 MB): the runtime,
+  the web view and both model repos (backbone + audio codec) are inside it, and it
+  points `HF_HOME` at its own copy with `HF_HUB_OFFLINE=1`, so it never touches the
+  network. The price is that a one-file build unpacks itself into `%TEMP%` on *every*
+  launch — measured ~10 s from launch to *Sẵn sàng* here, longer on a cold machine
+  while Defender scans it.
+- **The voices are licensed for non-commercial use only.** Bundling them into the exe
+  redistributes them; check the VieNeu terms before handing the file to anyone.
+- **The UI is black and white, dark only.** There is no light variant and no theme
+  switch; status is told apart by shape, not colour.
 
 ## Layout
 

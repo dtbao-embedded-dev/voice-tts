@@ -25,7 +25,16 @@ VENV = ROOT / ".venv"
 PY = VENV / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 REQS = ROOT / "requirements.txt"
 STAMP = VENV / ".requirements-sha256"
-MODEL_CACHE_NAME = "models--pnnbao-ump--VieNeu-TTS-v3-Turbo"
+# The engine resolves its weights from two Hub repos - the backbone and the audio
+# codec - and needs both. Read off vieneu's _V3_REPO / _CODEC_REPO; verify_stage()
+# is what catches this list going stale after an upgrade.
+MODEL_REPOS = (
+    "models--pnnbao-ump--VieNeu-TTS-v3-Turbo",
+    "models--OpenMOSS-Team--MOSS-Audio-Tokenizer-Nano-ONNX",
+)
+HF_HUB = Path(os.environ.get("HF_HOME", Path.home() / ".cache/huggingface")) / "hub"
+# Staged outside build/ and dist/: PyInstaller's --clean wipes both.
+MODEL_STAGE = VENV / "model-bundle"
 
 # PyInstaller cannot see these through vieneu's lazy imports.
 COLLECT = ["vieneu", "onnxruntime", "sea_g2p", "kaldi_native_fbank", "soxr", "soundfile"]
@@ -75,8 +84,7 @@ def ensure_deps() -> None:
 
 def ensure_model() -> None:
     """Pull the weights now, so the first launch is not a silent 30 s wait."""
-    cache = Path(os.environ.get("HF_HOME", Path.home() / ".cache/huggingface")) / "hub"
-    if (cache / MODEL_CACHE_NAME).exists():
+    if all((HF_HUB / repo).is_dir() for repo in MODEL_REPOS):
         print("  model ... cached", flush=True)
         return
     t0 = step("model (first download, this takes a while)")
@@ -91,14 +99,62 @@ def setup() -> None:
     ensure_model()
 
 
+def stage_model() -> Path:
+    """Copy the revision each repo currently points at into ``MODEL_STAGE``.
+
+    The HuggingFace cache keeps every revision it has ever seen; only the one
+    ``refs/main`` names goes into the exe, which is a third of what is on disk.
+    On Windows ``blobs/`` stays empty and the snapshot holds the real files, so
+    a plain copy is all an offline ``hf_hub_download`` needs to resolve.
+    """
+    if MODEL_STAGE.exists():
+        shutil.rmtree(MODEL_STAGE)
+    for repo in MODEL_REPOS:
+        src = HF_HUB / repo
+        if not src.is_dir():
+            sys.exit(f"ERROR: model cache missing at {src} - run --setup first")
+        revision = (src / "refs" / "main").read_text().strip()
+        out = MODEL_STAGE / "hub" / repo
+        (out / "refs").mkdir(parents=True)
+        (out / "refs" / "main").write_text(revision)
+        shutil.copytree(src / "snapshots" / revision, out / "snapshots" / revision)
+    return MODEL_STAGE
+
+
+def verify_stage(stage: Path) -> None:
+    """Load the engine against the staged cache alone, with the network off.
+
+    This is the same situation the packaged exe is in, and it costs seconds
+    against the minutes PyInstaller spends - so a missing repo surfaces here
+    rather than on the machine the exe was carried to.
+    """
+    run([str(PY), "-c", "import app; app.engine()"],
+        env={**os.environ, "HF_HOME": str(stage), "HF_HUB_OFFLINE": "1",
+             "PYTHONIOENCODING": "utf-8"})
+
+
+def dir_size(path: Path) -> int:
+    return sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+
+
 def package() -> None:
     t0 = step("pyinstaller")
     run([str(PY), "-m", "pip", "install", "--quiet", "pyinstaller"])
     done(t0)
 
-    t0 = step("bundle")
-    cmd = [str(PY), "-m", "PyInstaller", "--noconfirm", "--clean", "--windowed",
-           "--name", "VoiceTTS", "--add-data", f"web{os.pathsep}web"]
+    t0 = step("model")
+    stage = stage_model()
+    done(t0, f"{dir_size(stage) / 1e6:.0f} MB")
+
+    t0 = step("offline check")
+    verify_stage(stage)
+    done(t0)
+
+    t0 = step("bundle (one file, this takes a while)")
+    cmd = [str(PY), "-m", "PyInstaller", "--noconfirm", "--clean", "--windowed", "--onefile",
+           "--name", "VoiceTTS",
+           "--add-data", f"web{os.pathsep}web",
+           "--add-data", f"{stage}{os.pathsep}hf"]
     for mod in COLLECT:
         cmd += ["--collect-all", mod]
     for mod in EXCLUDE:
@@ -107,12 +163,13 @@ def package() -> None:
     run(cmd)
     done(t0)
 
-    exe = ROOT / "dist" / "VoiceTTS" / ("VoiceTTS.exe" if os.name == "nt" else "VoiceTTS")
+    exe = ROOT / "dist" / ("VoiceTTS.exe" if os.name == "nt" else "VoiceTTS")
     if not exe.exists():
         sys.exit(f"ERROR: PyInstaller finished but {exe} is missing")
-    size = sum(f.stat().st_size for f in exe.parent.rglob("*") if f.is_file())
-    print(f"\n{exe}  ({size / 1e6:.0f} MB)")
-    print("The model is not bundled; the packaged app downloads it on first launch.")
+    print(f"\n{exe}  ({exe.stat().st_size / 1e6:.0f} MB)")
+    print("Model and runtime are inside the file; it needs no network and no install.")
+    print("A one-file build unpacks itself on every launch - around 10 s before the")
+    print("window appears, and longer on a cold machine while Defender scans it.")
 
 
 def main() -> int:
