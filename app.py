@@ -13,6 +13,7 @@ import argparse
 import socket
 import sys
 import threading
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import numpy as np
@@ -29,7 +30,15 @@ MAX_CHARS = 5_000
 BASE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 WEB_DIR = BASE_DIR / "web"
 
-app = FastAPI(title="Voice TTS", docs_url=None, redoc_url=None)
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Load the model in the background so the window can paint immediately."""
+    threading.Thread(target=_warm, name="warm-engine", daemon=True).start()
+    yield
+
+
+app = FastAPI(title="Voice TTS", docs_url=None, redoc_url=None, lifespan=lifespan)
 
 _engine = None
 _engine_error: str | None = None
@@ -100,12 +109,6 @@ def default_voice() -> str:
 class SpeakRequest(BaseModel):
     text: str
     voice: str | None = None
-
-
-@app.on_event("startup")
-def warm_engine() -> None:
-    """Load the model in the background so the window can paint immediately."""
-    threading.Thread(target=_warm, name="warm-engine", daemon=True).start()
 
 
 def _warm() -> None:
