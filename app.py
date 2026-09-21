@@ -215,12 +215,18 @@ def main() -> None:
     webview.settings["ALLOW_DOWNLOADS"] = True
 
     _, port, _ = start_server(args.port)
+    # pywebview asks WinForms for FormStartPosition.CenterScreen, but it does so
+    # after the form handle exists, so the window lands at 78,78 instead. Passing
+    # a screen takes the branch that computes the position itself.
+    # ponytail: screens[0], not a "primary" lookup pywebview does not expose - on a
+    # multi-monitor box where it is not the primary, centre on that one instead.
     webview.create_window(
         "Voice TTS",
         f"http://127.0.0.1:{port}/",
         width=980,
         height=760,
-        min_size=(720, 560),
+        resizable=False,   # drops the maximize box too; minimize and close stay
+        screen=webview.screens[0],
         background_color="#000000",
     )
     webview.start()  # returns when the window closes; daemon threads go with it

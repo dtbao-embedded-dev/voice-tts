@@ -72,6 +72,9 @@ curl -X POST http://127.0.0.1:8760/api/tts/stream \
   network. The price is that a one-file build unpacks itself into `%TEMP%` on *every*
   launch — measured ~10 s from launch to *Sẵn sàng* here, longer on a cold machine
   while Defender scans it.
+- **Reading speed is a playback rate, not an engine setting.** v3 Turbo has no speed
+  parameter, so the 0.75×–1.5× buttons set `playbackRate` on the streamed buffers:
+  faster is also higher-pitched. A saved WAV carries the speed it was read at.
 - **The voices are licensed for non-commercial use only.** Bundling them into the exe
   redistributes them; check the VieNeu terms before handing the file to anyone.
 - **The UI is black and white, dark only.** There is no light variant and no theme

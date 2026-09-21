@@ -191,6 +191,27 @@ textarea::placeholder { color: var(--ink-3); }
 .voice-row__value { margin-left: auto; font-weight: 600; }
 .voice-row__chevron { width: 12px; height: 12px; color: var(--ink-3); }
 
+.speed { display: flex; gap: 6px; margin-left: auto; }
+.speed__opt {
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+/* Selected reads like the primary button: ink fill, background-coloured text. */
+.speed__opt[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: transparent;
+  color: var(--bg);
+  font-weight: 560;
+}
+.speed__opt:disabled { opacity: 0.4; }
+
 .meter {
   display: flex; align-items: flex-end; gap: 3px;
   height: 34px;
