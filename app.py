@@ -221,7 +221,7 @@ def main() -> None:
         width=980,
         height=760,
         min_size=(720, 560),
-        background_color="#0B0B0F",
+        background_color="#000000",
     )
     webview.start()  # returns when the window closes; daemon threads go with it
 

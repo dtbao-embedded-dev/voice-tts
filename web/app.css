@@ -1,20 +1,24 @@
-/* Voice TTS - Apple-style materials, typography and motion, on the web platform. */
+/* Voice TTS - Apple-style materials, typography and motion, in black and white.
+
+   Two colours only: everything below is an alpha step of #fff over #000, so
+   nothing carries hue and the app stays legible on an OLED panel. Dark is not
+   a preference here, it is the design - there is no light variant. */
 
 :root {
-  --bg: #0b0b0f;
-  --ink: #f2f2f7;
-  --ink-2: rgba(242, 242, 247, 0.62);
-  --ink-3: rgba(242, 242, 247, 0.38);
-  --accent: #0a84ff;
-  --accent-ink: #ffffff;
+  --bg: #000000;
+  --ink: #ffffff;
+  --ink-2: rgba(255, 255, 255, 0.68);
+  /* 0.5 is the floor that still clears 4.5:1 on black - with no hue to lean
+     on, the counter and the hints have nothing else keeping them readable. */
+  --ink-3: rgba(255, 255, 255, 0.5);
 
   /* Material weights: heavier separates structure, lighter marks interaction. */
-  --mat-thick: rgba(24, 24, 30, 0.72);
+  --mat-thick: rgba(20, 20, 20, 0.72);
   --mat-thin: rgba(255, 255, 255, 0.07);
-  --edge: rgba(255, 255, 255, 0.1);
-  --edge-bright: rgba(255, 255, 255, 0.18);
-  --shadow-card: 0 18px 40px rgba(0, 0, 0, 0.22);
-  --shadow-sheet: 0 -20px 60px rgba(0, 0, 0, 0.4);
+  --edge: rgba(255, 255, 255, 0.12);
+  --edge-bright: rgba(255, 255, 255, 0.2);
+  --shadow-card: 0 18px 40px rgba(0, 0, 0, 0.5);
+  --shadow-sheet: 0 -20px 60px rgba(0, 0, 0, 0.7);
 
   --r-card: 20px;
   --r-ctl: 13px;
@@ -23,22 +27,6 @@
   font: 100%/1.5 "Segoe UI Variable Text", system-ui, -apple-system, sans-serif;
   font-optical-sizing: auto;
   color-scheme: dark;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f2f2f7;
-    --ink: #10101a;
-    --ink-2: rgba(16, 16, 26, 0.6);
-    --ink-3: rgba(16, 16, 26, 0.36);
-    --mat-thick: rgba(255, 255, 255, 0.78);
-    --mat-thin: rgba(255, 255, 255, 0.72);
-    --edge: rgba(16, 16, 26, 0.1);
-    --edge-bright: rgba(255, 255, 255, 0.9);
-    --shadow-card: 0 10px 30px rgba(16, 16, 26, 0.09);
-    --shadow-sheet: 0 -16px 50px rgba(16, 16, 26, 0.18);
-    color-scheme: light;
-  }
 }
 
 * { box-sizing: border-box; }
@@ -65,11 +53,10 @@ img, svg { -webkit-user-drag: none; user-drag: none; }
   width: 46vmax; height: 46vmax;
   border-radius: 50%;
   filter: blur(120px);
-  opacity: 0.2;
+  opacity: 0.07;
 }
-.ambient i:nth-child(1) { background: #0a84ff; top: -20vmax; left: -16vmax; }
-.ambient i:nth-child(2) { background: #bf5af2; bottom: -22vmax; right: -18vmax; opacity: 0.14; }
-@media (prefers-color-scheme: light) { .ambient i { opacity: 0.16; } }
+.ambient i:nth-child(1) { background: #ffffff; top: -20vmax; left: -16vmax; }
+.ambient i:nth-child(2) { background: #ffffff; bottom: -22vmax; right: -18vmax; opacity: 0.05; }
 
 /* ---- Chrome: translucent layers, content passes underneath -------------- */
 
@@ -109,13 +96,20 @@ h1 {
   color: var(--ink-2);
 }
 .status .dot {
+  /* Hollow ring while it is still coming up, filled once it is there, and a
+     square when something is wrong - shape reads at 7px where hue no longer can. */
+  box-sizing: border-box;
   width: 7px; height: 7px; border-radius: 50%;
-  background: #ff9f0a;
-  box-shadow: 0 0 0 0 currentColor;
+  border: 1.5px solid var(--ink-2);
+  background: none;
 }
-.status[data-state="ready"] .dot { background: #30d158; }
-.status[data-state="error"] .dot { background: #ff453a; }
+.status[data-state="ready"] .dot { background: var(--ink); border-color: var(--ink); }
 .status[data-state="loading"] .dot { animation: breathe 1.8s ease-in-out infinite; }
+.status[data-state="error"] .dot {
+  width: 8px; height: 8px; border-radius: 2px;
+  background: var(--ink); border-color: var(--ink);
+}
+.status[data-state="error"] { color: var(--ink); }
 @keyframes breathe { 50% { opacity: 0.3; } }
 
 /* ---- Content ------------------------------------------------------------ */
@@ -211,8 +205,8 @@ textarea::placeholder { color: var(--ink-3); }
   height: 2px;
   min-height: 2px;
   border-radius: 2px;
-  background: var(--accent);
-  opacity: 0.6;
+  background: var(--ink);
+  opacity: 0.55;
   transform-origin: bottom;
 }
 
@@ -294,7 +288,7 @@ textarea::placeholder { color: var(--ink-3); }
 .voice-item[aria-selected="true"]::after {
   content: "✓";
   grid-column: 2; grid-row: 1 / span 2;
-  color: var(--accent);
+  color: var(--ink);
   font-weight: 700;
 }
 
@@ -315,9 +309,9 @@ textarea::placeholder { color: var(--ink-3); }
 .btn:active:not(:disabled) { transform: scale(0.97); }
 .btn:disabled { opacity: 0.4; }
 .btn--primary {
-  background: var(--accent);
+  background: var(--ink);
   border-color: transparent;
-  color: var(--accent-ink);
+  color: var(--bg);
   min-width: 124px;
   justify-content: center;
 }
