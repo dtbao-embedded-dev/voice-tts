@@ -27,7 +27,7 @@ done, so later runs start in seconds.
 | --- | --- |
 | `python docs/scripts/tool-build.py` | set up if needed, then launch the app |
 | `python docs/scripts/tool-build.py --check` | run the smoke test |
-| `python docs/scripts/tool-build.py --package` | build `dist/VoiceTTS/` with PyInstaller |
+| `python docs/scripts/tool-build.py --package` | build `dist/VoiceTTS.exe`, model included |
 | `python docs/scripts/tool-build.py --setup` | prepare the environment and stop |
 
 Running `app.py` directly works too:
@@ -64,9 +64,17 @@ curl -X POST http://127.0.0.1:8760/api/tts/stream \
 - **No GPU is required.** The default install is the torch-free ONNX build, and
   streaming runs on the CPU engine either way. `int8` precision is used for speed.
 - **The first launch downloads the model** (HuggingFace cache, `~/.cache/huggingface`).
-  The window shows *Đang tải model…* until it is ready.
-- **The packaged build does not bundle the model** — it downloads on first launch,
-  which keeps `dist/` small enough to move around.
+  The window shows *Đang tải model…* until it is ready. This applies to a source
+  checkout only.
+- **The packaged build is one self-contained `VoiceTTS.exe`** (~650 MB): the runtime,
+  the web view and the model weights are all inside it, and it points `HF_HOME` at its
+  own copy with `HF_HUB_OFFLINE=1`, so it never touches the network. The price is that
+  a one-file build unpacks itself into `%TEMP%` on *every* launch — 10-30 s before the
+  window appears, longer the first time while Defender scans it.
+- **The voices are licensed for non-commercial use only.** Bundling them into the exe
+  redistributes them; check the VieNeu terms before handing the file to anyone.
+- **The UI is black and white, dark only.** There is no light variant and no theme
+  switch; status is told apart by shape, not colour.
 
 ## Layout
 
