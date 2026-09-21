@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Voice TTS</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a84ff'/%3E%3Cg fill='white'%3E%3Crect x='7' y='13' width='3' height='6' rx='1.5'/%3E%3Crect x='12' y='9' width='3' height='14' rx='1.5'/%3E%3Crect x='17' y='6' width='3' height='20' rx='1.5'/%3E%3Crect x='22' y='11' width='3' height='10' rx='1.5'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="/web/app.css">
+</head>
+<body>
+
+<div class="ambient" aria-hidden="true"><i></i><i></i></div>
+
+<header class="chrome">
+  <h1>Voice TTS</h1>
+  <div class="status" id="status" role="status" aria-live="polite">
+    <span class="dot"></span><span id="statusText">Đang khởi động…</span>
+  </div>
+</header>
+
+<main>
+  <section class="card">
+    <label class="field-label" for="text">Văn bản</label>
+    <textarea id="text" spellcheck="false" maxlength="5000"
+      placeholder="Chào bạn, hôm nay chúng ta sẽ deploy một model text-to-speech mới lên production server."></textarea>
+    <div class="field-foot">
+      <span class="hint">Trộn tiếng Việt và tiếng Anh trong cùng một câu đều đọc được.</span>
+      <span class="count" id="count">0 / 5000</span>
+    </div>
+  </section>
+
+  <button class="voice-row" id="voiceBtn" type="button">
+    <span class="voice-row__label">Giọng đọc</span>
+    <span class="voice-row__value" id="voiceName">—</span>
+    <svg class="voice-row__chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+
+  <div class="meter" id="meter" aria-hidden="true"></div>
+</main>
+
+<footer class="chrome chrome--bottom">
+  <button class="btn btn--primary" id="playBtn" type="button" disabled>
+    <svg class="btn__icon" id="playIcon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.8v10.4l9-5.2z" fill="currentColor"/></svg>
+    <span id="playLabel">Đọc</span>
+  </button>
+  <span class="timecode" id="timecode">0:00</span>
+  <button class="btn" id="saveBtn" type="button" disabled>Lưu WAV</button>
+</footer>
+
+<div class="scrim" id="scrim" hidden></div>
+<section class="sheet" id="sheet" hidden aria-label="Chọn giọng đọc">
+  <div class="sheet__grip"></div>
+  <h2 class="sheet__title">Giọng đọc</h2>
+  <div class="sheet__list" id="voiceList"></div>
+</section>
+
+<script src="/web/app.js"></script>
+</body>
+</html>

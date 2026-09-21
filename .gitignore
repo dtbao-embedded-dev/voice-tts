@@ -20,3 +20,6 @@ out/
 .idea/
 Thumbs.db
 desktop.ini
+# skill-support-commit local files
+.claude/gitconfig.yml
+.claude/commit-backup.json

@@ -1,0 +1,9 @@
+# Vietnamese/English TTS engine (v3 Turbo, torch-free ONNX CPU build).
+vieneu>=3.8.1
+
+# Local HTTP backend.
+fastapi>=0.115
+uvicorn>=0.30
+
+# Native desktop window hosting the web view.
+pywebview>=5.3
