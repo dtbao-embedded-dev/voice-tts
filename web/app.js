@@ -19,6 +19,10 @@ let voice = null;
 let speaking = false;
 let abort = null;
 let speed = 1;
+// Every start and every stop bumps this. A read carries the value it started
+// with and checks it before touching the UI, so a read the user has already
+// stopped can no longer report into the one that replaced it.
+let run = 0;
 
 /* ---- This is an app: no page behaviour leaks through ------------------- */
 
@@ -184,8 +188,8 @@ function renderVoices() {
 
 /* ---- Reading speed ----------------------------------------------------- */
 
-// The v3 Turbo engine has no speed parameter, so speed is the playback rate of
-// the buffers it hands us: faster also means higher-pitched.
+// The backend stretches the time and leaves the pitch alone, so this only has
+// to travel with the request - what arrives is already at the chosen speed.
 els.speed.addEventListener('click', (e) => {
   const opt = e.target.closest('.speed__opt');
   if (!opt) return;
@@ -229,7 +233,6 @@ let ctx = null, gain = null, analyser = null;
 let sources = [];
 let recorded = [];
 let recordedRate = 48000;
-let recordedSpeed = 1;
 
 function audio() {
   if (!ctx) {
@@ -250,14 +253,14 @@ function setSpeaking(on) {
     ? '<rect x="4" y="4" width="8" height="8" rx="1.6" fill="currentColor"/>'
     : '<path d="M4 2.8v10.4l9-5.2z" fill="currentColor"/>';
   els.text.readOnly = on;
-  // Buffers already scheduled keep the rate they started with, so the speed is
-  // fixed for the duration of a read.
+  // The speed is baked into the request, so it is fixed for the whole read.
   for (const o of els.speed.children) o.disabled = on;
   els.meter.dataset.live = on ? '1' : '0';
   if (on) drawMeter(analyser);
 }
 
 function stop() {
+  run++;
   if (abort) abort.abort();
   for (const s of sources) { try { s.stop(); } catch { /* already finished */ } }
   sources = [];
@@ -269,11 +272,11 @@ async function speak() {
   const text = els.text.value.trim();
   if (!text) { els.text.focus(); return; }
 
+  const myRun = ++run;
   const ac = audio();
   await ac.resume();
   abort = new AbortController();
   recorded = [];
-  recordedSpeed = speed;
   sources = [];
   els.saveBtn.disabled = true;
   setSpeaking(true);
@@ -284,16 +287,18 @@ async function speak() {
     res = await fetch('/api/tts/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, voice }),
+      body: JSON.stringify({ text, voice, speed }),
       signal: abort.signal,
     });
   } catch {
+    if (myRun !== run) return;   // aborted by Dừng, not a failure to report
     setSpeaking(false);
     setStatus('error', 'Không gọi được backend');
     return;
   }
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
+    if (myRun !== run) return;
     setSpeaking(false);
     setStatus('error', detail.detail || `Lỗi ${res.status}`);
     return;
@@ -332,18 +337,19 @@ async function speak() {
       buf.copyToChannel(samples, 0);
       const src = ac.createBufferSource();
       src.buffer = buf;
-      src.playbackRate.value = recordedSpeed;
       src.connect(gain);
       cursor = Math.max(cursor, ac.currentTime + PRIME_SECONDS);
       src.start(cursor);
-      cursor += buf.duration / recordedSpeed;
+      cursor += buf.duration;
       sources.push(src);
 
-      els.timecode.textContent = fmt(total / recordedRate / recordedSpeed);
+      els.timecode.textContent = fmt(total / recordedRate);
     }
   } catch (err) {
-    if (err.name !== 'AbortError') setStatus('error', 'Luồng âm thanh bị ngắt');
+    if (myRun === run && err.name !== 'AbortError') setStatus('error', 'Luồng âm thanh bị ngắt');
   }
+
+  if (myRun !== run) return;   // stopped or superseded: this read owns nothing now
 
   if (!total) {
     setSpeaking(false);
@@ -356,7 +362,7 @@ async function speak() {
   // last scheduled buffer has actually played.
   const remaining = Math.max(0, (cursor - ac.currentTime) * 1000);
   setTimeout(() => {
-    if (!speaking) return;
+    if (myRun !== run) return;
     setSpeaking(false);
     setStatus('ready', 'Sẵn sàng');
   }, remaining);
@@ -391,12 +397,9 @@ function toWav(chunks, rate) {
 
 els.saveBtn.addEventListener('click', () => {
   if (!recorded.length) return;
-  // Declaring a faster sample rate is the same transform playbackRate applied,
-  // so the file sounds exactly like what was just heard - at the speed it was
-  // read at, not one picked afterwards.
-  // ponytail: rate in the header, no resampling - the file ends up at 36/60/72
-  // kHz, so resample to 48 kHz if some player ever refuses it.
-  const url = URL.createObjectURL(toWav(recorded, Math.round(recordedRate * recordedSpeed)));
+  // The samples already carry the speed they were read at, so this is a plain
+  // 48 kHz file - no sample-rate trickery for a player to refuse.
+  const url = URL.createObjectURL(toWav(recorded, recordedRate));
   const a = document.createElement('a');
   a.href = url;
   a.download = `voice-tts-${Date.now()}.wav`;
