@@ -19,6 +19,10 @@ let voice = null;
 let speaking = false;
 let abort = null;
 let speed = 1;
+// Every start and every stop bumps this. A read carries the value it started
+// with and checks it before touching the UI, so a read the user has already
+// stopped can no longer report into the one that replaced it.
+let run = 0;
 
 /* ---- This is an app: no page behaviour leaks through ------------------- */
 
@@ -258,6 +262,7 @@ function setSpeaking(on) {
 }
 
 function stop() {
+  run++;
   if (abort) abort.abort();
   for (const s of sources) { try { s.stop(); } catch { /* already finished */ } }
   sources = [];
@@ -269,6 +274,7 @@ async function speak() {
   const text = els.text.value.trim();
   if (!text) { els.text.focus(); return; }
 
+  const myRun = ++run;
   const ac = audio();
   await ac.resume();
   abort = new AbortController();
@@ -288,12 +294,14 @@ async function speak() {
       signal: abort.signal,
     });
   } catch {
+    if (myRun !== run) return;   // aborted by Dừng, not a failure to report
     setSpeaking(false);
     setStatus('error', 'Không gọi được backend');
     return;
   }
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
+    if (myRun !== run) return;
     setSpeaking(false);
     setStatus('error', detail.detail || `Lỗi ${res.status}`);
     return;
@@ -342,8 +350,10 @@ async function speak() {
       els.timecode.textContent = fmt(total / recordedRate / recordedSpeed);
     }
   } catch (err) {
-    if (err.name !== 'AbortError') setStatus('error', 'Luồng âm thanh bị ngắt');
+    if (myRun === run && err.name !== 'AbortError') setStatus('error', 'Luồng âm thanh bị ngắt');
   }
+
+  if (myRun !== run) return;   // stopped or superseded: this read owns nothing now
 
   if (!total) {
     setSpeaking(false);
@@ -356,7 +366,7 @@ async function speak() {
   // last scheduled buffer has actually played.
   const remaining = Math.max(0, (cursor - ac.currentTime) * 1000);
   setTimeout(() => {
-    if (!speaking) return;
+    if (myRun !== run) return;
     setSpeaking(false);
     setStatus('ready', 'Sẵn sàng');
   }, remaining);
