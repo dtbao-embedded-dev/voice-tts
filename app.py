@@ -22,6 +22,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from numpy.lib.stride_tricks import sliding_window_view
 from pydantic import BaseModel
 
 SAMPLE_RATE = 48_000
@@ -115,9 +116,105 @@ def default_voice() -> str:
     return name or preset_voices()[0]["name"]
 
 
+SPEED_MIN, SPEED_MAX = 0.5, 2.0
+# 32 ms at 48 kHz spans two periods of a 62 Hz voice. The periodic Hann sums to
+# exactly 1.0 at half-frame hops, so the overlap-add needs no normalisation.
+# ponytail: tuned for a 62-250 Hz speaking range; a voice below it can warble
+# faintly at 0.75x, and these two constants are the knobs for that.
+STRETCH_FRAME = 1536
+STRETCH_HOP = STRETCH_FRAME // 2
+STRETCH_SEARCH = 512  # +/- 10.7 ms, about one period at 94 Hz
+_WINDOW = 0.5 - 0.5 * np.cos(2 * np.pi * np.arange(STRETCH_FRAME) / STRETCH_FRAME)
+
+
+class Stretch:
+    """Make a stream of samples longer or shorter without moving its pitch.
+
+    WSOLA: each output frame is read from the position, within
+    ``STRETCH_SEARCH`` of the nominal one, whose waveform best continues the
+    frame just emitted. Lining the pitch periods up that way is what keeps the
+    overlap-add from doubling or cancelling them, and it is the whole difference
+    from resampling - where duration and pitch can only move together.
+
+    The engine has no speed parameter, so this is where reading speed comes
+    from. Feed it whatever chunks arrive; the state carried between calls is
+    what makes the joins inaudible.
+    """
+
+    def __init__(self, speed: float) -> None:
+        self.hop_in = max(1, round(STRETCH_HOP * speed))
+        self.buf = np.zeros(0, dtype=np.float32)
+        self.nominal = 0  # advances by hop_in, exactly
+        self.pos = 0  # where the current frame is read from
+        self.tail = np.zeros(STRETCH_HOP, dtype=np.float32)  # awaiting its partner
+
+    def push(self, chunk) -> np.ndarray:
+        """Absorb a chunk and return whatever output it completed."""
+        arriving = np.asarray(chunk, dtype=np.float32).ravel()
+        self.buf = np.concatenate((self.buf, arriving))
+        out = []
+        while len(self.buf) >= self._need():
+            out.append(self._frame())
+        drop = min(self.pos, self.nominal) - STRETCH_SEARCH  # no later search reaches it
+        if drop > 0:
+            self.buf = self.buf[drop:]
+            self.pos -= drop
+            self.nominal -= drop
+        return np.concatenate(out) if out else np.zeros(0, dtype=np.float32)
+
+    def flush(self) -> np.ndarray:
+        """End the stream: the pending half-frame plus the unconsumed input.
+
+        That remainder is under 70 ms and sits at the very end of a whole read,
+        so it passes through unstretched rather than earning a second code path.
+        """
+        if not self.nominal:  # never filled one frame: there is nothing to overlap
+            return self.buf
+        return np.concatenate((self.tail, self.buf[self.pos + STRETCH_HOP:]))
+
+    def _need(self) -> int:
+        """How much ``buf`` must hold before the next frame can be placed."""
+        return max(self.pos + STRETCH_HOP,
+                   self.nominal + self.hop_in + STRETCH_SEARCH) + STRETCH_FRAME
+
+    def _frame(self) -> np.ndarray:
+        seg = self.buf[self.pos:self.pos + STRETCH_FRAME] * _WINDOW
+        out = self.tail + seg[:STRETCH_HOP]
+        self.tail = seg[STRETCH_HOP:].copy()
+
+        # What would have followed had we not stretched - match against that.
+        target = self.buf[self.pos + STRETCH_HOP:self.pos + STRETCH_HOP + STRETCH_FRAME]
+        self.nominal += self.hop_in
+        lo = max(self.nominal - STRETCH_SEARCH, 0)
+        hi = self.nominal + STRETCH_SEARCH
+        cand = sliding_window_view(self.buf[lo:hi + STRETCH_FRAME], STRETCH_FRAME)
+        cand = cand[:hi - lo + 1]
+        score = (cand @ target) / (np.sqrt(np.einsum("ij,ij->i", cand, cand)) + 1e-9)
+        # The nominal pointer carries the time scale, not the chosen one: letting
+        # the search offset accumulate makes the output drift longer every frame.
+        self.pos = lo + int(np.argmax(score))
+        return out
+
+
+def stretch(chunks, speed: float):
+    """Yield ``chunks`` time-scaled by ``speed``, pitch untouched."""
+    if speed == 1.0:
+        yield from chunks
+        return
+    scaler = Stretch(speed)
+    for chunk in chunks:
+        out = scaler.push(chunk)
+        if len(out):
+            yield out
+    rest = scaler.flush()
+    if len(rest):
+        yield rest
+
+
 class SpeakRequest(BaseModel):
     text: str
     voice: str | None = None
+    speed: float = 1.0
 
 
 def _warm() -> None:
@@ -148,12 +245,18 @@ def voices() -> dict:
 
 @app.post("/api/tts/stream")
 def tts_stream(req: SpeakRequest):
-    """Stream raw float32 LE samples at 48 kHz as they are generated."""
+    """Stream raw float32 LE samples at 48 kHz as they are generated.
+
+    ``speed`` scales the duration and leaves the pitch where it is, so the
+    stream is always 48 kHz and the client plays it back untouched.
+    """
     text = req.text.strip()
     if not text:
         raise HTTPException(400, "Chưa có văn bản để đọc.")
     if len(text) > MAX_CHARS:
         raise HTTPException(400, f"Văn bản dài quá {MAX_CHARS} ký tự.")
+    if not SPEED_MIN <= req.speed <= SPEED_MAX:
+        raise HTTPException(400, f"Tốc độ phải trong khoảng {SPEED_MIN}-{SPEED_MAX}.")
 
     tts = engine()
     voice = tts.resolve_voice_name(req.voice) or (None if req.voice else default_voice())
@@ -163,7 +266,7 @@ def tts_stream(req: SpeakRequest):
     def samples():
         # A failure here lands mid-body, so the client sees a short stream
         # rather than an HTTP error; it reports that as a playback failure.
-        for chunk in tts.infer_stream(text, voice=voice):
+        for chunk in stretch(tts.infer_stream(text, voice=voice), req.speed):
             yield np.asarray(chunk, dtype=np.float32).tobytes()
 
     return StreamingResponse(

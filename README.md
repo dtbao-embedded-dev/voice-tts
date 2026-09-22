@@ -10,6 +10,8 @@ Desktop app that reads mixed Vietnamese/English text aloud, powered by
   48 kHz audio as it is generated.
 - **Limit** — 20 000 characters per request, enforced by the backend and reported to
   the UI by `/api/voices`, so the field and the counter never drift from it.
+- **Speed** — a backend time-stretch, so 0.75× is the same voice read slower rather
+  than a lower one.
 - **Model** — v3 Turbo is bilingual, so Vietnamese and English mix freely inside one
   sentence; no language tagging or manual splitting is needed.
 
@@ -45,6 +47,9 @@ Running `app.py` directly works too:
 | `GET /api/voices` | 25 preset voices with region, gender and description, plus `maxChars` |
 | `POST /api/tts/stream` | raw float32 LE mono at 48 kHz, streamed as it is generated |
 
+`POST /api/tts/stream` takes `{"text", "voice", "speed"}`; `speed` defaults to `1.0`
+and must be between `0.5` and `2.0`.
+
 ```
 curl -X POST http://127.0.0.1:8760/api/tts/stream \
   -H "Content-Type: application/json" \
@@ -72,9 +77,12 @@ curl -X POST http://127.0.0.1:8760/api/tts/stream \
   network. The price is that a one-file build unpacks itself into `%TEMP%` on *every*
   launch — measured ~10 s from launch to *Sẵn sàng* here, longer on a cold machine
   while Defender scans it.
-- **Reading speed is a playback rate, not an engine setting.** v3 Turbo has no speed
-  parameter, so the 0.75×–1.5× buttons set `playbackRate` on the streamed buffers:
-  faster is also higher-pitched. A saved WAV carries the speed it was read at.
+- **Reading speed is a time-stretch, not a playback rate.** v3 Turbo has no speed
+  parameter, so the backend stretches the stream itself (WSOLA: overlap-add with a
+  waveform-similarity search, `Stretch` in `app.py`). The 0.75×–1.5× buttons change
+  the duration and leave the pitch where it is, so the voice at 0.75× is the voice at
+  1×, only slower. The stream is always 48 kHz and a saved WAV is a plain 48 kHz file
+  carrying the speed it was read at.
 - **The voices are licensed for non-commercial use only.** Bundling them into the exe
   redistributes them; check the VieNeu terms before handing the file to anyone.
 - **The UI is black and white, dark only.** There is no light variant and no theme
