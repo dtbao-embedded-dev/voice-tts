@@ -24,6 +24,10 @@ the release before it builds.
   packaged build carries it.
 - README licence note follows the model card: Apache-2.0 for the weights and the
   preset voices, commercial use allowed.
+- One app icon - a white sound wave on a black disc - drawn from one place
+  (`icon.py`): the tray, the Start Menu shortcut and the web page's favicon
+  (`/favicon.svg`, which used to be a different white square) all show it. Each
+  `.ico` size is drawn at its own resolution instead of scaled down from 256 px.
 
 ## [0.4.0] - 2026-10-08
 

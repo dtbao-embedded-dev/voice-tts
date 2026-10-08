@@ -259,9 +259,6 @@ def check_tray() -> None:
     assert "Mở cửa sổ" not in [label for label, _ in headless.menu_items()], \
         "serve --tray has no window to open"
 
-    image = tray.icon_image()
-    assert image.size == (64, 64) and image.mode == "RGBA", (image.size, image.mode)
-
     # No tray backend (a Linux box without AppIndicator, say) must not take the
     # app down with it: start() reports False and the caller keeps going.
     broken = tray.Tray("http://127.0.0.1:1/", on_quit=lambda: None)
@@ -274,7 +271,38 @@ def check_tray() -> None:
     assert args.tray and args.open, "serve --tray --open not parsed"
     assert cli.parse(p, ["--no-tray"]).tray is False, "gui --no-tray not parsed"
     assert cli.parse(p, []).tray is True, "the window must use the tray by default"
-    print("tray: menu, headless menu, icon, backend failure falls back")
+    print("tray: menu, headless menu, backend failure falls back")
+
+
+def check_icon(base: str, tmp: Path) -> None:
+    """One design everywhere: a black disc, a white ring and five white bars."""
+    import icon
+
+    image = icon.image(64)
+    assert image.size == (64, 64) and image.mode == "RGBA", (image.size, image.mode)
+    px = image.getpixel
+    assert px((0, 0))[3] == 0, "the corner outside the disc must be transparent"
+    assert px((32, 32))[:3] == (255, 255, 255), "the middle bar is not white"
+    assert px((32, 2))[:3] == (255, 255, 255), "the ring is not white"
+    assert px((32, 8)) == (0, 0, 0, 255), "the disc between ring and bars is not black"
+    white = lambda x: px((x, 32))[:3] == (255, 255, 255)
+    runs = sum(1 for x in range(8, 57) if white(x) and not white(x - 1))
+    assert runs == 5, f"expected 5 bars across the middle, found {runs}"
+
+    ico = tmp / "voice-tts.ico"
+    icon.save_ico(ico)
+    data = ico.read_bytes()
+    assert data[:4] == b"\0\0\1\0", "not an ICO file"
+    assert int.from_bytes(data[4:6], "little") >= 4, "the ICO lacks the small sizes"
+
+    status, headers, body = request(f"{base}/favicon.svg")
+    assert status == 200, f"/favicon.svg gave {status}"
+    assert headers.get("content-type", "").startswith("image/svg+xml"), headers
+    svg = body.decode()
+    assert svg.count("<circle") == 1 and svg.count("<rect") == 5, svg
+    page = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
+    assert 'href="/favicon.svg"' in page, "the page does not use the shared favicon"
+    print("icon: disc + ring + 5 bars, ICO with small sizes, /favicon.svg on the page")
 
 
 def check_release_notes() -> None:
@@ -310,6 +338,7 @@ def main() -> int:
         check_remote(base, Path(tmp))
         check_wav_format(base)
         check_local(Path(tmp))
+        check_icon(base, Path(tmp))
     print("OK")
     return 0
 

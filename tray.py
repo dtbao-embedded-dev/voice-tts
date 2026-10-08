@@ -21,24 +21,6 @@ log = logging.getLogger("voice-tts.tray")
 TITLE = "Voice TTS"
 
 
-def icon_image(size: int = 64):
-    """A white sound wave on a black disc - the app is black and white."""
-    from PIL import Image, ImageDraw
-
-    image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(image)
-    draw.ellipse((1, 1, size - 2, size - 2), fill=(0, 0, 0, 255),
-                 outline=(255, 255, 255, 255), width=max(2, size // 24))
-    bars = (0.28, 0.55, 0.85, 0.55, 0.28)
-    step = size / (len(bars) + 3)
-    for i, height in enumerate(bars):
-        x = step * (i + 2)
-        half = height * size * 0.3
-        draw.rounded_rectangle((x - step * 0.3, size / 2 - half, x + step * 0.3, size / 2 + half),
-                               radius=step * 0.3, fill=(255, 255, 255, 255))
-    return image
-
-
 def copy_text(text: str) -> bool:
     """Put ``text`` on the clipboard with whatever the platform ships."""
     if sys.platform == "win32":
@@ -102,12 +84,14 @@ class Tray:
     def _make_icon(self):
         import pystray
 
+        import icon
+
         items = self.menu_items()
         # The first entry is the default: a click on the icon reopens the window,
         # or opens the browser when there is none.
         menu = pystray.Menu(*(pystray.MenuItem(label, _call(fn), default=(i == 0))
                               for i, (label, fn) in enumerate(items)))
-        return pystray.Icon("voice-tts", icon_image(), TITLE, menu)
+        return pystray.Icon("voice-tts", icon.image(), TITLE, menu)
 
     def start(self) -> bool:
         """Show the icon from a background thread; False if there is no tray."""

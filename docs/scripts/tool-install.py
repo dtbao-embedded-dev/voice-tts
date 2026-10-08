@@ -30,7 +30,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-APP_FILES = ("app.py", "cli.py", "tray.py", "requirements.txt", "requirements-desktop.txt")
+APP_FILES = ("app.py", "cli.py", "tray.py", "icon.py", "requirements.txt",
+             "requirements-desktop.txt")
 APP_DIRS = ("web",)
 DOCKER_FILES = ("Dockerfile", "compose.yaml", ".dockerignore")
 SELF = Path("docs/scripts/tool-install.py")
@@ -136,9 +137,8 @@ class Windows:
         say(f"command: {self.bin / 'voice-tts.cmd'}")
 
     def make_icon(self) -> None:
-        run([self.py, "-c",
-             "import sys, tray; tray.icon_image(256).save(sys.argv[1], "
-             "sizes=[(16, 16), (32, 32), (48, 48), (256, 256)])", self.icon], cwd=self.app)
+        run([self.py, "-c", "import sys, icon; icon.save_ico(sys.argv[1])", self.icon],
+            cwd=self.app)
 
     def shortcut(self, link: Path, args: str, description: str) -> None:
         link.parent.mkdir(parents=True, exist_ok=True)

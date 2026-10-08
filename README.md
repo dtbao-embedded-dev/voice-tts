@@ -462,6 +462,7 @@ python docs/scripts/tool-build.py --release-notes 0.5.0     # the notes a v0.5.0
 ```
 app.py                    FastAPI backend + native window entry point
 tray.py                   system tray icon and its menu (pystray)
+icon.py                   the app icon, one geometry: tray/window/exe .ico and /favicon.svg
 cli.py                    command line: subcommands and flags, stdlib-only at import
 test_tts.py               assert-based smoke test over the real HTTP path
 test_cli.py               fast checks with a stub engine: CLI (local + remote), token guard

@@ -378,6 +378,15 @@ def index(token: str | None = None) -> FileResponse:
     return page
 
 
+@app.get("/favicon.svg")
+def favicon() -> Response:
+    """The app icon, drawn from the same geometry as the tray and the window icon."""
+    import icon
+
+    return Response(icon.svg(), media_type="image/svg+xml",
+                    headers={"Cache-Control": "max-age=86400"})
+
+
 app.mount("/web", StaticFiles(directory=WEB_DIR), name="web")
 
 
