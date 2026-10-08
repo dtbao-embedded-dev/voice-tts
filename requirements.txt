@@ -2,7 +2,7 @@
 # The desktop window adds requirements-desktop.txt on top of this.
 
 # Vietnamese/English TTS engine (v3 Turbo, torch-free ONNX CPU build).
-vieneu>=3.8.1
+vieneu>=3.8.3
 
 # HTTP backend.
 fastapi>=0.115

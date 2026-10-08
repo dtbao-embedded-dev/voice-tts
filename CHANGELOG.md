@@ -12,6 +12,18 @@ the release before it builds.
 
 - `CHANGELOG.md`; a tagged release publishes the section of its version as the
   release notes instead of a generated commit list.
+- README: a `GET /api/voices` response example and how renamed voices resolve.
+
+### Changed
+
+- VieNeu SDK 3.8.3 (`vieneu>=3.8.3`), still the int8 graphs of
+  `pnnbao-ump/VieNeu-TTS-v3-Turbo`. Its voice list renames three presets: the default
+  `Minh Quân Pro` is now `Hải Đăng`, `Anh Khôi` is `Thiện Minh`, `Mạnh Dũng` is
+  `Quốc Tuấn`. The old names, and `Minh Quân`, still work as `voice`.
+- The engine now also loads the model repo's `denoiser.onnx` (43 MB), so the
+  packaged build carries it.
+- README licence note follows the model card: Apache-2.0 for the weights and the
+  preset voices, commercial use allowed.
 
 ## [0.4.0] - 2026-10-08
 
