@@ -8,8 +8,10 @@ Desktop app that reads mixed Vietnamese/English text aloud, powered by
 - **UI** — a web view hosted in a native window (pywebview / WebView2). It behaves
   like an app: no reload, no context menu, no find bar, no zoom, no text selection
   outside the editor.
-- **Backend** — Python (FastAPI + uvicorn) bound to a loopback port, streaming
-  48 kHz audio as it is generated.
+- **Backend** — Python (FastAPI + uvicorn) streaming 48 kHz audio as it is
+  generated; loopback-only inside the desktop app, or a LAN server with a token.
+- **Everywhere** — a desktop app with a tray icon on Windows, a Docker server on
+  Linux, and one `voice-tts` command line for both.
 - **Limit** — 20 000 characters per request, enforced by the backend and reported to
   the UI by `/api/voices`, so the field and the counter never drift from it.
 - **Speed** — a backend time-stretch, so 0.75× is the same voice read slower rather
@@ -17,7 +19,84 @@ Desktop app that reads mixed Vietnamese/English text aloud, powered by
 - **Model** — v3 Turbo is bilingual, so Vietnamese and English mix freely inside one
   sentence; no language tagging or manual splitting is needed.
 
-## Quick start
+## Usage
+
+### Pick a way to run it
+
+| You want | Get it with | Then |
+| --- | --- | --- |
+| The app on a Windows PC | [Releases](https://github.com/dtbao-embedded-dev/voice-tts/releases): `VoiceTTS-windows-x64.exe`, or `python docs/scripts/tool-install.py` | open *Voice TTS*, type, press **Đọc** |
+| A server for the whole LAN | `python docs/scripts/tool-install.py --remote user@linux-host` | open `http://<host>:8760/?token=<token>` |
+| Text to audio from a script | `voice-tts speak ... -o out.wav` | see [Command line](#command-line) |
+| A Linux binary, no Docker | Releases: `voice-tts-linux-x86_64` | `./voice-tts-linux-x86_64 serve --host 0.0.0.0` |
+
+Every way ships or downloads the same model; the first start takes ~30 s to load
+it (plus a one-off download for a source install).
+
+### Read text in the window
+
+1. Open **Voice TTS** (Start Menu, or the downloaded exe).
+2. Paste or type the text - up to 20 000 characters, Vietnamese and English mixed
+   freely in one sentence.
+3. **Giọng đọc** picks the voice (★ = featured); **Tốc độ** picks 0.75×-1.5×.
+4. **Đọc** (`Ctrl+Enter`) reads it as it is generated; press again or `Esc` to stop.
+5. **Lưu WAV** saves what was read.
+
+Minimizing or closing the window hides it in the system tray and the app keeps
+running; click the tray icon to bring it back, right-click → *Thoát* to quit.
+To have it start with Windows, install with `--autostart`.
+
+### Use the LAN server
+
+Install once on a Linux box with Docker (see [Linux (Docker)](#linux-docker)); the
+install prints the page URL with its token. From any machine on the LAN:
+
+- **Browser:** open `http://<host>:8760/?token=<token>` once; the browser keeps the
+  token in a cookie, so `http://<host>:8760/` works from then on.
+- **CLI:** point `voice-tts` at it once per machine, then use it as if it were local:
+
+  ```powershell
+  setx VOICE_TTS_SERVER http://<host>:8760     # Windows; open a new terminal after
+  setx VOICE_TTS_TOKEN  <token>
+  ```
+  ```sh
+  export VOICE_TTS_SERVER=http://<host>:8760    # Linux/macOS, e.g. in ~/.profile
+  export VOICE_TTS_TOKEN=<token>
+  ```
+
+  The CLI talks to a server with the Python standard library only, so a plain
+  `python cli.py ...` from a checkout works on any machine with Python 3.10+.
+
+The token is in `~/voice-tts/.env` on the server. To change it, re-run the install
+with `--token <new>`; to see logs, `cd ~/voice-tts && docker compose logs -f`.
+
+### Common commands
+
+```
+voice-tts speak "Xin chào, deploy lên production server."        # read aloud
+voice-tts speak -f chuong-1.txt -v "Mai Anh" -s 1.25 -o ch1.wav   # a file to a WAV
+cat notes.txt | voice-tts speak -o - > notes.wav                  # a pipe to a WAV
+voice-tts voices                                                  # the voices to pick from
+voice-tts status --wait 120                                       # is the server ready?
+voice-tts speak "..." --local                                     # ignore the server, run here
+```
+
+`voice-tts <command> -h` lists every flag; [Command line](#command-line) has the
+full table and the exit codes.
+
+### Troubleshooting
+
+| Symptom | Cause and fix |
+| --- | --- |
+| `server refused the token` | wrong or missing token: `--token`, or `VOICE_TTS_TOKEN` |
+| `cannot reach http://...` | server down or port blocked: `voice-tts status`, `docker ps` on the host |
+| Page says *Đang tải model…* for long | first start after install is loading or downloading the model; wait |
+| `Không có giọng '...'` (exit 2) | voice name mistyped: `voice-tts voices` lists the exact names |
+| `voice-tts` not found on Windows | open a new terminal after the install, so it sees the new `PATH` |
+| `no audio player found` on Linux | install `pulseaudio-utils` or `alsa-utils`, or write a file with `-o` |
+| Exe takes ~10 s to show up | a one-file build unpacks itself on every launch; that is normal |
+
+## Quick start (development)
 
 ```
 python docs/scripts/tool-build.py
