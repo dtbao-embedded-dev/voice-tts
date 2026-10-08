@@ -128,9 +128,11 @@ def add_client_flags(cmd: argparse.ArgumentParser, local: bool) -> None:
 def parse(parser: argparse.ArgumentParser, argv: list[str]) -> argparse.Namespace:
     """Parse ``argv``, defaulting to ``gui`` and keeping the old ``--no-window``."""
     argv = list(argv)
-    if argv and argv[0] == "--no-window":
-        # The pre-subcommand spelling: backend only, port 8760 unless given.
-        argv[0] = "serve"
+    if "--no-window" in argv and (not argv or argv[0].startswith("-")):
+        # The pre-subcommand spelling, in any position: backend only, port 8760
+        # unless given.
+        argv.remove("--no-window")
+        argv.insert(0, "serve")
     elif not argv or (argv[0].startswith("-") and argv[0] not in ("-h", "--help", "--version")):
         argv.insert(0, "gui")
     args = parser.parse_args(argv)

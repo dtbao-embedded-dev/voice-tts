@@ -71,6 +71,8 @@ def check_parser() -> None:
     assert cli.parse(p, []).command == "gui", "no arguments must open the window"
     assert cli.parse(p, ["--no-window"]).command == "serve", "--no-window is serve"
     assert cli.parse(p, ["--no-window", "--port", "9001"]).port == 9001
+    assert cli.parse(p, ["--port", "9002", "--no-window"]).command == "serve", \
+        "--no-window after --port no longer means serve"
     args = cli.parse(p, ["serve", "--host", "0.0.0.0", "--port", "9000", "--token", "x"])
     assert (args.command, args.host, args.port, args.token) == ("serve", "0.0.0.0", 9000, "x")
     args = cli.parse(p, ["serve"])
