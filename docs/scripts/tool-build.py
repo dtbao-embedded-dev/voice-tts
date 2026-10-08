@@ -71,9 +71,14 @@ def ensure_venv() -> None:
         print("  venv ... already there", flush=True)
         return
     t0 = step("venv")
-    base = shutil.which("py") or sys.executable
-    cmd = [base, "-3.12", "-m", "venv", str(VENV)] if base.endswith("py.exe") \
-        else [base, "-m", "venv", str(VENV)]
+    # The wheels the engine needs (kaldi-native-fbank) exist for 3.12; a newer
+    # default Python falls back to a source build that fails without MSVC/CMake.
+    launcher = shutil.which("py")
+    if sys.version_info[:2] == (3, 12) or not launcher:
+        cmd = [sys.executable, "-m", "venv", str(VENV)]
+    else:
+        # which() keeps the PATHEXT case, e.g. "py.EXE" on the GitHub runners.
+        cmd = [launcher, "-3.12", "-m", "venv", str(VENV)]
     try:
         run(cmd)
     except subprocess.CalledProcessError:
