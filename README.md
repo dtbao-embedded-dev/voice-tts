@@ -42,6 +42,27 @@ Running `app.py` directly works too:
 
 `--no-window` is still accepted and means `serve`.
 
+## Install
+
+### Windows
+
+```
+python docs/scripts/tool-install.py              # install for this user
+python docs/scripts/tool-install.py --autostart  # ... and run `serve --tray` at login
+python docs/scripts/tool-install.py --uninstall
+```
+
+The app goes to `%LOCALAPPDATA%\Programs\VoiceTTS` with its own venv (Python 3.12
+through the `py` launcher when present). `voice-tts` is added to the user `PATH` -
+open a new terminal to see it - and a *Voice TTS* Start Menu shortcut opens the
+window through `pythonw`, so no console comes with it. Re-running updates the app
+files in place and reinstalls packages only when the requirements changed;
+`--prefix DIR` installs elsewhere. Uninstall removes the folder, the shortcuts and
+the `PATH` entry, and leaves the HuggingFace model cache alone.
+
+This is the install that gives a working CLI. The packaged `VoiceTTS.exe` is a
+windowed build with no console, so it is for the window and `serve --tray` only.
+
 ## Command line
 
 ```
@@ -201,4 +222,5 @@ requirements.txt          server + CLI core (what Docker installs)
 requirements-desktop.txt  core + window + tray (what tool-build.py installs)
 Dockerfile, compose.yaml  Linux server image, token from .env
 docs/scripts/tool-build.py  setup / run / check / package
+docs/scripts/tool-install.py  install / uninstall (Windows; Linux via Docker)
 ```
