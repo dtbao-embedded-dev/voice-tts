@@ -365,6 +365,13 @@ server keeps running**. A click on the tray icon brings the window back; its men
 has *Mở cửa sổ*, *Mở trong trình duyệt*, *Sao chép URL* and *Thoát* - only *Thoát*
 ends the app. `--no-tray` restores the old behaviour, close = quit.
 
+On Windows the right-click menu is the app's own (`web/tray.html`, shown by
+`tray.PopupMenu`): the status and the address *Sao chép URL* copies on top, an icon
+per entry, *Thoát* in red below a separator. It is a hidden window made at start,
+so opening it only moves and shows it; it closes on Esc, a click elsewhere or a
+pick, and the arrow keys and Enter work as in a native menu. Should it fail to open,
+the native menu shows instead.
+
 ```
 voice-tts serve --tray --open              # no window at all: an icon and a browser tab
 voice-tts serve --tray --host 0.0.0.0 --token <t>

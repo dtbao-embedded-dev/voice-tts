@@ -255,6 +255,16 @@ def check_tray() -> None:
     dict(icon.menu_items())["Mở cửa sổ"]()
     assert calls == ["show"], calls
 
+    # The popup menu draws each entry with the icon named by its key, and shows
+    # the address that "Sao chép URL" copies.
+    page = (ROOT / "web" / "tray.html").read_text(encoding="utf-8")
+    for key, _, _ in icon.entries():
+        assert f"\n  {key}: '" in page, f"web/tray.html has no icon for {key!r}"
+    api = tray._PopupApi(type("Popup", (), {"tray": icon})())
+    got = api.info()
+    assert got["address"] == "192.168.0.2:1", got
+    assert [i["label"] for i in got["items"]] == labels, got
+
     headless = tray.Tray("http://127.0.0.1:1/", on_quit=lambda: None)
     assert "Mở cửa sổ" not in [label for label, _ in headless.menu_items()], \
         "serve --tray has no window to open"
