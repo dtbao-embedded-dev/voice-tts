@@ -1,15 +1,16 @@
 """Voice TTS - a desktop app that reads mixed Vietnamese/English text aloud.
 
-The UI is a web view hosted in a native window; this module is both the HTTP
-backend (FastAPI on a loopback port) and the application entry point.
+The UI is a web view hosted in a native window; this module is the HTTP backend
+(FastAPI) and the entry point. The command line itself lives in ``cli.py``.
 
     python app.py              # native window
-    python app.py --no-window  # backend only, prints the URL
+    python app.py serve        # backend only (``--no-window`` still works)
+    python app.py --help       # every subcommand and flag
 """
 
 from __future__ import annotations
 
-import argparse
+import hmac
 import os
 import socket
 import sys
@@ -19,8 +20,8 @@ from pathlib import Path
 
 import numpy as np
 import uvicorn
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from numpy.lib.stride_tricks import sliding_window_view
 from pydantic import BaseModel
@@ -49,6 +50,39 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Voice TTS", docs_url=None, redoc_url=None, lifespan=lifespan)
+
+# Shared secret for a server reachable from the LAN. None keeps the API open,
+# which is what a loopback-only desktop app wants.
+TOKEN_COOKIE = "vtts_token"
+_token: str | None = None
+
+
+def set_token(token: str | None) -> None:
+    """Require ``token`` on every ``/api`` request from now on (None: open)."""
+    global _token
+    _token = token or None
+
+
+def _token_ok(candidate: str | None) -> bool:
+    # compare_digest, so a wrong guess costs the same time however close it is.
+    return candidate is not None and hmac.compare_digest(candidate.encode(), _token.encode())
+
+
+@app.middleware("http")
+async def require_token(request: Request, call_next):
+    """Guard the API, not the page: the page is static and carries nothing.
+
+    A script sends ``Authorization: Bearer``; the web UI cannot add a header to
+    its own fetches without knowing the token, so it rides on the cookie that
+    ``/?token=`` sets instead.
+    """
+    if _token is None or not request.url.path.startswith("/api/"):
+        return await call_next(request)
+    auth = request.headers.get("authorization", "")
+    bearer = auth[7:] if auth.lower().startswith("bearer ") else None
+    if _token_ok(bearer) or _token_ok(request.cookies.get(TOKEN_COOKIE)):
+        return await call_next(request)
+    return JSONResponse({"detail": "Thiếu hoặc sai token."}, status_code=401)
 
 _engine = None
 _engine_error: str | None = None
@@ -243,6 +277,34 @@ def voices() -> dict:
     }
 
 
+def synthesize(text: str, voice: str | None = None, speed: float = 1.0):
+    """Validate a request and return ``(voice, chunks)``.
+
+    ``chunks`` yields float32 arrays at ``SAMPLE_RATE`` as the engine produces
+    them, time-scaled by ``speed``. Validation runs here, eagerly, and raises
+    ``ValueError`` - so the HTTP route can still answer 400 before streaming,
+    and the CLI can report it before opening any output.
+    """
+    text = text.strip()
+    if not text:
+        raise ValueError("Chưa có văn bản để đọc.")
+    if len(text) > MAX_CHARS:
+        raise ValueError(f"Văn bản dài quá {MAX_CHARS} ký tự.")
+    if not SPEED_MIN <= speed <= SPEED_MAX:
+        raise ValueError(f"Tốc độ phải trong khoảng {SPEED_MIN}-{SPEED_MAX}.")
+
+    tts = engine()
+    resolved = tts.resolve_voice_name(voice) or (None if voice else default_voice())
+    if resolved is None:
+        raise ValueError(f"Không có giọng '{voice}'.")
+
+    def chunks():
+        for chunk in stretch(tts.infer_stream(text, voice=resolved), speed):
+            yield np.asarray(chunk, dtype=np.float32)
+
+    return resolved, chunks()
+
+
 @app.post("/api/tts/stream")
 def tts_stream(req: SpeakRequest):
     """Stream raw float32 LE samples at 48 kHz as they are generated.
@@ -250,24 +312,16 @@ def tts_stream(req: SpeakRequest):
     ``speed`` scales the duration and leaves the pitch where it is, so the
     stream is always 48 kHz and the client plays it back untouched.
     """
-    text = req.text.strip()
-    if not text:
-        raise HTTPException(400, "Chưa có văn bản để đọc.")
-    if len(text) > MAX_CHARS:
-        raise HTTPException(400, f"Văn bản dài quá {MAX_CHARS} ký tự.")
-    if not SPEED_MIN <= req.speed <= SPEED_MAX:
-        raise HTTPException(400, f"Tốc độ phải trong khoảng {SPEED_MIN}-{SPEED_MAX}.")
-
-    tts = engine()
-    voice = tts.resolve_voice_name(req.voice) or (None if req.voice else default_voice())
-    if voice is None:
-        raise HTTPException(400, f"Không có giọng '{req.voice}'.")
+    try:
+        _, chunks = synthesize(req.text, req.voice, req.speed)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
 
     def samples():
         # A failure here lands mid-body, so the client sees a short stream
         # rather than an HTTP error; it reports that as a playback failure.
-        for chunk in stretch(tts.infer_stream(text, voice=voice), req.speed):
-            yield np.asarray(chunk, dtype=np.float32).tobytes()
+        for chunk in chunks:
+            yield chunk.tobytes()
 
     return StreamingResponse(
         samples(),
@@ -277,47 +331,50 @@ def tts_stream(req: SpeakRequest):
 
 
 @app.get("/")
-def index() -> FileResponse:
-    return FileResponse(WEB_DIR / "index.html")
+def index(token: str | None = None) -> FileResponse:
+    """The page; ``?token=`` hands the web UI its cookie for a guarded server."""
+    page = FileResponse(WEB_DIR / "index.html")
+    if _token is not None and _token_ok(token):
+        page.set_cookie(TOKEN_COOKIE, token, httponly=True, samesite="strict",
+                        max_age=365 * 24 * 3600)
+    return page
 
 
 app.mount("/web", StaticFiles(directory=WEB_DIR), name="web")
 
 
-def start_server(port: int = 0) -> tuple[uvicorn.Server, int, threading.Thread]:
-    """Bind a loopback socket, serve on it in a daemon thread, return the port.
+def start_server(port: int = 0, host: str = "127.0.0.1",
+                 log_level: str = "warning") -> tuple[uvicorn.Server, int, threading.Thread]:
+    """Bind a socket, serve on it in a daemon thread, return the bound port.
 
     Binding before handing the socket to uvicorn avoids the race of picking a
     free port and then losing it to another process.
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(("127.0.0.1", port))
+    sock.bind((host, port))
     bound_port = sock.getsockname()[1]
 
-    server = uvicorn.Server(uvicorn.Config(app, log_level="warning"))
+    server = uvicorn.Server(uvicorn.Config(app, log_level=log_level))
     thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]}, daemon=True)
     thread.start()
     return server, bound_port, thread
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Voice TTS")
-    parser.add_argument("--no-window", action="store_true", help="run the backend only")
-    parser.add_argument("--port", type=int, default=0, help="fixed port (default: any free port)")
-    args = parser.parse_args()
+def serve(host: str = "127.0.0.1", port: int = 8760, log_level: str = "info") -> None:
+    """Run the backend in the foreground until interrupted."""
+    uvicorn.run(app, host=host, port=port, log_level=log_level)
 
-    if args.no_window:
-        uvicorn.run(app, host="127.0.0.1", port=args.port or 8760, log_level="info")
-        return
 
+def run_gui(port: int = 0) -> None:
+    """The desktop app: the backend on loopback plus a native window over it."""
     import webview
 
     # WebView2 cancels every download while this is off - that is why "Lưu WAV"
     # used to do nothing at all. With it on, the platform shows its Save dialog.
     webview.settings["ALLOW_DOWNLOADS"] = True
 
-    _, port, _ = start_server(args.port)
+    _, port, _ = start_server(port)
     # pywebview asks WinForms for FormStartPosition.CenterScreen, but it does so
     # after the form handle exists, so the window lands at 78,78 instead. Passing
     # a screen takes the branch that computes the position itself.
@@ -335,5 +392,11 @@ def main() -> None:
     webview.start()  # returns when the window closes; daemon threads go with it
 
 
+def main(argv: list[str] | None = None) -> int:
+    import cli
+
+    return cli.main(argv)
+
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

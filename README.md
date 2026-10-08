@@ -36,8 +36,32 @@ Running `app.py` directly works too:
 
 ```
 .venv/Scripts/python app.py              # native window
-.venv/Scripts/python app.py --no-window  # backend only, on port 8760
+.venv/Scripts/python app.py serve        # backend only, on port 8760
+.venv/Scripts/python app.py --help       # every subcommand and flag
 ```
+
+`--no-window` is still accepted and means `serve`.
+
+## Server mode
+
+```
+python app.py serve --host 0.0.0.0 --port 8760 --token <secret>
+```
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--host` | `127.0.0.1` | address to bind; `0.0.0.0` serves the LAN |
+| `--port` | `8760` | port to bind |
+| `--token` | `$VOICE_TTS_TOKEN`, else none | require this token on every `/api` request |
+| `--log-level` | `info` | uvicorn log level |
+
+With a token set, `/api/*` answers `401` unless the request carries
+`Authorization: Bearer <token>` or the `vtts_token` cookie. Open
+`http://<host>:8760/?token=<token>` once in a browser and the page sets that cookie
+for itself, so the web UI works unchanged. The page and `/web/*` stay open; they are
+static. Without a token the API is open, which is what the loopback-only desktop app
+wants - binding anything else without one prints a warning. The token travels over
+plain HTTP: fine on a home LAN, not for the internet.
 
 ## HTTP API
 
@@ -92,7 +116,9 @@ curl -X POST http://127.0.0.1:8760/api/tts/stream \
 
 ```
 app.py                    FastAPI backend + native window entry point
+cli.py                    command line: subcommands and flags, stdlib-only at import
 test_tts.py               assert-based smoke test over the real HTTP path
+test_cli.py               fast checks with a stub engine: CLI, token guard
 web/                      index.html, app.css, app.js - no build step
 docs/scripts/tool-build.py  setup / run / check / package
 ```
