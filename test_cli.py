@@ -277,6 +277,22 @@ def check_tray() -> None:
     print("tray: menu, headless menu, icon, backend failure falls back")
 
 
+def check_release_notes() -> None:
+    """The release publishes the CHANGELOG section of ``cli.__version__``."""
+    def notes(version: str) -> subprocess.CompletedProcess:
+        return subprocess.run([sys.executable, str(ROOT / "docs/scripts/tool-build.py"),
+                               "--release-notes", version], capture_output=True,
+                              env={**os.environ, "PYTHONIOENCODING": "utf-8"}, timeout=60)
+
+    proc = notes(cli.__version__)
+    body = proc.stdout.decode("utf-8")
+    assert proc.returncode == 0, f"no notes for {cli.__version__}: {proc.stderr!r}"
+    assert body.strip() and "## [" not in body, f"section of {cli.__version__} is off: {body!r}"
+    proc = notes("9.9.9")
+    assert proc.returncode == 1, f"a missing version must fail the release, got {proc.returncode}"
+    print(f"release notes: CHANGELOG section for {cli.__version__}, a missing one fails")
+
+
 def main() -> int:
     # The DSP check needs no engine either; running it here puts it in CI.
     from test_tts import check_stretch
@@ -284,6 +300,7 @@ def main() -> int:
     check_stretch()
     app._engine = StubEngine()
     check_parser()
+    check_release_notes()
     check_tray()
 
     _, port, _ = app.start_server(host="127.0.0.1", port=0)

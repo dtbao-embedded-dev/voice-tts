@@ -10,6 +10,8 @@
                                                                 # server + CLI, no window
     python docs/scripts/tool-build.py --smoke dist/voice-tts    # run a build offline as a
                                                                 # server and read a sentence
+    python docs/scripts/tool-build.py --release-notes 0.5.0     # that version's CHANGELOG
+                                                                # section, for the release
 
 Every step is skipped when it is already done, so the second run is the fast one.
 """
@@ -19,6 +21,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -50,6 +53,7 @@ HIDDEN = ["pystray._win32"] if os.name == "nt" else []
 EXCLUDE = ["gradio", "gradio_client", "matplotlib", "tkinter", "IPython"]
 # A server-only build has no window and no tray.
 EXCLUDE_SERVER = ["webview", "pystray", "tray"]
+CHANGELOG = ROOT / "CHANGELOG.md"
 SMOKE_TEXT = "Xin chào, bản đóng gói này chạy offline và đọc được tiếng Việt lẫn English."
 
 
@@ -259,6 +263,29 @@ def smoke(exe: Path) -> int:
             print(log.read().decode("utf-8", "replace")[-2000:], flush=True)
 
 
+def release_notes(version: str) -> int:
+    """Print the body of ``## [version]`` in CHANGELOG.md - the GitHub Release notes.
+
+    A version with no section fails, so a tag nobody wrote notes for stops the
+    release before it spends an hour building.
+    """
+    text = CHANGELOG.read_text(encoding="utf-8")
+    heading = re.search(rf"^## \[{re.escape(version)}\].*$", text, re.MULTILINE)
+    if heading is None:
+        print(f"ERROR: {CHANGELOG.name} has no '## [{version}]' section", file=sys.stderr)
+        return 1
+    rest = text[heading.end():]
+    following = re.search(r"^## \[", rest, re.MULTILINE)
+    body = rest[:following.start()] if following else rest
+    if not body.strip():
+        print(f"ERROR: the '## [{version}]' section of {CHANGELOG.name} is empty", file=sys.stderr)
+        return 1
+    # Bytes, not print(): a Windows console or pipe would encode it as cp1252 and
+    # choke on the Vietnamese in the notes.
+    sys.stdout.buffer.write(body.strip().encode("utf-8") + b"\n")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -268,10 +295,14 @@ def main() -> int:
     mode.add_argument("--setup", action="store_true", help="prepare the environment and stop")
     mode.add_argument("--smoke", type=Path, metavar="EXE",
                       help="run a packaged build offline as a server and read a sentence")
+    mode.add_argument("--release-notes", metavar="VERSION",
+                      help="print that version's CHANGELOG.md section and stop")
     ap.add_argument("--server-only", action="store_true",
                     help="with --setup/--package: server + CLI only, no window or tray")
     args = ap.parse_args()
 
+    if args.release_notes:
+        return release_notes(args.release_notes)
     if args.smoke:
         return smoke(args.smoke)
     setup(args.server_only)

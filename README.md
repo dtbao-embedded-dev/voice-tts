@@ -396,12 +396,16 @@ installer. The real-model smoke test runs locally (`tool-build.py --check`).
 
 ## Release
 
+Write the version's section in `CHANGELOG.md` first, bump `cli.__version__`, then:
+
 ```
-git tag v0.4.0 && git push origin v0.4.0
+git tag v0.5.0 && git push origin v0.5.0
 ```
 
-`.github/workflows/release.yml` checks that the tag matches `cli.__version__`, then
-builds on both platforms and attaches to a GitHub Release, with `SHA256SUMS`:
+`.github/workflows/release.yml` checks that the tag matches `cli.__version__` and that
+`CHANGELOG.md` has a `## [<version>]` section - either missing fails the run before
+the build. It then builds on both platforms and publishes a GitHub Release whose
+notes are that section, with these files and `SHA256SUMS`:
 
 | File | What it is |
 | --- | --- |
@@ -419,6 +423,7 @@ non-commercial use - a release redistributes them.
 ```
 python docs/scripts/tool-build.py --package --server-only   # dist/voice-tts, locally
 python docs/scripts/tool-build.py --smoke dist/voice-tts
+python docs/scripts/tool-build.py --release-notes 0.5.0     # the notes a v0.5.0 tag publishes
 ```
 
 ## Layout
@@ -429,6 +434,7 @@ tray.py                   system tray icon and its menu (pystray)
 cli.py                    command line: subcommands and flags, stdlib-only at import
 test_tts.py               assert-based smoke test over the real HTTP path
 test_cli.py               fast checks with a stub engine: CLI (local + remote), token guard
+CHANGELOG.md              user-visible changes per version; a release publishes its section
 web/                      index.html, app.css, app.js - no build step
 requirements.txt          server + CLI core (what Docker installs)
 requirements-desktop.txt  core + window + tray (what tool-build.py installs)
