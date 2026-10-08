@@ -1,0 +1,23 @@
+# Voice TTS server. Put VOICE_TTS_TOKEN=<secret> in .env next to this file
+# (tool-install.py --docker generates one); leave it empty for an open API.
+#
+#   docker compose up -d --build
+#   docker compose logs -f
+
+services:
+  voice-tts:
+    build: .
+    image: voice-tts:latest
+    container_name: ${VOICE_TTS_CONTAINER:-voice-tts}
+    restart: unless-stopped
+    ports:
+      - "${VOICE_TTS_PORT:-8760}:8760"
+    environment:
+      VOICE_TTS_TOKEN: ${VOICE_TTS_TOKEN:-}
+    volumes:
+      - hf-cache:/data/hf
+
+volumes:
+  hf-cache:
+    # A fixed name, so a reinstall from another directory reuses the model.
+    name: voice-tts-hf

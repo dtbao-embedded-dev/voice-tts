@@ -119,6 +119,27 @@ curl -X POST http://127.0.0.1:8760/api/tts/stream \
   --output speech.f32
 ```
 
+## Docker (Linux server)
+
+```
+echo "VOICE_TTS_TOKEN=$(openssl rand -hex 16)" > .env
+docker compose up -d --build
+docker compose logs -f            # first start downloads the model, ~30 s on a LAN
+```
+
+The image (`python:3.12-slim`, ~1 GB) runs `serve --host 0.0.0.0 --port 8760` as an
+unprivileged user. The model lives in the `voice-tts-hf` volume, so rebuilds and
+reinstalls do not download it again. `restart: unless-stopped` brings it back after
+a reboot; the healthcheck turns `healthy` once the model is ready. `.env` holds
+`VOICE_TTS_TOKEN`, and optionally `VOICE_TTS_PORT` (host port, default 8760) and
+`VOICE_TTS_CONTAINER` (default `voice-tts`); it is git-ignored.
+
+A Linux HuggingFace cache normally links snapshot files to blobs; onnxruntime then
+rejects the backbone's external `.data` file as outside the model directory.
+`app.py` sets `HF_HUB_DISABLE_SYMLINKS=1` so the snapshot holds real files. A cache
+filled before that, with symlinks, has to be deleted once (`docker volume rm
+voice-tts-hf`, or `~/.cache/huggingface/hub/models--*` for a source checkout).
+
 ## System tray
 
 The window lives in the system tray: **minimize or close hides it there and the
@@ -178,5 +199,6 @@ test_cli.py               fast checks with a stub engine: CLI (local + remote), 
 web/                      index.html, app.css, app.js - no build step
 requirements.txt          server + CLI core (what Docker installs)
 requirements-desktop.txt  core + window + tray (what tool-build.py installs)
+Dockerfile, compose.yaml  Linux server image, token from .env
 docs/scripts/tool-build.py  setup / run / check / package
 ```
