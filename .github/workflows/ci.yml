@@ -1,0 +1,54 @@
+# Fast checks on both platforms: the CLI, the token guard, the tray menu and the
+# time-stretcher, against a stub engine. No model is downloaded here; the
+# real-model smoke test runs in release.yml, on the artifacts it ships.
+name: CI
+
+on:
+  push:
+    branches: [main, developing, "feat/**", "fix/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Install
+        run: python -m pip install -r requirements-desktop.txt
+
+      - name: test_cli.py
+        run: python test_cli.py
+
+      - name: Every subcommand answers --help
+        shell: bash
+        run: |
+          python cli.py --version
+          for cmd in gui serve speak voices status; do
+            python cli.py "$cmd" --help > /dev/null
+          done
+
+      - name: Installer parses its arguments
+        run: python docs/scripts/tool-install.py --help

@@ -1,5 +1,7 @@
 # Voice TTS
 
+[![CI](https://github.com/dtbao-embedded-dev/voice-tts/actions/workflows/ci.yml/badge.svg)](https://github.com/dtbao-embedded-dev/voice-tts/actions/workflows/ci.yml)
+
 Desktop app that reads mixed Vietnamese/English text aloud, powered by
 [VieNeu-TTS v3 Turbo](https://github.com/pnnbao97/VieNeu-TTS).
 
@@ -238,6 +240,14 @@ carries on without one: the window closes as before, `serve` keeps serving.
   redistributes them; check the VieNeu terms before handing the file to anyone.
 - **The UI is black and white, dark only.** There is no light variant and no theme
   switch; status is told apart by shape, not colour.
+
+## CI
+
+`.github/workflows/ci.yml` runs on every push to `main`, `developing`, `feat/**` and
+`fix/**` and on pull requests, on `ubuntu-latest` and `windows-latest` with Python
+3.12: `test_cli.py` (CLI, token guard, tray menu and the time-stretcher, against a
+stub engine - no model download) and `--help` for every subcommand and the
+installer. The real-model smoke test runs locally (`tool-build.py --check`).
 
 ## Layout
 

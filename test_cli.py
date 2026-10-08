@@ -1,7 +1,8 @@
 """Fast checks for the CLI, the server options and the token guard.
 
 No model is loaded: a stub engine stands in for VieNeu, so this runs in seconds
-and is what CI runs. The real-model path is ``test_tts.py``.
+and is what CI runs, together with the time-stretch check from ``test_tts.py``.
+The real-model path is ``test_tts.py`` itself.
 
     python test_cli.py
 """
@@ -246,6 +247,10 @@ def check_tray() -> None:
 
 
 def main() -> int:
+    # The DSP check needs no engine either; running it here puts it in CI.
+    from test_tts import check_stretch
+
+    check_stretch()
     app._engine = StubEngine()
     check_parser()
     check_tray()
