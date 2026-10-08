@@ -1,0 +1,9 @@
+# The desktop app: the server core plus the native window and the tray icon.
+-r requirements.txt
+
+# Native window hosting the web view.
+pywebview>=5.3
+
+# System tray icon; Pillow draws its image.
+pystray>=0.19
+Pillow>=10

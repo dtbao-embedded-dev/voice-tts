@@ -1,26 +1,30 @@
 """Voice TTS - a desktop app that reads mixed Vietnamese/English text aloud.
 
-The UI is a web view hosted in a native window; this module is both the HTTP
-backend (FastAPI on a loopback port) and the application entry point.
+The UI is a web view hosted in a native window; this module is the HTTP backend
+(FastAPI) and the entry point. The command line itself lives in ``cli.py``.
 
     python app.py              # native window
-    python app.py --no-window  # backend only, prints the URL
+    python app.py serve        # backend only (``--no-window`` still works)
+    python app.py --help       # every subcommand and flag
 """
 
 from __future__ import annotations
 
-import argparse
+import hmac
+import io
 import os
 import socket
 import sys
 import threading
+import wave
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import uvicorn
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from numpy.lib.stride_tricks import sliding_window_view
 from pydantic import BaseModel
@@ -40,6 +44,13 @@ if (BASE_DIR / "hf").is_dir():
     os.environ["HF_HOME"] = str(BASE_DIR / "hf")
     os.environ["HF_HUB_OFFLINE"] = "1"
 
+# On Linux the HuggingFace cache makes each snapshot file a symlink into blobs/.
+# onnxruntime resolves the backbone through that link and then refuses its
+# external .data file, a different blob, as "escaping the model directory".
+# Real files in the snapshot keep the weights side by side. Windows already
+# gets real files (no symlink rights), so nothing changes there.
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS", "1")
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -49,6 +60,39 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Voice TTS", docs_url=None, redoc_url=None, lifespan=lifespan)
+
+# Shared secret for a server reachable from the LAN. None keeps the API open,
+# which is what a loopback-only desktop app wants.
+TOKEN_COOKIE = "vtts_token"
+_token: str | None = None
+
+
+def set_token(token: str | None) -> None:
+    """Require ``token`` on every ``/api`` request from now on (None: open)."""
+    global _token
+    _token = token or None
+
+
+def _token_ok(candidate: str | None) -> bool:
+    # compare_digest, so a wrong guess costs the same time however close it is.
+    return candidate is not None and hmac.compare_digest(candidate.encode(), _token.encode())
+
+
+@app.middleware("http")
+async def require_token(request: Request, call_next):
+    """Guard the API, not the page: the page is static and carries nothing.
+
+    A script sends ``Authorization: Bearer``; the web UI cannot add a header to
+    its own fetches without knowing the token, so it rides on the cookie that
+    ``/?token=`` sets instead.
+    """
+    if _token is None or not request.url.path.startswith("/api/"):
+        return await call_next(request)
+    auth = request.headers.get("authorization", "")
+    bearer = auth[7:] if auth.lower().startswith("bearer ") else None
+    if _token_ok(bearer) or _token_ok(request.cookies.get(TOKEN_COOKIE)):
+        return await call_next(request)
+    return JSONResponse({"detail": "Thiếu hoặc sai token."}, status_code=401)
 
 _engine = None
 _engine_error: str | None = None
@@ -215,6 +259,22 @@ class SpeakRequest(BaseModel):
     text: str
     voice: str | None = None
     speed: float = 1.0
+    # "f32": raw float32 streamed as it is generated. "wav": the whole reading
+    # as one 16-bit file, sent once it is complete.
+    format: Literal["f32", "wav"] = "f32"
+
+
+def wav_bytes(chunks) -> bytes:
+    """Collect float32 chunks into a complete 16-bit mono WAV file."""
+    audio = np.concatenate([np.zeros(0, dtype=np.float32), *chunks])
+    pcm = (np.clip(audio, -1.0, 1.0) * 32767).astype("<i2")
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(SAMPLE_RATE)
+        out.writeframes(pcm.tobytes())
+    return buf.getvalue()
 
 
 def _warm() -> None:
@@ -243,31 +303,63 @@ def voices() -> dict:
     }
 
 
+def synthesize(text: str, voice: str | None = None, speed: float = 1.0):
+    """Validate a request and return ``(voice, chunks)``.
+
+    ``chunks`` yields float32 arrays at ``SAMPLE_RATE`` as the engine produces
+    them, time-scaled by ``speed``. Validation runs here, eagerly, and raises
+    ``ValueError`` - so the HTTP route can still answer 400 before streaming,
+    and the CLI can report it before opening any output.
+    """
+    text = text.strip()
+    if not text:
+        raise ValueError("Chưa có văn bản để đọc.")
+    if len(text) > MAX_CHARS:
+        raise ValueError(f"Văn bản dài quá {MAX_CHARS} ký tự.")
+    if not SPEED_MIN <= speed <= SPEED_MAX:
+        raise ValueError(f"Tốc độ phải trong khoảng {SPEED_MIN}-{SPEED_MAX}.")
+
+    tts = engine()
+    resolved = tts.resolve_voice_name(voice) or (None if voice else default_voice())
+    if resolved is None:
+        raise ValueError(f"Không có giọng '{voice}'.")
+
+    def chunks():
+        for chunk in stretch(tts.infer_stream(text, voice=resolved), speed):
+            yield np.asarray(chunk, dtype=np.float32)
+
+    return resolved, chunks()
+
+
 @app.post("/api/tts/stream")
 def tts_stream(req: SpeakRequest):
     """Stream raw float32 LE samples at 48 kHz as they are generated.
 
     ``speed`` scales the duration and leaves the pitch where it is, so the
     stream is always 48 kHz and the client plays it back untouched.
-    """
-    text = req.text.strip()
-    if not text:
-        raise HTTPException(400, "Chưa có văn bản để đọc.")
-    if len(text) > MAX_CHARS:
-        raise HTTPException(400, f"Văn bản dài quá {MAX_CHARS} ký tự.")
-    if not SPEED_MIN <= req.speed <= SPEED_MAX:
-        raise HTTPException(400, f"Tốc độ phải trong khoảng {SPEED_MIN}-{SPEED_MAX}.")
 
-    tts = engine()
-    voice = tts.resolve_voice_name(req.voice) or (None if req.voice else default_voice())
-    if voice is None:
-        raise HTTPException(400, f"Không có giọng '{req.voice}'.")
+    ``format: "wav"`` trades the streaming for a file any player opens: the
+    whole reading is synthesized first, then sent as one 16-bit WAV with its
+    real length in the header and in ``Content-Length``.
+    """
+    try:
+        _, chunks = synthesize(req.text, req.voice, req.speed)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+    if req.format == "wav":
+        return Response(
+            wav_bytes(chunks),
+            media_type="audio/wav",
+            headers={"X-Sample-Rate": str(SAMPLE_RATE), "Cache-Control": "no-store",
+                     "Content-Disposition": 'inline; filename="speech.wav"'},
+        )
 
     def samples():
         # A failure here lands mid-body, so the client sees a short stream
         # rather than an HTTP error; it reports that as a playback failure.
-        for chunk in stretch(tts.infer_stream(text, voice=voice), req.speed):
-            yield np.asarray(chunk, dtype=np.float32).tobytes()
+        for chunk in chunks:
+            yield chunk.tobytes()
 
     return StreamingResponse(
         samples(),
@@ -277,63 +369,155 @@ def tts_stream(req: SpeakRequest):
 
 
 @app.get("/")
-def index() -> FileResponse:
-    return FileResponse(WEB_DIR / "index.html")
+def index(token: str | None = None) -> FileResponse:
+    """The page; ``?token=`` hands the web UI its cookie for a guarded server."""
+    page = FileResponse(WEB_DIR / "index.html")
+    if _token is not None and _token_ok(token):
+        page.set_cookie(TOKEN_COOKIE, token, httponly=True, samesite="strict",
+                        max_age=365 * 24 * 3600)
+    return page
 
 
 app.mount("/web", StaticFiles(directory=WEB_DIR), name="web")
 
 
-def start_server(port: int = 0) -> tuple[uvicorn.Server, int, threading.Thread]:
-    """Bind a loopback socket, serve on it in a daemon thread, return the port.
+def start_server(port: int = 0, host: str = "127.0.0.1",
+                 log_level: str = "warning") -> tuple[uvicorn.Server, int, threading.Thread]:
+    """Bind a socket, serve on it in a daemon thread, return the bound port.
 
     Binding before handing the socket to uvicorn avoids the race of picking a
-    free port and then losing it to another process.
+    free port and then losing it to another process. Listening here too means a
+    request made the moment this returns waits in the backlog instead of being
+    refused while uvicorn is still starting - Linux refuses at once, Windows
+    only hides it by retrying the connect for a second or two.
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(("127.0.0.1", port))
+    sock.bind((host, port))
+    sock.listen(2048)  # uvicorn's default backlog; its own listen() is then a no-op
     bound_port = sock.getsockname()[1]
 
-    server = uvicorn.Server(uvicorn.Config(app, log_level="warning"))
+    server = uvicorn.Server(uvicorn.Config(app, log_level=log_level))
     thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]}, daemon=True)
     thread.start()
     return server, bound_port, thread
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Voice TTS")
-    parser.add_argument("--no-window", action="store_true", help="run the backend only")
-    parser.add_argument("--port", type=int, default=0, help="fixed port (default: any free port)")
-    args = parser.parse_args()
+def lan_address() -> str:
+    """This machine's address on the LAN, for a URL another machine can open.
 
-    if args.no_window:
-        uvicorn.run(app, host="127.0.0.1", port=args.port or 8760, log_level="info")
+    Connecting a UDP socket sends nothing; it only makes the OS pick the
+    interface it would route through.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        try:
+            probe.connect(("192.0.2.1", 9))  # TEST-NET-1: never routed anywhere
+            return probe.getsockname()[0]
+        except OSError:
+            return "127.0.0.1"
+
+
+def page_urls(host: str, port: int) -> tuple[str, str]:
+    """``(local, shareable)`` URLs of the page, carrying the token if one is set."""
+    query = f"?token={_token}" if _token else ""
+    wildcard = host in ("0.0.0.0", "::", "")
+    local_host = "127.0.0.1" if wildcard else host
+    shared_host = lan_address() if wildcard else host
+    return f"http://{local_host}:{port}/{query}", f"http://{shared_host}:{port}/{query}"
+
+
+def serve(host: str = "127.0.0.1", port: int = 8760, log_level: str = "info",
+          tray: bool = False, open_browser: bool = False) -> None:
+    """Run the backend until interrupted, or until "Thoát" with ``tray``."""
+    import webbrowser
+
+    local_url, shared_url = page_urls(host, port)
+    if not tray:
+        if open_browser:
+            threading.Timer(1.0, webbrowser.open, [local_url]).start()
+        uvicorn.run(app, host=host, port=port, log_level=log_level)
         return
 
+    from tray import Tray
+
+    server, _, thread = start_server(port, host, log_level)
+    if open_browser:
+        webbrowser.open(local_url)
+    if Tray(local_url, on_quit=lambda: None, lan_url=shared_url).run():
+        server.should_exit = True  # "Thoát": let uvicorn finish what it is sending
+        thread.join(timeout=5)
+    else:
+        thread.join()  # no tray on this desktop: keep serving in the foreground
+
+
+def run_gui(port: int = 0, tray: bool = True) -> None:
+    """The desktop app: the backend on loopback plus a native window over it.
+
+    With ``tray`` the window hides into the system tray when minimized or
+    closed, and the server keeps running; "Thoát" in the tray menu ends it.
+    """
     import webview
 
     # WebView2 cancels every download while this is off - that is why "Lưu WAV"
     # used to do nothing at all. With it on, the platform shows its Save dialog.
     webview.settings["ALLOW_DOWNLOADS"] = True
 
-    _, port, _ = start_server(args.port)
+    _, port, _ = start_server(port)
+    url = f"http://127.0.0.1:{port}/"
     # pywebview asks WinForms for FormStartPosition.CenterScreen, but it does so
     # after the form handle exists, so the window lands at 78,78 instead. Passing
     # a screen takes the branch that computes the position itself.
     # ponytail: screens[0], not a "primary" lookup pywebview does not expose - on a
     # multi-monitor box where it is not the primary, centre on that one instead.
-    webview.create_window(
+    window = webview.create_window(
         "Voice TTS",
-        f"http://127.0.0.1:{port}/",
+        url,
         width=980,
         height=760,
         resizable=False,   # drops the maximize box too; minimize and close stay
         screen=webview.screens[0],
         background_color="#000000",
     )
-    webview.start()  # returns when the window closes; daemon threads go with it
+
+    icon = None
+    if tray:
+        from tray import Tray
+
+        quitting = threading.Event()
+
+        def show() -> None:
+            window.show()
+            window.restore()
+
+        def quit_app() -> None:
+            quitting.set()
+            window.destroy()
+
+        def on_closing():
+            if quitting.is_set():
+                return True
+            # This handler runs on the UI thread while the close is pending;
+            # hiding from here would wait on that same thread, so hand it off.
+            threading.Thread(target=window.hide, daemon=True).start()
+            return False  # cancel the close: the app lives on in the tray
+
+        icon = Tray(url, on_quit=quit_app, on_show=show)
+        if icon.start():
+            window.events.closing += on_closing
+            window.events.minimized += window.hide
+        else:
+            icon = None  # no tray here: closing the window quits, as before
+
+    webview.start()  # returns when the window is destroyed; daemon threads go with it
+    if icon is not None:
+        icon.stop()
+
+
+def main(argv: list[str] | None = None) -> int:
+    import cli
+
+    return cli.main(argv)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
