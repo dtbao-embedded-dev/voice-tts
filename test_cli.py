@@ -211,9 +211,44 @@ def check_local(tmp: Path) -> None:
     print("local: in-process engine, speed, validation -> 2")
 
 
+def check_tray() -> None:
+    """The tray's menu and its fallback, without putting an icon on screen."""
+    import tray
+
+    calls = []
+    icon = tray.Tray("http://127.0.0.1:1/", lan_url="http://192.168.0.2:1/",
+                     on_show=lambda: calls.append("show"), on_quit=lambda: calls.append("quit"))
+    labels = [label for label, _ in icon.menu_items()]
+    assert labels == ["Mở cửa sổ", "Mở trong trình duyệt", "Sao chép URL", "Thoát"], labels
+    dict(icon.menu_items())["Mở cửa sổ"]()
+    assert calls == ["show"], calls
+
+    headless = tray.Tray("http://127.0.0.1:1/", on_quit=lambda: None)
+    assert "Mở cửa sổ" not in [label for label, _ in headless.menu_items()], \
+        "serve --tray has no window to open"
+
+    image = tray.icon_image()
+    assert image.size == (64, 64) and image.mode == "RGBA", (image.size, image.mode)
+
+    # No tray backend (a Linux box without AppIndicator, say) must not take the
+    # app down with it: start() reports False and the caller keeps going.
+    broken = tray.Tray("http://127.0.0.1:1/", on_quit=lambda: None)
+    broken._make_icon = lambda: (_ for _ in ()).throw(RuntimeError("no tray here"))
+    assert broken.start() is False, "a failing backend must report False"
+    assert broken.run() is False, "a failing backend must report False from run() too"
+
+    p = cli.build_parser()
+    args = cli.parse(p, ["serve", "--tray", "--open"])
+    assert args.tray and args.open, "serve --tray --open not parsed"
+    assert cli.parse(p, ["--no-tray"]).tray is False, "gui --no-tray not parsed"
+    assert cli.parse(p, []).tray is True, "the window must use the tray by default"
+    print("tray: menu, headless menu, icon, backend failure falls back")
+
+
 def main() -> int:
     app._engine = StubEngine()
     check_parser()
+    check_tray()
 
     _, port, _ = app.start_server(host="127.0.0.1", port=0)
     base = f"http://127.0.0.1:{port}"

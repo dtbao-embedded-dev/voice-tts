@@ -21,7 +21,7 @@ Desktop app that reads mixed Vietnamese/English text aloud, powered by
 python docs/scripts/tool-build.py
 ```
 
-That creates `.venv`, installs `requirements.txt`, downloads the model into the
+That creates `.venv`, installs `requirements-desktop.txt`, downloads the model into the
 HuggingFace cache and launches the app. Every step is skipped when it is already
 done, so later runs start in seconds.
 
@@ -119,6 +119,23 @@ curl -X POST http://127.0.0.1:8760/api/tts/stream \
   --output speech.f32
 ```
 
+## System tray
+
+The window lives in the system tray: **minimize or close hides it there and the
+server keeps running**. A click on the tray icon brings the window back; its menu
+has *Mở cửa sổ*, *Mở trong trình duyệt*, *Sao chép URL* and *Thoát* - only *Thoát*
+ends the app. `--no-tray` restores the old behaviour, close = quit.
+
+```
+voice-tts serve --tray --open              # no window at all: an icon and a browser tab
+voice-tts serve --tray --host 0.0.0.0 --token <t>
+```
+
+`serve --tray` puts only the icon on screen; its first entry opens the page (with the
+token, if one is set) and *Sao chép URL* copies the LAN address. When the desktop
+has no tray (a Linux session without AppIndicator, say) the app logs a warning and
+carries on without one: the window closes as before, `serve` keeps serving.
+
 ## Keyboard
 
 | Key | Action |
@@ -154,9 +171,12 @@ curl -X POST http://127.0.0.1:8760/api/tts/stream \
 
 ```
 app.py                    FastAPI backend + native window entry point
+tray.py                   system tray icon and its menu (pystray)
 cli.py                    command line: subcommands and flags, stdlib-only at import
 test_tts.py               assert-based smoke test over the real HTTP path
 test_cli.py               fast checks with a stub engine: CLI (local + remote), token guard
 web/                      index.html, app.css, app.js - no build step
+requirements.txt          server + CLI core (what Docker installs)
+requirements-desktop.txt  core + window + tray (what tool-build.py installs)
 docs/scripts/tool-build.py  setup / run / check / package
 ```

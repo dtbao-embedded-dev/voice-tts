@@ -69,6 +69,9 @@ def build_parser() -> argparse.ArgumentParser:
     gui = sub.add_parser("gui", help="open the desktop window (default)")
     gui.add_argument("--port", type=int, default=0,
                      help="loopback port for the backend (default: any free port)")
+    gui.add_argument("--tray", action=argparse.BooleanOptionalAction, default=True,
+                     help="minimize and close hide the window into the system tray; "
+                          "--no-tray makes close quit (default: on)")
 
     serve = sub.add_parser("serve", help="run the HTTP backend without a window")
     serve.add_argument("--host", default="127.0.0.1",
@@ -80,6 +83,9 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--log-level", default="info",
                        choices=("critical", "error", "warning", "info", "debug"),
                        help="uvicorn log level (default: %(default)s)")
+    serve.add_argument("--tray", action="store_true",
+                       help="show a system tray icon; its menu opens the page and quits")
+    serve.add_argument("--open", action="store_true", help="open the page in the browser")
 
     speak = sub.add_parser(
         "speak", help="read text aloud or save it as audio",
@@ -481,7 +487,7 @@ def cmd_status(args: argparse.Namespace) -> int:
 def cmd_gui(args: argparse.Namespace) -> int:
     import app
 
-    app.run_gui(args.port)
+    app.run_gui(args.port, tray=args.tray)
     return 0
 
 
@@ -491,7 +497,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
     app.set_token(args.token)
     if args.host not in ("127.0.0.1", "localhost") and not args.token:
         eprint(f"warning: serving {args.host} with no token - anyone on the network can use it")
-    app.serve(args.host, args.port, args.log_level)
+    app.serve(args.host, args.port, args.log_level, tray=args.tray, open_browser=args.open)
     return 0
 
 
@@ -500,6 +506,11 @@ HANDLERS = {"gui": cmd_gui, "serve": cmd_serve, "speak": cmd_speak,
 
 
 def main(argv: list[str] | None = None) -> int:
+    # pythonw, the Start Menu shortcut and a windowed build run with no console:
+    # stdout/stderr are None there, and the first print or log line would raise.
+    for name in ("stdout", "stderr"):
+        if getattr(sys, name) is None:
+            setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))
     # Voice names and server messages are Vietnamese; a redirected stream on
     # Windows would otherwise be cp1252 and fail on the first diacritic.
     for stream in (sys.stdout, sys.stderr):

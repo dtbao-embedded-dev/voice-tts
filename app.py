@@ -361,13 +361,59 @@ def start_server(port: int = 0, host: str = "127.0.0.1",
     return server, bound_port, thread
 
 
-def serve(host: str = "127.0.0.1", port: int = 8760, log_level: str = "info") -> None:
-    """Run the backend in the foreground until interrupted."""
-    uvicorn.run(app, host=host, port=port, log_level=log_level)
+def lan_address() -> str:
+    """This machine's address on the LAN, for a URL another machine can open.
+
+    Connecting a UDP socket sends nothing; it only makes the OS pick the
+    interface it would route through.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        try:
+            probe.connect(("192.0.2.1", 9))  # TEST-NET-1: never routed anywhere
+            return probe.getsockname()[0]
+        except OSError:
+            return "127.0.0.1"
 
 
-def run_gui(port: int = 0) -> None:
-    """The desktop app: the backend on loopback plus a native window over it."""
+def page_urls(host: str, port: int) -> tuple[str, str]:
+    """``(local, shareable)`` URLs of the page, carrying the token if one is set."""
+    query = f"?token={_token}" if _token else ""
+    wildcard = host in ("0.0.0.0", "::", "")
+    local_host = "127.0.0.1" if wildcard else host
+    shared_host = lan_address() if wildcard else host
+    return f"http://{local_host}:{port}/{query}", f"http://{shared_host}:{port}/{query}"
+
+
+def serve(host: str = "127.0.0.1", port: int = 8760, log_level: str = "info",
+          tray: bool = False, open_browser: bool = False) -> None:
+    """Run the backend until interrupted, or until "Thoát" with ``tray``."""
+    import webbrowser
+
+    local_url, shared_url = page_urls(host, port)
+    if not tray:
+        if open_browser:
+            threading.Timer(1.0, webbrowser.open, [local_url]).start()
+        uvicorn.run(app, host=host, port=port, log_level=log_level)
+        return
+
+    from tray import Tray
+
+    server, _, thread = start_server(port, host, log_level)
+    if open_browser:
+        webbrowser.open(local_url)
+    if Tray(local_url, on_quit=lambda: None, lan_url=shared_url).run():
+        server.should_exit = True  # "Thoát": let uvicorn finish what it is sending
+        thread.join(timeout=5)
+    else:
+        thread.join()  # no tray on this desktop: keep serving in the foreground
+
+
+def run_gui(port: int = 0, tray: bool = True) -> None:
+    """The desktop app: the backend on loopback plus a native window over it.
+
+    With ``tray`` the window hides into the system tray when minimized or
+    closed, and the server keeps running; "Thoát" in the tray menu ends it.
+    """
     import webview
 
     # WebView2 cancels every download while this is off - that is why "Lưu WAV"
@@ -375,21 +421,54 @@ def run_gui(port: int = 0) -> None:
     webview.settings["ALLOW_DOWNLOADS"] = True
 
     _, port, _ = start_server(port)
+    url = f"http://127.0.0.1:{port}/"
     # pywebview asks WinForms for FormStartPosition.CenterScreen, but it does so
     # after the form handle exists, so the window lands at 78,78 instead. Passing
     # a screen takes the branch that computes the position itself.
     # ponytail: screens[0], not a "primary" lookup pywebview does not expose - on a
     # multi-monitor box where it is not the primary, centre on that one instead.
-    webview.create_window(
+    window = webview.create_window(
         "Voice TTS",
-        f"http://127.0.0.1:{port}/",
+        url,
         width=980,
         height=760,
         resizable=False,   # drops the maximize box too; minimize and close stay
         screen=webview.screens[0],
         background_color="#000000",
     )
-    webview.start()  # returns when the window closes; daemon threads go with it
+
+    icon = None
+    if tray:
+        from tray import Tray
+
+        quitting = threading.Event()
+
+        def show() -> None:
+            window.show()
+            window.restore()
+
+        def quit_app() -> None:
+            quitting.set()
+            window.destroy()
+
+        def on_closing():
+            if quitting.is_set():
+                return True
+            # This handler runs on the UI thread while the close is pending;
+            # hiding from here would wait on that same thread, so hand it off.
+            threading.Thread(target=window.hide, daemon=True).start()
+            return False  # cancel the close: the app lives on in the tray
+
+        icon = Tray(url, on_quit=quit_app, on_show=show)
+        if icon.start():
+            window.events.closing += on_closing
+            window.events.minimized += window.hide
+        else:
+            icon = None  # no tray here: closing the window quits, as before
+
+    webview.start()  # returns when the window is destroyed; daemon threads go with it
+    if icon is not None:
+        icon.stop()
 
 
 def main(argv: list[str] | None = None) -> int:

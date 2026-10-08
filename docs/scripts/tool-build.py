@@ -23,7 +23,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 VENV = ROOT / ".venv"
 PY = VENV / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-REQS = ROOT / "requirements.txt"
+REQS = ROOT / "requirements-desktop.txt"  # pulls in requirements.txt with -r
+REQ_FILES = (ROOT / "requirements.txt", REQS)
 STAMP = VENV / ".requirements-sha256"
 # The engine resolves its weights from two Hub repos - the backbone and the audio
 # codec - and needs both. Read off vieneu's _V3_REPO / _CODEC_REPO; verify_stage()
@@ -71,7 +72,7 @@ def ensure_venv() -> None:
 
 
 def ensure_deps() -> None:
-    digest = hashlib.sha256(REQS.read_bytes()).hexdigest()
+    digest = hashlib.sha256(b"".join(f.read_bytes() for f in REQ_FILES)).hexdigest()
     if STAMP.exists() and STAMP.read_text().strip() == digest:
         print("  deps ... unchanged", flush=True)
         return
