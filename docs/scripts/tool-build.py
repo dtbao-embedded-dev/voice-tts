@@ -3,13 +3,17 @@
 
     python docs/scripts/tool-build.py             # set up (if needed) and launch
     python docs/scripts/tool-build.py --check     # set up and run the smoke test
-    python docs/scripts/tool-build.py --package   # set up and build dist/VoiceTTS
+    python docs/scripts/tool-build.py --package   # set up and build dist/VoiceTTS/
+    python docs/scripts/tool-build.py --installer # wrap it in dist/VoiceTTS-<ver>-setup.exe
     python docs/scripts/tool-build.py --setup     # set up only
 
     python docs/scripts/tool-build.py --package --server-only   # dist/voice-tts: console,
                                                                 # server + CLI, no window
     python docs/scripts/tool-build.py --smoke dist/voice-tts    # run a build offline as a
                                                                 # server and read a sentence
+    python docs/scripts/tool-build.py --smoke-installer dist/VoiceTTS-0.6.0-setup.exe
+        # install silently into a temp dir, --smoke it, uninstall it. Like every
+        # install, it stops a running VoiceTTS.exe first.
     python docs/scripts/tool-build.py --release-notes 0.5.0     # that version's CHANGELOG
                                                                 # section, for the release
 
@@ -45,6 +49,7 @@ HF_HUB = Path(os.environ.get("HF_HOME", Path.home() / ".cache/huggingface")) / "
 # Staged outside build/ and dist/: PyInstaller's --clean wipes both.
 MODEL_STAGE = VENV / "model-bundle"
 EXE_ICON = VENV / "build-icon" / "voice-tts.ico"
+NSI = ROOT / "docs" / "scripts" / "voice-tts.nsi"
 
 # PyInstaller cannot see these through vieneu's lazy imports.
 COLLECT = ["vieneu", "onnxruntime", "sea_g2p", "kaldi_native_fbank", "soxr", "soundfile"]
@@ -160,8 +165,10 @@ def dir_size(path: Path) -> int:
 
 
 def exe_path(server_only: bool) -> Path:
+    """The server build is one file; the desktop build is a folder the installer ships."""
     name = "voice-tts" if server_only else "VoiceTTS"
-    return ROOT / "dist" / (f"{name}.exe" if os.name == "nt" else name)
+    exe = f"{name}.exe" if os.name == "nt" else name
+    return ROOT / "dist" / exe if server_only else ROOT / "dist" / name / exe
 
 
 def package(server_only: bool = False) -> Path:
@@ -186,10 +193,13 @@ def package(server_only: bool = False) -> Path:
         run([str(PY), "-c", "import sys, icon; icon.save_ico(sys.argv[1])", str(EXE_ICON)])
         icon_flags = ["--icon", str(EXE_ICON)]
 
-    t0 = step("bundle (one file, this takes a while)")
+    t0 = step("bundle (this takes a while)")
     # The desktop build is windowed: no console flashes up behind the window.
-    # The server build is a console program - it is run from a shell.
-    cmd = [str(PY), "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile",
+    # It is a folder, which the installer ships: one file would unpack its
+    # ~400 MB into %TEMP% on every launch. The server build is a console
+    # program run from a shell, and one file is what makes it easy to carry.
+    cmd = [str(PY), "-m", "PyInstaller", "--noconfirm", "--clean",
+           "--onefile" if server_only else "--onedir",
            "--console" if server_only else "--windowed",
            "--name", exe.stem, *icon_flags,
            "--add-data", f"web{os.pathsep}web",
@@ -206,11 +216,70 @@ def package(server_only: bool = False) -> Path:
 
     if not exe.exists():
         sys.exit(f"ERROR: PyInstaller finished but {exe} is missing")
-    print(f"\n{exe}  ({exe.stat().st_size / 1e6:.0f} MB)")
-    print("Model and runtime are inside the file; it needs no network and no install.")
-    print("A one-file build unpacks itself on every launch - around 10 s before it is")
-    print("ready, and longer on a cold machine while a virus scanner reads it.")
+    size = exe.stat().st_size if server_only else dir_size(exe.parent)
+    print(f"\n{exe}  ({size / 1e6:.0f} MB)")
+    if server_only:
+        print("Model and runtime are inside the file; it needs no network and no install.")
+    else:
+        print("Model and runtime are inside the folder; --installer wraps it in a setup.exe.")
     return exe
+
+
+def find_makensis() -> str:
+    found = shutil.which("makensis")
+    for base in (os.environ.get("ProgramFiles(x86)"), os.environ.get("ProgramFiles")):
+        if not found and base and (Path(base) / "NSIS" / "makensis.exe").exists():
+            found = str(Path(base) / "NSIS" / "makensis.exe")
+    if not found:
+        sys.exit("ERROR: makensis not found - install NSIS (winget install NSIS.NSIS)")
+    return found
+
+
+def installer() -> Path:
+    """Wrap the desktop folder build in ``dist/VoiceTTS-<version>-setup.exe``."""
+    sys.path.insert(0, str(ROOT))
+    import cli
+
+    exe = exe_path(False)
+    if not exe.exists():
+        sys.exit(f"ERROR: {exe} is missing - run --package first")
+    out = ROOT / "dist" / f"VoiceTTS-{cli.__version__}-setup.exe"
+    run([str(PY), "-c", "import sys, icon; icon.save_ico(sys.argv[1])", str(EXE_ICON)])
+    t0 = step("installer (NSIS, compressing the model)")
+    run([find_makensis(), "/V2", f"/DVERSION={cli.__version__}", f"/DSRC={exe.parent}",
+         f"/DICON={EXE_ICON}", f"/DOUT={out}", str(NSI)])
+    done(t0)
+    print(f"\n{out}  ({out.stat().st_size / 1e6:.0f} MB)")
+    return out
+
+
+def smoke_installer(setup_exe: Path) -> int:
+    """Install ``setup_exe`` silently into a temp dir, smoke-test it, uninstall it.
+
+    That is what a user gets: the installed exe runs offline, and the
+    uninstaller leaves nothing behind in its folder.
+    """
+    import tempfile
+
+    target = Path(tempfile.mkdtemp(prefix="voice-tts-install-")) / "Voice TTS"
+    # NSIS wants /D last and unquoted, even with spaces in it - hence one string.
+    subprocess.run(f'"{setup_exe.resolve()}" /S /D={target}', check=True)
+    exe = target / "VoiceTTS.exe"
+    if not exe.exists():
+        sys.exit(f"ERROR: the installer did not put {exe.name} in {target}")
+    print(f"installer: installed into {target}", flush=True)
+    code = smoke(exe)
+    # _?= runs the uninstaller in place and waits for it, instead of it copying
+    # itself to %TEMP% and returning at once; it then cannot delete itself.
+    # Unquoted and last, like /D: NSIS takes the rest of the line as the path.
+    subprocess.run(f'"{target / "uninstall.exe"}" /S _?={target}', check=True)
+    (target / "uninstall.exe").unlink(missing_ok=True)
+    left = [p.name for p in target.iterdir()] if target.exists() else []
+    if left:
+        print(f"ERROR: the uninstaller left {left} in {target}", flush=True)
+        return 1
+    print("installer: uninstalled cleanly", flush=True)
+    return code
 
 
 def smoke(exe: Path) -> int:
@@ -304,6 +373,10 @@ def main() -> int:
     mode.add_argument("--setup", action="store_true", help="prepare the environment and stop")
     mode.add_argument("--smoke", type=Path, metavar="EXE",
                       help="run a packaged build offline as a server and read a sentence")
+    mode.add_argument("--installer", action="store_true",
+                      help="wrap the --package desktop build in an NSIS setup.exe (Windows)")
+    mode.add_argument("--smoke-installer", type=Path, metavar="SETUP",
+                      help="install a setup.exe into a temp dir, --smoke it, uninstall it")
     mode.add_argument("--release-notes", metavar="VERSION",
                       help="print that version's CHANGELOG.md section and stop")
     ap.add_argument("--server-only", action="store_true",
@@ -314,6 +387,11 @@ def main() -> int:
         return release_notes(args.release_notes)
     if args.smoke:
         return smoke(args.smoke)
+    if args.smoke_installer:
+        return smoke_installer(args.smoke_installer)
+    if args.installer:
+        installer()
+        return 0
     setup(args.server_only)
     if args.setup:
         return 0
