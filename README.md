@@ -238,14 +238,65 @@ plain HTTP: fine on a home LAN, not for the internet.
 | `GET /api/voices` | 25 preset voices with region, gender and description, plus `maxChars` |
 | `POST /api/tts/stream` | raw float32 LE mono at 48 kHz, streamed as it is generated |
 
-`POST /api/tts/stream` takes `{"text", "voice", "speed"}`; `speed` defaults to `1.0`
-and must be between `0.5` and `2.0`.
+`POST /api/tts/stream` takes `{"text", "voice", "speed"}`: `text` up to 20 000
+characters, `voice` an exact name from `/api/voices` (omit it for the default),
+`speed` between `0.5` and `2.0` (default `1.0`). The answer is `400` for empty or
+over-long text, an unknown voice or a speed out of range, and `401` when the server
+has a token and the request does not carry it. Every `/api` call takes the token as
+`Authorization: Bearer <token>`; leave the header out for a server without one.
 
+The examples below read one sentence from a LAN server (`<host>` is its address,
+`<token>` the `VOICE_TTS_TOKEN` from its `.env`; for the desktop app use
+`127.0.0.1:<port>` and no header).
+
+**curl.** Put the body in a UTF-8 file and send it with `--data-binary @file`.
+Vietnamese typed straight into a `curl -d '...'` argument gets re-encoded by the
+Windows console (Git Bash and PowerShell alike), and the server answers `400 There
+was an error parsing the body`.
+
+`request.json`:
+```json
+{"text": "Xin chào, đây là ví dụ gọi API.", "voice": "Mai Anh", "speed": 1.0}
 ```
-curl -X POST http://127.0.0.1:8760/api/tts/stream \
+```bash
+curl -f -X POST http://<host>:8760/api/tts/stream \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -d '{"text": "Deploy model lên production server.", "voice": "Mai Anh"}' \
-  --output speech.f32
+  --data-binary @request.json --output speech.f32
+
+ffmpeg -f f32le -ar 48000 -ac 1 -i speech.f32 speech.wav   # raw float32 -> WAV
+```
+
+**Python**, standard library only, straight to a 16-bit WAV:
+```python
+import array, json, urllib.request, wave
+
+req = urllib.request.Request(
+    "http://<host>:8760/api/tts/stream",
+    data=json.dumps({"text": "Xin chào, đây là ví dụ gọi API.",
+                     "voice": "Mai Anh", "speed": 1.0}).encode("utf-8"),
+    headers={"Authorization": "Bearer <token>",
+             "Content-Type": "application/json"})
+with urllib.request.urlopen(req, timeout=600) as resp:
+    rate = int(resp.headers["X-Sample-Rate"])          # 48000
+    samples = array.array("f", resp.read())            # float32 LE mono
+
+pcm = array.array("h", (max(-32767, min(32767, int(x * 32767))) for x in samples))
+with wave.open("speech.wav", "wb") as w:
+    w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate)
+    w.writeframes(pcm.tobytes())
+```
+
+**CLI**, which does the request and the WAV in one step:
+```bash
+voice-tts speak -f text.txt -v "Mai Anh" -s 1.25 -o speech.wav \
+  --server http://<host>:8760 --token <token>
+```
+
+The other endpoints take the same header:
+```bash
+curl -H "Authorization: Bearer <token>" http://<host>:8760/api/voices   # names to use as "voice"
+curl -H "Authorization: Bearer <token>" http://<host>:8760/api/status   # {"state": "ready"}
 ```
 
 ## Docker (Linux server)
