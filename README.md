@@ -392,7 +392,7 @@ carries on without one: the window closes as before, `serve` keeps serving.
 - **The first launch downloads the model** (HuggingFace cache, `~/.cache/huggingface`).
   The window shows *Đang tải model…* until it is ready. This applies to a source
   checkout only.
-- **The packaged build is one self-contained `VoiceTTS.exe`** (~610 MB): the runtime,
+- **The packaged build is one self-contained `VoiceTTS.exe`** (~400 MB): the runtime,
   the web view, the tray icon and both model repos (backbone + audio codec) are
   inside it, and it takes the same subcommands as `app.py` (`VoiceTTS.exe serve
   --tray`, say) - but, being windowed, it prints nothing; the CLI is the installed
@@ -412,6 +412,11 @@ carries on without one: the window closes as before, `serve` keeps serving.
   keep the notices of [pnnbao97/VieNeu-TTS](https://github.com/pnnbao97/VieNeu-TTS)
   and the model repo when redistributing the exe. Cloning a voice you have no rights
   to is not covered.
+- **One icon everywhere.** `icon.py` draws the white sound wave on a black disc for
+  the tray, the window title bar and taskbar button, the Start Menu shortcut, the
+  `VoiceTTS.exe` file and the page's `/favicon.svg`. The window sets its own taskbar
+  app id (`VoiceTTS.Desktop`), so a source run is not grouped under `pythonw.exe`
+  and its Python logo.
 - **The UI is iOS dark, dark only.** A true-black background under `#1C1C1E` grouped
   surfaces, Apple's dark label colours and `systemBlue` as the one tint (the *Đọc*
   button, the chosen speed, the selected voice). There is no light variant and no

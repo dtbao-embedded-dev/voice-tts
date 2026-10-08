@@ -29,6 +29,12 @@ the release before it builds.
   (`/favicon.svg`, which used to be a different white square) all show it. Each
   `.ico` size is drawn at its own resolution instead of scaled down from 256 px.
 
+### Fixed
+
+- The window's title bar and taskbar button showed the Python logo (or
+  PyInstaller's, in `VoiceTTS.exe`); they show the app icon now, and so does the
+  exe file in Explorer.
+
 ## [0.4.0] - 2026-10-08
 
 First published release.

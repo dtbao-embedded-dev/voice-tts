@@ -44,6 +44,7 @@ MODEL_REPOS = (
 HF_HUB = Path(os.environ.get("HF_HOME", Path.home() / ".cache/huggingface")) / "hub"
 # Staged outside build/ and dist/: PyInstaller's --clean wipes both.
 MODEL_STAGE = VENV / "model-bundle"
+EXE_ICON = VENV / "build-icon" / "voice-tts.ico"
 
 # PyInstaller cannot see these through vieneu's lazy imports.
 COLLECT = ["vieneu", "onnxruntime", "sea_g2p", "kaldi_native_fbank", "soxr", "soundfile"]
@@ -177,12 +178,20 @@ def package(server_only: bool = False) -> Path:
     done(t0)
 
     exe = exe_path(server_only)
+    # The desktop exe carries the app icon (Explorer, and the window falls back to
+    # it); without one PyInstaller stamps its own. Only Windows exes have icons,
+    # and only the desktop build has Pillow declared to draw it.
+    icon_flags = []
+    if os.name == "nt" and not server_only:
+        run([str(PY), "-c", "import sys, icon; icon.save_ico(sys.argv[1])", str(EXE_ICON)])
+        icon_flags = ["--icon", str(EXE_ICON)]
+
     t0 = step("bundle (one file, this takes a while)")
     # The desktop build is windowed: no console flashes up behind the window.
     # The server build is a console program - it is run from a shell.
     cmd = [str(PY), "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile",
            "--console" if server_only else "--windowed",
-           "--name", exe.stem,
+           "--name", exe.stem, *icon_flags,
            "--add-data", f"web{os.pathsep}web",
            "--add-data", f"{stage}{os.pathsep}hf"]
     for mod in COLLECT:
