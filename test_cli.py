@@ -288,6 +288,12 @@ def check_icon(base: str, tmp: Path) -> None:
     white = lambda x: px((x, 32))[:3] == (255, 255, 255)
     runs = sum(1 for x in range(8, 57) if white(x) and not white(x - 1))
     assert runs == 5, f"expected 5 bars across the middle, found {runs}"
+    # The title bar takes the 16 px image: there the bars once merged into one blob.
+    for size in icon.ICO_SIZES:
+        small = icon.image(size)
+        row = [small.getpixel((x, size // 2))[:3] == (255, 255, 255) for x in range(size)]
+        runs = sum(1 for x in range(size) if row[x] and (x == 0 or not row[x - 1]))
+        assert runs == 7, f"{size} px: expected ring + 5 bars + ring across the middle, found {runs} runs"
 
     ico = tmp / "voice-tts.ico"
     icon.save_ico(ico)
