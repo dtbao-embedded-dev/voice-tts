@@ -1,5 +1,5 @@
-# Release builds: one self-contained file per platform, model inside, each
-# smoke-tested offline before it ships.
+# Release builds, model inside, each smoke-tested offline before it ships:
+# a Windows installer (NSIS, per user, no admin) and a one-file Linux server.
 #
 #   git tag v0.5.0 && git push origin v0.5.0   # build, test, publish a GitHub Release
 #                                              # (notes: that version's CHANGELOG.md section)
@@ -23,11 +23,13 @@ jobs:
         include:
           - os: windows-latest
             flags: ""
-            exe: dist/VoiceTTS.exe
-            asset: VoiceTTS-windows-x64.exe
+            exe: dist/VoiceTTS/VoiceTTS.exe
+            ship: dist/VoiceTTS-*-setup.exe
+            asset: VoiceTTS-windows-x64-setup.exe
           - os: ubuntu-latest
             flags: --server-only
             exe: dist/voice-tts
+            ship: dist/voice-tts
             asset: voice-tts-linux-x86_64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
@@ -65,18 +67,36 @@ jobs:
       - name: Smoke-test the build offline
         run: python docs/scripts/tool-build.py --smoke ${{ matrix.exe }}
 
+      - name: NSIS
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue) -and
+              -not (Test-Path "${env:ProgramFiles(x86)}\NSIS\makensis.exe")) {
+            choco install nsis -y --no-progress
+          }
+
+      - name: Installer
+        if: runner.os == 'Windows'
+        run: python docs/scripts/tool-build.py --installer
+
+      - name: Install, smoke-test and uninstall the installer
+        if: runner.os == 'Windows'
+        shell: bash
+        run: python docs/scripts/tool-build.py --smoke-installer dist/VoiceTTS-*-setup.exe
+
       - name: Name the file for the release
         shell: bash
         run: |
           mkdir -p release
-          cp "${{ matrix.exe }}" "release/${{ matrix.asset }}"
+          cp ${{ matrix.ship }} "release/${{ matrix.asset }}"
           ls -l release
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}
           path: release/${{ matrix.asset }}
-          compression-level: 0   # already a compressed one-file bundle
+          compression-level: 0   # already compressed: an installer or a one-file bundle
           retention-days: 14
 
   publish:

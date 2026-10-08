@@ -25,7 +25,7 @@ Desktop app that reads mixed Vietnamese/English text aloud, powered by
 
 | You want | Get it with | Then |
 | --- | --- | --- |
-| The app on a Windows PC | [Releases](https://github.com/dtbao-embedded-dev/voice-tts/releases): `VoiceTTS-windows-x64.exe`, or `python docs/scripts/tool-install.py` | open *Voice TTS*, type, press **Đọc** |
+| The app on a Windows PC | [Releases](https://github.com/dtbao-embedded-dev/voice-tts/releases): `VoiceTTS-windows-x64-setup.exe`, or `python docs/scripts/tool-install.py` | open *Voice TTS*, type, press **Đọc** |
 | A server for the whole LAN | `python docs/scripts/tool-install.py --remote user@linux-host` | open `http://<host>:8760/?token=<token>` |
 | Text to audio from a script | `voice-tts speak ... -o out.wav` | see [Command line](#command-line) |
 | A Linux binary, no Docker | Releases: `voice-tts-linux-x86_64` | `./voice-tts-linux-x86_64 serve --host 0.0.0.0` |
@@ -94,7 +94,6 @@ full table and the exit codes.
 | `Không có giọng '...'` (exit 2) | voice name mistyped: `voice-tts voices` lists the exact names |
 | `voice-tts` not found on Windows | open a new terminal after the install, so it sees the new `PATH` |
 | `no audio player found` on Linux | install `pulseaudio-utils` or `alsa-utils`, or write a file with `-o` |
-| Exe takes ~10 s to show up | a one-file build unpacks itself on every launch; that is normal |
 
 ## Quick start (development)
 
@@ -110,7 +109,8 @@ done, so later runs start in seconds.
 | --- | --- |
 | `python docs/scripts/tool-build.py` | set up if needed, then launch the app |
 | `python docs/scripts/tool-build.py --check` | run the smoke test |
-| `python docs/scripts/tool-build.py --package` | build `dist/VoiceTTS.exe`, model included |
+| `python docs/scripts/tool-build.py --package` | build `dist/VoiceTTS/`, model included |
+| `python docs/scripts/tool-build.py --installer` | wrap it in `dist/VoiceTTS-<version>-setup.exe` (needs NSIS) |
 | `python docs/scripts/tool-build.py --setup` | prepare the environment and stop |
 
 Running `app.py` directly works too:
@@ -141,8 +141,10 @@ files in place and reinstalls packages only when the requirements changed;
 `--prefix DIR` installs elsewhere. Uninstall removes the folder, the shortcuts and
 the `PATH` entry, and leaves the HuggingFace model cache alone.
 
-This is the install that gives a working CLI. The packaged `VoiceTTS.exe` is a
-windowed build with no console, so it is for the window and `serve --tray` only.
+This is the install that gives a working CLI. The release installer's `VoiceTTS.exe`
+is a windowed build with no console, so it is for the window and `serve --tray` only.
+The two live side by side: this one in `Programs\VoiceTTS`, the installer's in
+`Programs\Voice TTS`; whichever ran last owns the Start Menu shortcut.
 
 ### Linux (Docker)
 
@@ -365,6 +367,13 @@ server keeps running**. A click on the tray icon brings the window back; its men
 has *Mở cửa sổ*, *Mở trong trình duyệt*, *Sao chép URL* and *Thoát* - only *Thoát*
 ends the app. `--no-tray` restores the old behaviour, close = quit.
 
+On Windows the right-click menu is the app's own (`web/tray.html`, shown by
+`tray.PopupMenu`): the status and the address *Sao chép URL* copies on top, an icon
+per entry, *Thoát* in red below a separator. It is a hidden window made at start,
+so opening it only moves and shows it; it closes on Esc, a click elsewhere or a
+pick, and the arrow keys and Enter work as in a native menu. Should it fail to open,
+the native menu shows instead.
+
 ```
 voice-tts serve --tray --open              # no window at all: an icon and a browser tab
 voice-tts serve --tray --host 0.0.0.0 --token <t>
@@ -392,15 +401,15 @@ carries on without one: the window closes as before, `serve` keeps serving.
 - **The first launch downloads the model** (HuggingFace cache, `~/.cache/huggingface`).
   The window shows *Đang tải model…* until it is ready. This applies to a source
   checkout only.
-- **The packaged build is one self-contained `VoiceTTS.exe`** (~400 MB): the runtime,
-  the web view, the tray icon and both model repos (backbone + audio codec) are
-  inside it, and it takes the same subcommands as `app.py` (`VoiceTTS.exe serve
-  --tray`, say) - but, being windowed, it prints nothing; the CLI is the installed
-  `voice-tts`. It
-  points `HF_HOME` at its own copy with `HF_HUB_OFFLINE=1`, so it never touches the
-  network. The price is that a one-file build unpacks itself into `%TEMP%` on *every*
-  launch — measured ~10 s from launch to *Sẵn sàng* here, longer on a cold machine
-  while Defender scans it.
+- **The packaged desktop build is a folder** (`dist/VoiceTTS/`, ~760 MB; the NSIS
+  installer around it is ~330 MB): the runtime, the web view, the tray icon and both
+  model repos (backbone + audio codec) are inside, and `VoiceTTS.exe` takes the same
+  subcommands as `app.py` (`VoiceTTS.exe serve --tray`, say) - but, being windowed,
+  it prints nothing; the CLI is the installed `voice-tts`. It points `HF_HOME` at its
+  own copy with `HF_HUB_OFFLINE=1`, so it never touches the network. It is a folder
+  and not one file because a one-file build unpacks itself into `%TEMP%` on *every*
+  launch (~10 s here before *Sẵn sàng*). Building the installer compresses the model
+  with LZMA, which takes ~9 minutes.
 - **Reading speed is a time-stretch, not a playback rate.** v3 Turbo has no speed
   parameter, so the backend stretches the stream itself (WSOLA: overlap-add with a
   waveform-similarity search, `Stretch` in `app.py`). The 0.75×–1.5× buttons change
@@ -445,12 +454,14 @@ notes are that section, with these files and `SHA256SUMS`:
 
 | File | What it is |
 | --- | --- |
-| `VoiceTTS-windows-x64.exe` | the desktop app: window + tray + every subcommand, model inside |
+| `VoiceTTS-windows-x64-setup.exe` | the desktop app's installer (per user, no admin): window + tray + every subcommand, model inside |
 | `voice-tts-linux-x86_64` | console server + CLI (`serve`, `speak`, `voices`, `status`), model inside, no window |
 
 Each file is smoke-tested before it ships: `tool-build.py --smoke <file>` starts it
 as a server with `HF_HUB_OFFLINE=1`, waits for the bundled model and has it read a
-mixed sentence. *Run workflow* in the Actions tab does the build and the test
+mixed sentence. The installer gets the same test after a silent install into a temp
+folder (`--smoke-installer`), and then must uninstall without leaving a file
+behind. *Run workflow* in the Actions tab does the build and the test
 without publishing; the files stay as artifacts for 14 days. The Linux binary is
 built on `ubuntu-latest`, so it needs a glibc at least as new as that runner's;
 older distributions use the Docker image instead. A release redistributes the model
@@ -459,6 +470,8 @@ and its preset voices (Apache-2.0, see *Licence* under Notes).
 ```
 python docs/scripts/tool-build.py --package --server-only   # dist/voice-tts, locally
 python docs/scripts/tool-build.py --smoke dist/voice-tts
+python docs/scripts/tool-build.py --package && python docs/scripts/tool-build.py --installer
+python docs/scripts/tool-build.py --smoke-installer dist/VoiceTTS-0.6.0-setup.exe
 python docs/scripts/tool-build.py --release-notes 0.5.0     # the notes a v0.5.0 tag publishes
 ```
 
@@ -466,17 +479,18 @@ python docs/scripts/tool-build.py --release-notes 0.5.0     # the notes a v0.5.0
 
 ```
 app.py                    FastAPI backend + native window entry point
-tray.py                   system tray icon and its menu (pystray)
+tray.py                   system tray icon, its native menu (pystray) and the popup menu
 icon.py                   the app icon, one geometry: tray/window/exe .ico and /favicon.svg
 cli.py                    command line: subcommands and flags, stdlib-only at import
 test_tts.py               assert-based smoke test over the real HTTP path
 test_cli.py               fast checks with a stub engine: CLI (local + remote), token guard
 CHANGELOG.md              user-visible changes per version; a release publishes its section
-web/                      index.html, app.css, app.js - no build step
+web/                      index.html, app.css, app.js, tray.html (tray menu) - no build step
 requirements.txt          server + CLI core (what Docker installs)
 requirements-desktop.txt  core + window + tray (what tool-build.py installs)
 Dockerfile, compose.yaml  Linux server image, token from .env
-.github/workflows/        ci.yml (tests, both OSes), release.yml (exe + Linux binary)
-docs/scripts/tool-build.py  setup / run / check / package
+.github/workflows/        ci.yml (tests, both OSes), release.yml (installer + Linux binary)
+docs/scripts/tool-build.py  setup / run / check / package / installer
+docs/scripts/voice-tts.nsi  the NSIS installer script tool-build.py --installer runs
 docs/scripts/tool-install.py  install / uninstall: Windows venv, Linux Docker, --remote over ssh
 ```

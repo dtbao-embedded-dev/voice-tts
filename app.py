@@ -545,6 +545,11 @@ def run_gui(port: int = 0, tray: bool = True) -> None:
         if icon.start():
             window.events.closing += on_closing
             window.events.minimized += window.hide
+            if sys.platform == "win32":
+                from tray import PopupMenu
+
+                # Right-click opens the app's own dark menu, not the native one.
+                icon.popup = PopupMenu(icon, url)
         else:
             icon = None  # no tray here: closing the window quits, as before
 

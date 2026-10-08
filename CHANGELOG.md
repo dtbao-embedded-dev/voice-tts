@@ -6,6 +6,28 @@ Every user-visible change, newest first. The format follows
 (`tool-build.py --release-notes <version>`), and a tag without a section here fails
 the release before it builds.
 
+## [0.6.0] - 2026-10-08
+
+### Changed
+
+- The Windows release is an installer, `VoiceTTS-windows-x64-setup.exe` (NSIS),
+  instead of a one-file `VoiceTTS.exe`. It installs for the current user without an
+  admin prompt into `%LOCALAPPDATA%\Programs\Voice TTS`, adds a Start Menu entry
+  (and a desktop shortcut, optional), and uninstalls from Settings > Apps. The app
+  inside is a folder build, so it no longer unpacks ~400 MB into `%TEMP%` on every
+  launch.
+- The tray icon's right-click menu is the app's own dark menu - status and address
+  at the top, an icon per entry, *Thoát* set apart in red - in place of the white
+  Windows menu. It opens at the pointer, closes on Esc or a click elsewhere, and
+  *Sao chép URL* confirms the copy in place. `serve --tray`, which has no window,
+  keeps the native menu.
+
+### Fixed
+
+- The title bar icon was a white blob: at 16 px the five bars merged into one. The
+  bars now sit on whole pixels at every size, and the `.ico` carries a 20 px image
+  for 125 % scaling.
+
 ## [0.5.0] - 2026-10-08
 
 ### Added

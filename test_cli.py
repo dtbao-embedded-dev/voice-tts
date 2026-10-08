@@ -255,6 +255,16 @@ def check_tray() -> None:
     dict(icon.menu_items())["Mở cửa sổ"]()
     assert calls == ["show"], calls
 
+    # The popup menu draws each entry with the icon named by its key, and shows
+    # the address that "Sao chép URL" copies.
+    page = (ROOT / "web" / "tray.html").read_text(encoding="utf-8")
+    for key, _, _ in icon.entries():
+        assert f"\n  {key}: '" in page, f"web/tray.html has no icon for {key!r}"
+    api = tray._PopupApi(type("Popup", (), {"tray": icon})())
+    got = api.info()
+    assert got["address"] == "192.168.0.2:1", got
+    assert [i["label"] for i in got["items"]] == labels, got
+
     headless = tray.Tray("http://127.0.0.1:1/", on_quit=lambda: None)
     assert "Mở cửa sổ" not in [label for label, _ in headless.menu_items()], \
         "serve --tray has no window to open"
@@ -288,6 +298,12 @@ def check_icon(base: str, tmp: Path) -> None:
     white = lambda x: px((x, 32))[:3] == (255, 255, 255)
     runs = sum(1 for x in range(8, 57) if white(x) and not white(x - 1))
     assert runs == 5, f"expected 5 bars across the middle, found {runs}"
+    # The title bar takes the 16 px image: there the bars once merged into one blob.
+    for size in icon.ICO_SIZES:
+        small = icon.image(size)
+        row = [small.getpixel((x, size // 2))[:3] == (255, 255, 255) for x in range(size)]
+        runs = sum(1 for x in range(size) if row[x] and (x == 0 or not row[x - 1]))
+        assert runs == 7, f"{size} px: expected ring + 5 bars + ring across the middle, found {runs} runs"
 
     ico = tmp / "voice-tts.ico"
     icon.save_ico(ico)
