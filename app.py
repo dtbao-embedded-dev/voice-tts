@@ -11,17 +11,20 @@ The UI is a web view hosted in a native window; this module is the HTTP backend
 from __future__ import annotations
 
 import hmac
+import io
 import os
 import socket
 import sys
 import threading
+import wave
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from numpy.lib.stride_tricks import sliding_window_view
 from pydantic import BaseModel
@@ -256,6 +259,22 @@ class SpeakRequest(BaseModel):
     text: str
     voice: str | None = None
     speed: float = 1.0
+    # "f32": raw float32 streamed as it is generated. "wav": the whole reading
+    # as one 16-bit file, sent once it is complete.
+    format: Literal["f32", "wav"] = "f32"
+
+
+def wav_bytes(chunks) -> bytes:
+    """Collect float32 chunks into a complete 16-bit mono WAV file."""
+    audio = np.concatenate([np.zeros(0, dtype=np.float32), *chunks])
+    pcm = (np.clip(audio, -1.0, 1.0) * 32767).astype("<i2")
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(SAMPLE_RATE)
+        out.writeframes(pcm.tobytes())
+    return buf.getvalue()
 
 
 def _warm() -> None:
@@ -318,11 +337,23 @@ def tts_stream(req: SpeakRequest):
 
     ``speed`` scales the duration and leaves the pitch where it is, so the
     stream is always 48 kHz and the client plays it back untouched.
+
+    ``format: "wav"`` trades the streaming for a file any player opens: the
+    whole reading is synthesized first, then sent as one 16-bit WAV with its
+    real length in the header and in ``Content-Length``.
     """
     try:
         _, chunks = synthesize(req.text, req.voice, req.speed)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from None
+
+    if req.format == "wav":
+        return Response(
+            wav_bytes(chunks),
+            media_type="audio/wav",
+            headers={"X-Sample-Rate": str(SAMPLE_RATE), "Cache-Control": "no-store",
+                     "Content-Disposition": 'inline; filename="speech.wav"'},
+        )
 
     def samples():
         # A failure here lands mid-body, so the client sees a short stream

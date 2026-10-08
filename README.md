@@ -236,12 +236,20 @@ plain HTTP: fine on a home LAN, not for the internet.
 | --- | --- |
 | `GET /api/status` | `{"state": "loading" \| "ready" \| "error"}` while the model warms up |
 | `GET /api/voices` | 25 preset voices with region, gender and description, plus `maxChars` |
-| `POST /api/tts/stream` | raw float32 LE mono at 48 kHz, streamed as it is generated |
+| `POST /api/tts/stream` | raw float32 LE mono at 48 kHz, streamed as it is generated; or one 16-bit WAV file with `"format": "wav"` |
 
-`POST /api/tts/stream` takes `{"text", "voice", "speed"}`: `text` up to 20 000
-characters, `voice` an exact name from `/api/voices` (omit it for the default),
-`speed` between `0.5` and `2.0` (default `1.0`). The answer is `400` for empty or
-over-long text, an unknown voice or a speed out of range, and `401` when the server
+`POST /api/tts/stream` takes `{"text", "voice", "speed", "format"}`: `text` up to
+20 000 characters, `voice` an exact name from `/api/voices` (omit it for the
+default), `speed` between `0.5` and `2.0` (default `1.0`), `format` either `"f32"`
+(default) or `"wav"`.
+
+| `format` | Body | `Content-Type` | Starts arriving |
+| --- | --- | --- | --- |
+| `"f32"` | raw float32 LE mono, 48 kHz, no header | `application/octet-stream` | with the first generated chunk - for live playback |
+| `"wav"` | a complete 16-bit mono WAV, 48 kHz, real length in the header and `Content-Length` | `audio/wav` | once the whole text is synthesized - for saving a file |
+
+The answer is `400` for empty or over-long text, an unknown voice or a speed out
+of range, `422` for an unknown `format`, and `401` when the server
 has a token and the request does not carry it. Every `/api` call takes the token as
 `Authorization: Bearer <token>`; leave the header out for a server without one.
 
@@ -256,35 +264,40 @@ was an error parsing the body`.
 
 `request.json`:
 ```json
-{"text": "Xin chào, đây là ví dụ gọi API.", "voice": "Mai Anh", "speed": 1.0}
+{"text": "Xin chào, đây là ví dụ gọi API.", "voice": "Mai Anh", "speed": 1.0, "format": "wav"}
 ```
 ```bash
 curl -f -X POST http://<host>:8760/api/tts/stream \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  --data-binary @request.json --output speech.f32
-
-ffmpeg -f f32le -ar 48000 -ac 1 -i speech.f32 speech.wav   # raw float32 -> WAV
+  --data-binary @request.json --output speech.wav
 ```
 
-**Python**, standard library only, straight to a 16-bit WAV:
+Without `"format": "wav"` the same call streams raw float32; save that as
+`speech.f32` and convert it with
+`ffmpeg -f f32le -ar 48000 -ac 1 -i speech.f32 speech.wav`.
+
+**Python**, standard library only, the server writing the WAV:
 ```python
-import array, json, urllib.request, wave
+import json, urllib.request
 
 req = urllib.request.Request(
     "http://<host>:8760/api/tts/stream",
     data=json.dumps({"text": "Xin chào, đây là ví dụ gọi API.",
-                     "voice": "Mai Anh", "speed": 1.0}).encode("utf-8"),
+                     "voice": "Mai Anh", "speed": 1.0, "format": "wav"}).encode("utf-8"),
     headers={"Authorization": "Bearer <token>",
              "Content-Type": "application/json"})
-with urllib.request.urlopen(req, timeout=600) as resp:
-    rate = int(resp.headers["X-Sample-Rate"])          # 48000
-    samples = array.array("f", resp.read())            # float32 LE mono
+with urllib.request.urlopen(req, timeout=600) as resp, open("speech.wav", "wb") as out:
+    out.write(resp.read())
+```
 
-pcm = array.array("h", (max(-32767, min(32767, int(x * 32767))) for x in samples))
-with wave.open("speech.wav", "wb") as w:
-    w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate)
-    w.writeframes(pcm.tobytes())
+To start playing before the whole text is done, leave `format` out and read the
+raw stream as it arrives:
+```python
+with urllib.request.urlopen(req, timeout=600) as resp:   # a request without "format"
+    rate = int(resp.headers["X-Sample-Rate"])             # 48000
+    while block := resp.read1(65536):                     # float32 LE mono
+        ...                                               # hand it to an audio device
 ```
 
 **CLI**, which does the request and the WAV in one step:

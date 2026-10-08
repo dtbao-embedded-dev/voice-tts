@@ -196,6 +196,37 @@ def check_remote(base: str, tmp: Path) -> None:
     print("remote: wav, stdout, stdin, -f, --raw, bad input -> 2, auth/unreachable -> 1")
 
 
+def post(base: str, body: dict) -> tuple[int, dict, bytes]:
+    req = urllib.request.Request(f"{base}/api/tts/stream", data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.status, {k.lower(): v for k, v in resp.headers.items()}, resp.read()
+    except urllib.error.HTTPError as exc:
+        return exc.code, {}, exc.read()
+
+
+def check_wav_format(base: str) -> None:
+    """``"format": "wav"`` answers a whole, playable file; the default stays raw."""
+    status, headers, body = post(base, {"text": "xin chào", "format": "wav"})
+    assert status == 200, f"format wav: {status} {body[:200]!r}"
+    assert headers["content-type"] == "audio/wav", headers["content-type"]
+    assert int(headers["content-length"]) == len(body), "WAV must carry its length"
+    assert wav_frames(body) == 2 * WORD, "WAV frames do not match the speech"
+
+    status, headers, body = post(base, {"text": "xin chào", "format": "wav", "speed": 0.75})
+    slack = app.STRETCH_FRAME + app.STRETCH_SEARCH + app.STRETCH_HOP
+    assert status == 200 and abs(wav_frames(body) - 2 * WORD / 0.75) <= slack, "wav at 0.75x"
+
+    status, headers, body = post(base, {"text": "xin chào"})
+    assert headers["content-type"] == "application/octet-stream", "default is no longer raw"
+    assert len(body) == 2 * WORD * 4, "raw stream length changed"
+
+    assert post(base, {"text": "xin chào", "format": "mp3"})[0] == 422, "unknown format accepted"
+    assert post(base, {"text": " ", "format": "wav"})[0] == 400, "empty text as wav accepted"
+    print("format: wav is a whole 16-bit file with its length, raw stays the default")
+
+
 def check_local(tmp: Path) -> None:
     """The in-process engine path (the stub stands in for VieNeu)."""
     out = tmp / "local.wav"
@@ -260,6 +291,7 @@ def main() -> int:
     check_token(base)
     with tempfile.TemporaryDirectory() as tmp:
         check_remote(base, Path(tmp))
+        check_wav_format(base)
         check_local(Path(tmp))
     print("OK")
     return 0
