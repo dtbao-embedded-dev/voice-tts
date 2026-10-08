@@ -355,11 +355,15 @@ def start_server(port: int = 0, host: str = "127.0.0.1",
     """Bind a socket, serve on it in a daemon thread, return the bound port.
 
     Binding before handing the socket to uvicorn avoids the race of picking a
-    free port and then losing it to another process.
+    free port and then losing it to another process. Listening here too means a
+    request made the moment this returns waits in the backlog instead of being
+    refused while uvicorn is still starting - Linux refuses at once, Windows
+    only hides it by retrying the connect for a second or two.
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind((host, port))
+    sock.listen(2048)  # uvicorn's default backlog; its own listen() is then a no-op
     bound_port = sock.getsockname()[1]
 
     server = uvicorn.Server(uvicorn.Config(app, log_level=log_level))
