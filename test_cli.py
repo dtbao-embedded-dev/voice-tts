@@ -8,9 +8,17 @@ and is what CI runs. The real-model path is ``test_tts.py``.
 
 from __future__ import annotations
 
+import io
+import json
+import os
+import socket
+import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.request
+import wave
+from pathlib import Path
 
 import numpy as np
 
@@ -18,6 +26,8 @@ import app
 import cli
 
 TOKEN = "s3cret-token"
+ROOT = Path(__file__).resolve().parent
+WORD = int(app.SAMPLE_RATE * 0.1)  # samples the stub engine emits per word
 
 
 class StubEngine:
@@ -96,6 +106,109 @@ def check_token(base: str) -> None:
     print("token: 401 without, 200 with Bearer or cookie, /?token= sets it")
 
 
+def run_cli(*args: str, stdin: bytes = b"") -> tuple[int, bytes, str]:
+    """``cli.py`` in a fresh process, as a user runs it: exit code, stdout, stderr.
+
+    A subprocess is the only honest test of ``-o -``: nothing but the WAV may
+    reach stdout. It also proves the remote path imports nothing beyond the
+    standard library, since this process never touches ``app``.
+    """
+    env = {k: v for k, v in os.environ.items() if not k.startswith("VOICE_TTS_")}
+    env["PYTHONIOENCODING"] = "utf-8"
+    proc = subprocess.run([sys.executable, str(ROOT / "cli.py"), *args], input=stdin,
+                          capture_output=True, env=env, timeout=60)
+    return proc.returncode, proc.stdout, proc.stderr.decode("utf-8", "replace")
+
+
+def wav_frames(data: bytes) -> int:
+    with wave.open(io.BytesIO(data)) as wav:
+        assert wav.getframerate() == app.SAMPLE_RATE, f"rate {wav.getframerate()}"
+        assert (wav.getnchannels(), wav.getsampwidth()) == (1, 2), "not 16-bit mono"
+        frames = wav.readframes(wav.getnframes())
+        assert np.abs(np.frombuffer(frames, "<i2")).max() > 3000, "WAV is silent"
+        return wav.getnframes()
+
+
+def free_port() -> int:
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def check_remote(base: str, tmp: Path) -> None:
+    app.set_token(TOKEN)
+    try:
+        remote = ("--server", base, "--token", TOKEN)
+
+        out = tmp / "remote.wav"
+        code, _, err = run_cli("speak", "xin chào", "-o", str(out), *remote)
+        assert code == 0, f"speak -o failed ({code}): {err}"
+        assert wav_frames(out.read_bytes()) == 2 * WORD, "WAV length does not match the stream"
+
+        code, stdout, err = run_cli("speak", "một hai ba", "-o", "-", "-q", *remote)
+        assert code == 0, f"speak -o - failed ({code}): {err}"
+        assert stdout[:4] == b"RIFF", "stdout does not start with the WAV header"
+        assert wav_frames(stdout) == 3 * WORD, "stdout carries more than the WAV"
+
+        code, stdout, err = run_cli("speak", "-o", "-", "-q", *remote, stdin="một hai ba bốn".encode())
+        assert code == 0 and wav_frames(stdout) == 4 * WORD, f"stdin text not read: {err}"
+
+        src = tmp / "text.txt"
+        src.write_text("năm sáu", encoding="utf-8")
+        code, stdout, err = run_cli("speak", "-f", str(src), "-o", "-", "-q", *remote)
+        assert code == 0 and wav_frames(stdout) == 2 * WORD, f"-f FILE not read: {err}"
+
+        raw = tmp / "remote.f32"
+        code, _, err = run_cli("speak", "xin chào", "--raw", "-o", str(raw), *remote)
+        assert code == 0 and raw.stat().st_size == 2 * WORD * 4, f"--raw wrong size: {err}"
+
+        code, _, err = run_cli("speak", "xin chào", "-v", "Không Tồn Tại", "-o", "-", *remote)
+        assert code == 2 and "Không Tồn Tại" in err, f"unknown voice: exit {code}, {err!r}"
+        code, _, err = run_cli("speak", "xin chào", "-s", "3", "-o", "-", *remote)
+        assert code == 2, f"out-of-range speed: exit {code}"
+        code, _, err = run_cli("speak", "xin chào", "--raw", *remote)
+        assert code == 2, "--raw without -o must be a usage error"
+        code, _, err = run_cli("speak", "xin chào", "-o", "-", "--server", base, "--token", "nope")
+        assert code == 1 and "token" in err.lower(), f"wrong token: exit {code}, {err!r}"
+        code, _, err = run_cli("speak", "xin chào", "-o", "-",
+                               "--server", f"http://127.0.0.1:{free_port()}")
+        assert code == 1 and "reach" in err.lower(), f"server down: exit {code}, {err!r}"
+
+        code, stdout, err = run_cli("voices", "--json", *remote)
+        assert code == 0, f"voices --json failed: {err}"
+        info = json.loads(stdout)
+        assert [v["name"] for v in info["voices"]] == ["Stub A", "Stub B"], info
+        code, stdout, _ = run_cli("voices", *remote)
+        table = stdout.decode("utf-8")
+        assert code == 0 and "Stub A" in table and "Bắc" in table, table
+
+        code, stdout, err = run_cli("status", *remote)
+        assert code == 0 and stdout.decode().strip() == "ready", f"status: {code} {stdout!r} {err}"
+        code, stdout, _ = run_cli("status", "--json", *remote)
+        assert json.loads(stdout) == {"state": "ready"}, stdout
+        code, _, _ = run_cli("status", "--server", f"http://127.0.0.1:{free_port()}")
+        assert code == 1, "status of an unreachable server must fail"
+    finally:
+        app.set_token(None)
+    print("remote: wav, stdout, stdin, -f, --raw, bad input -> 2, auth/unreachable -> 1")
+
+
+def check_local(tmp: Path) -> None:
+    """The in-process engine path (the stub stands in for VieNeu)."""
+    out = tmp / "local.wav"
+    assert cli.main(["speak", "xin chào", "-o", str(out), "-q"]) == 0
+    assert wav_frames(out.read_bytes()) == 2 * WORD, "local WAV length is off"
+
+    assert cli.main(["speak", "xin chào", "-s", "0.75", "-o", str(out), "-q"]) == 0
+    slow = wav_frames(out.read_bytes())
+    slack = app.STRETCH_FRAME + app.STRETCH_SEARCH + app.STRETCH_HOP
+    assert abs(slow - 2 * WORD / 0.75) <= slack, f"0.75x gave {slow} frames"
+
+    assert cli.main(["speak", "xin chào", "-v", "Không Tồn Tại", "-o", str(out), "-q"]) == 2
+    assert cli.main(["speak", " ", "-o", str(out), "-q"]) == 2, "empty text accepted"
+    print("local: in-process engine, speed, validation -> 2")
+
+
 def main() -> int:
     app._engine = StubEngine()
     check_parser()
@@ -103,6 +216,9 @@ def main() -> int:
     _, port, _ = app.start_server(host="127.0.0.1", port=0)
     base = f"http://127.0.0.1:{port}"
     check_token(base)
+    with tempfile.TemporaryDirectory() as tmp:
+        check_remote(base, Path(tmp))
+        check_local(Path(tmp))
     print("OK")
     return 0
 

@@ -42,6 +42,44 @@ Running `app.py` directly works too:
 
 `--no-window` is still accepted and means `serve`.
 
+## Command line
+
+```
+voice-tts speak "Xin chào, deploy lên production server."           # play it
+voice-tts speak -f bai-doc.txt -v "Mai Anh" -s 1.25 -o bai-doc.wav  # save it
+echo "Chào bạn" | voice-tts speak -o - > chao.wav                   # pipe it
+voice-tts speak "Xin chào" --server http://192.168.0.137:8760 --token <t>
+voice-tts voices                 # * default, + featured; --json for the raw list
+voice-tts status --wait 600      # exit 0 once the server's model is ready
+```
+
+| `speak` flag | Meaning |
+| --- | --- |
+| `TEXT...` / `-f FILE` / stdin | the text; `-` (or a pipe with no `TEXT`) reads stdin, UTF-8 |
+| `-v`, `--voice` | preset voice name; `voice-tts voices` lists them |
+| `-s`, `--speed` | 0.5-2.0, pitch unchanged (default 1.0) |
+| `-o`, `--output` | write to a file, or `-` for stdout; without it the text is played |
+| `--play` / `--no-play` | force playback on or off (default: on unless `-o`) |
+| `--raw` | with `-o`: raw float32 LE mono 48 kHz instead of a 16-bit WAV |
+| `--server URL`, `--token T` | use a running server instead of loading the model here |
+| `--local` | ignore `$VOICE_TTS_SERVER` |
+| `--timeout S` | seconds to wait on the server (default 600) |
+| `-q`, `--quiet` | nothing on stderr except errors |
+
+`voices` and `status` take `--server`, `--token`, `--timeout` and `--json` too.
+`$VOICE_TTS_SERVER` and `$VOICE_TTS_TOKEN` are the defaults for `--server` and
+`--token`. Exit codes: `0` done, `1` runtime failure (unreachable server, wrong
+token, model failed), `2` bad input (usage, empty or over-long text, unknown voice,
+speed out of range).
+
+- **Without `--server`** the model loads in the CLI process (~30 s); for many short
+  reads, start `voice-tts serve` once and point the CLI at it.
+- **With `--server`** `cli.py` imports only the standard library, so it runs on any
+  Python 3.10+ with nothing installed.
+- **Playback** streams into `paplay`, `pw-play` or `aplay` on Linux as the audio
+  arrives. Windows (`winsound`) and macOS (`afplay`) have no streaming player in the
+  base system, so they play once the whole text is synthesized.
+
 ## Server mode
 
 ```
@@ -118,7 +156,7 @@ curl -X POST http://127.0.0.1:8760/api/tts/stream \
 app.py                    FastAPI backend + native window entry point
 cli.py                    command line: subcommands and flags, stdlib-only at import
 test_tts.py               assert-based smoke test over the real HTTP path
-test_cli.py               fast checks with a stub engine: CLI, token guard
+test_cli.py               fast checks with a stub engine: CLI (local + remote), token guard
 web/                      index.html, app.css, app.js - no build step
 docs/scripts/tool-build.py  setup / run / check / package
 ```
