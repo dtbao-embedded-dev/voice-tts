@@ -27,7 +27,7 @@ import urllib.request
 import wave
 from array import array
 
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 
 DEFAULT_PORT = 8760
 ENV_TOKEN = "VOICE_TTS_TOKEN"

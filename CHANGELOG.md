@@ -6,7 +6,7 @@ Every user-visible change, newest first. The format follows
 (`tool-build.py --release-notes <version>`), and a tag without a section here fails
 the release before it builds.
 
-## [Unreleased]
+## [0.6.1] - 2026-10-08
 
 ### Changed
 
