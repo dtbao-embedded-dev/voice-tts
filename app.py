@@ -41,6 +41,13 @@ if (BASE_DIR / "hf").is_dir():
     os.environ["HF_HOME"] = str(BASE_DIR / "hf")
     os.environ["HF_HUB_OFFLINE"] = "1"
 
+# On Linux the HuggingFace cache makes each snapshot file a symlink into blobs/.
+# onnxruntime resolves the backbone through that link and then refuses its
+# external .data file, a different blob, as "escaping the model directory".
+# Real files in the snapshot keep the weights side by side. Windows already
+# gets real files (no symlink rights), so nothing changes there.
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS", "1")
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
