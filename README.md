@@ -219,8 +219,11 @@ carries on without one: the window closes as before, `serve` keeps serving.
 - **The first launch downloads the model** (HuggingFace cache, `~/.cache/huggingface`).
   The window shows *Đang tải model…* until it is ready. This applies to a source
   checkout only.
-- **The packaged build is one self-contained `VoiceTTS.exe`** (~400 MB): the runtime,
-  the web view and both model repos (backbone + audio codec) are inside it, and it
+- **The packaged build is one self-contained `VoiceTTS.exe`** (~610 MB): the runtime,
+  the web view, the tray icon and both model repos (backbone + audio codec) are
+  inside it, and it takes the same subcommands as `app.py` (`VoiceTTS.exe serve
+  --tray`, say) - but, being windowed, it prints nothing; the CLI is the installed
+  `voice-tts`. It
   points `HF_HOME` at its own copy with `HF_HUB_OFFLINE=1`, so it never touches the
   network. The price is that a one-file build unpacks itself into `%TEMP%` on *every*
   launch — measured ~10 s from launch to *Sẵn sàng* here, longer on a cold machine

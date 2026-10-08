@@ -39,6 +39,8 @@ MODEL_STAGE = VENV / "model-bundle"
 
 # PyInstaller cannot see these through vieneu's lazy imports.
 COLLECT = ["vieneu", "onnxruntime", "sea_g2p", "kaldi_native_fbank", "soxr", "soundfile"]
+# pystray picks its backend module by name at runtime; name the Windows one.
+HIDDEN = ["pystray._win32"]
 # vieneu ships a Gradio demo we never import; it would double the bundle.
 EXCLUDE = ["gradio", "gradio_client", "matplotlib", "tkinter", "IPython"]
 
@@ -158,6 +160,8 @@ def package() -> None:
            "--add-data", f"{stage}{os.pathsep}hf"]
     for mod in COLLECT:
         cmd += ["--collect-all", mod]
+    for mod in HIDDEN:
+        cmd += ["--hidden-import", mod]
     for mod in EXCLUDE:
         cmd += ["--exclude-module", mod]
     cmd.append("app.py")
