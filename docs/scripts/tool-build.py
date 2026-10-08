@@ -6,6 +6,11 @@
     python docs/scripts/tool-build.py --package   # set up and build dist/VoiceTTS
     python docs/scripts/tool-build.py --setup     # set up only
 
+    python docs/scripts/tool-build.py --package --server-only   # dist/voice-tts: console,
+                                                                # server + CLI, no window
+    python docs/scripts/tool-build.py --smoke dist/voice-tts    # run a build offline as a
+                                                                # server and read a sentence
+
 Every step is skipped when it is already done, so the second run is the fast one.
 """
 
@@ -40,9 +45,12 @@ MODEL_STAGE = VENV / "model-bundle"
 # PyInstaller cannot see these through vieneu's lazy imports.
 COLLECT = ["vieneu", "onnxruntime", "sea_g2p", "kaldi_native_fbank", "soxr", "soundfile"]
 # pystray picks its backend module by name at runtime; name the Windows one.
-HIDDEN = ["pystray._win32"]
+HIDDEN = ["pystray._win32"] if os.name == "nt" else []
 # vieneu ships a Gradio demo we never import; it would double the bundle.
 EXCLUDE = ["gradio", "gradio_client", "matplotlib", "tkinter", "IPython"]
+# A server-only build has no window and no tray.
+EXCLUDE_SERVER = ["webview", "pystray", "tray"]
+SMOKE_TEXT = "Xin chào, bản đóng gói này chạy offline và đọc được tiếng Việt lẫn English."
 
 
 def run(cmd: list[str], **kw) -> None:
@@ -73,14 +81,15 @@ def ensure_venv() -> None:
     done(t0)
 
 
-def ensure_deps() -> None:
-    digest = hashlib.sha256(b"".join(f.read_bytes() for f in REQ_FILES)).hexdigest()
+def ensure_deps(server_only: bool = False) -> None:
+    files = REQ_FILES[:1] if server_only else REQ_FILES
+    digest = hashlib.sha256(b"".join(f.read_bytes() for f in files)).hexdigest()
     if STAMP.exists() and STAMP.read_text().strip() == digest:
         print("  deps ... unchanged", flush=True)
         return
     t0 = step("deps")
     run([str(PY), "-m", "pip", "install", "--upgrade", "--quiet", "pip"])
-    run([str(PY), "-m", "pip", "install", "--quiet", "-r", str(REQS)])
+    run([str(PY), "-m", "pip", "install", "--quiet", "-r", str(files[-1])])
     STAMP.write_text(digest)
     done(t0)
 
@@ -95,10 +104,10 @@ def ensure_model() -> None:
     done(t0)
 
 
-def setup() -> None:
-    print("Voice TTS build", flush=True)
+def setup(server_only: bool = False) -> None:
+    print("Voice TTS build" + (" (server only)" if server_only else ""), flush=True)
     ensure_venv()
-    ensure_deps()
+    ensure_deps(server_only)
     ensure_model()
 
 
@@ -140,7 +149,12 @@ def dir_size(path: Path) -> int:
     return sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
 
 
-def package() -> None:
+def exe_path(server_only: bool) -> Path:
+    name = "voice-tts" if server_only else "VoiceTTS"
+    return ROOT / "dist" / (f"{name}.exe" if os.name == "nt" else name)
+
+
+def package(server_only: bool = False) -> Path:
     t0 = step("pyinstaller")
     run([str(PY), "-m", "pip", "install", "--quiet", "pyinstaller"])
     done(t0)
@@ -153,28 +167,91 @@ def package() -> None:
     verify_stage(stage)
     done(t0)
 
+    exe = exe_path(server_only)
     t0 = step("bundle (one file, this takes a while)")
-    cmd = [str(PY), "-m", "PyInstaller", "--noconfirm", "--clean", "--windowed", "--onefile",
-           "--name", "VoiceTTS",
+    # The desktop build is windowed: no console flashes up behind the window.
+    # The server build is a console program - it is run from a shell.
+    cmd = [str(PY), "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile",
+           "--console" if server_only else "--windowed",
+           "--name", exe.stem,
            "--add-data", f"web{os.pathsep}web",
            "--add-data", f"{stage}{os.pathsep}hf"]
     for mod in COLLECT:
         cmd += ["--collect-all", mod]
-    for mod in HIDDEN:
+    for mod in [] if server_only else HIDDEN:
         cmd += ["--hidden-import", mod]
-    for mod in EXCLUDE:
+    for mod in EXCLUDE + (EXCLUDE_SERVER if server_only else []):
         cmd += ["--exclude-module", mod]
     cmd.append("app.py")
     run(cmd)
     done(t0)
 
-    exe = ROOT / "dist" / ("VoiceTTS.exe" if os.name == "nt" else "VoiceTTS")
     if not exe.exists():
         sys.exit(f"ERROR: PyInstaller finished but {exe} is missing")
     print(f"\n{exe}  ({exe.stat().st_size / 1e6:.0f} MB)")
     print("Model and runtime are inside the file; it needs no network and no install.")
-    print("A one-file build unpacks itself on every launch - around 10 s before the")
-    print("window appears, and longer on a cold machine while Defender scans it.")
+    print("A one-file build unpacks itself on every launch - around 10 s before it is")
+    print("ready, and longer on a cold machine while a virus scanner reads it.")
+    return exe
+
+
+def smoke(exe: Path) -> int:
+    """Run a packaged build as a server, offline, and have it read one sentence.
+
+    This is the check a release ships on: the file starts with no network, its
+    bundled model loads, and the audio it returns is speech-length and not
+    silence. The CLI side is ``cli.py`` from this checkout, standard library only.
+    """
+    import socket
+    import tempfile
+    import wave
+    from array import array
+
+    sys.path.insert(0, str(ROOT))
+    import cli
+
+    exe = exe.resolve()
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    url = f"http://127.0.0.1:{port}"
+    log = tempfile.TemporaryFile()
+    proc = subprocess.Popen([str(exe), "serve", "--port", str(port), "--log-level", "warning"],
+                            env={**os.environ, "HF_HUB_OFFLINE": "1"},
+                            stdout=log, stderr=subprocess.STDOUT)
+    print(f"smoke: {exe.name} serving on {url} (pid {proc.pid})", flush=True)
+    passed = False
+    try:
+        if cli.main(["status", "--server", url, "--wait", "600"]) != 0:
+            raise SystemExit("ERROR: the build never reported ready")
+        out = ROOT / "out" / "package-smoke.wav"
+        out.parent.mkdir(exist_ok=True)
+        if cli.main(["speak", SMOKE_TEXT, "--server", url, "-o", str(out)]) != 0:
+            raise SystemExit("ERROR: speak against the build failed")
+        with wave.open(str(out)) as wav:
+            pcm = array("h", wav.readframes(wav.getnframes()))
+            seconds = wav.getnframes() / wav.getframerate()
+        peak = max(map(abs, pcm), default=0)
+        print(f"smoke: {seconds:.2f} s, peak {peak}", flush=True)
+        if seconds < 2.0 or peak < 3000:
+            raise SystemExit(f"ERROR: audio too short or silent ({seconds:.2f} s, peak {peak})")
+        print("smoke: OK")
+        passed = True
+        return 0
+    finally:
+        # A one-file build is a bootloader plus the real process; take both down.
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            proc.terminate()
+        try:
+            proc.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        if not passed:  # the build's own output is the first thing to read then
+            log.seek(0)
+            print(log.read().decode("utf-8", "replace")[-2000:], flush=True)
 
 
 def main() -> int:
@@ -184,13 +261,19 @@ def main() -> int:
     mode.add_argument("--check", action="store_true", help="run the smoke test instead of the app")
     mode.add_argument("--package", action="store_true", help="build a standalone bundle")
     mode.add_argument("--setup", action="store_true", help="prepare the environment and stop")
+    mode.add_argument("--smoke", type=Path, metavar="EXE",
+                      help="run a packaged build offline as a server and read a sentence")
+    ap.add_argument("--server-only", action="store_true",
+                    help="with --setup/--package: server + CLI only, no window or tray")
     args = ap.parse_args()
 
-    setup()
+    if args.smoke:
+        return smoke(args.smoke)
+    setup(args.server_only)
     if args.setup:
         return 0
     if args.package:
-        package()
+        package(args.server_only)
         return 0
 
     print()

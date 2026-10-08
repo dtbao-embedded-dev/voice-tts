@@ -249,6 +249,33 @@ carries on without one: the window closes as before, `serve` keeps serving.
 stub engine - no model download) and `--help` for every subcommand and the
 installer. The real-model smoke test runs locally (`tool-build.py --check`).
 
+## Release
+
+```
+git tag v0.4.0 && git push origin v0.4.0
+```
+
+`.github/workflows/release.yml` checks that the tag matches `cli.__version__`, then
+builds on both platforms and attaches to a GitHub Release, with `SHA256SUMS`:
+
+| File | What it is |
+| --- | --- |
+| `VoiceTTS-windows-x64.exe` | the desktop app: window + tray + every subcommand, model inside |
+| `voice-tts-linux-x86_64` | console server + CLI (`serve`, `speak`, `voices`, `status`), model inside, no window |
+
+Each file is smoke-tested before it ships: `tool-build.py --smoke <file>` starts it
+as a server with `HF_HUB_OFFLINE=1`, waits for the bundled model and has it read a
+mixed sentence. *Run workflow* in the Actions tab does the build and the test
+without publishing; the files stay as artifacts for 14 days. The Linux binary is
+built on `ubuntu-latest`, so it needs a glibc at least as new as that runner's;
+older distributions use the Docker image instead. The voices are licensed for
+non-commercial use - a release redistributes them.
+
+```
+python docs/scripts/tool-build.py --package --server-only   # dist/voice-tts, locally
+python docs/scripts/tool-build.py --smoke dist/voice-tts
+```
+
 ## Layout
 
 ```
@@ -261,6 +288,7 @@ web/                      index.html, app.css, app.js - no build step
 requirements.txt          server + CLI core (what Docker installs)
 requirements-desktop.txt  core + window + tray (what tool-build.py installs)
 Dockerfile, compose.yaml  Linux server image, token from .env
+.github/workflows/        ci.yml (tests, both OSes), release.yml (exe + Linux binary)
 docs/scripts/tool-build.py  setup / run / check / package
 docs/scripts/tool-install.py  install / uninstall: Windows venv, Linux Docker, --remote over ssh
 ```
