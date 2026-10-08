@@ -246,8 +246,9 @@ def installer() -> Path:
     out = ROOT / "dist" / f"VoiceTTS-{cli.__version__}-setup.exe"
     run([str(PY), "-c", "import sys, icon; icon.save_ico(sys.argv[1])", str(EXE_ICON)])
     t0 = step("installer (NSIS, compressing the model)")
-    run([find_makensis(), "/V2", f"/DVERSION={cli.__version__}", f"/DSRC={exe.parent}",
-         f"/DICON={EXE_ICON}", f"/DOUT={out}", str(NSI)])
+    # The .nsi is UTF-8 without a BOM; makensis would read it as ANSI.
+    run([find_makensis(), "/V2", "/INPUTCHARSET", "UTF8", f"/DVERSION={cli.__version__}",
+         f"/DSRC={exe.parent}", f"/DICON={EXE_ICON}", f"/DOUT={out}", str(NSI)])
     done(t0)
     print(f"\n{out}  ({out.stat().st_size / 1e6:.0f} MB)")
     return out
