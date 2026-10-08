@@ -1,6 +1,6 @@
-; Voice TTS installer: the one-folder desktop build, installed for the current
-; user (no UAC prompt), with Start Menu entry, optional desktop shortcut and an
-; entry in Settings > Apps that uninstalls it.
+; Voice TTS installer: the one-folder desktop build, installed for every user
+; into Program Files (UAC prompt), with an all-users Start Menu entry, optional
+; desktop shortcut and an entry in Settings > Apps that uninstalls it.
 ;
 ; Built by `python docs/scripts/tool-build.py --installer`, which passes:
 ;   /DVERSION=0.5.0              cli.__version__
@@ -11,6 +11,12 @@
 ; The app folder is "Voice TTS", not "VoiceTTS": tool-install.py puts a source
 ; install (its own venv) in %LOCALAPPDATA%\Programs\VoiceTTS, and the two must
 ; not overwrite each other's files.
+;
+; This file is UTF-8 without a BOM, so tool-build.py passes /INPUTCHARSET UTF8:
+; makensis otherwise reads it in the ANSI code page and mangles the Vietnamese.
+;
+; 0.6.0 installed per user into %LOCALAPPDATA%\Programs\Voice TTS. This one
+; removes that copy first, so Settings > Apps does not list the app twice.
 
 Unicode true
 SetCompressor /SOLID lzma
@@ -22,9 +28,9 @@ SetCompressorDictSize 64
 
 Name "${NAME}"
 OutFile "${OUT}"
-InstallDir "$LOCALAPPDATA\Programs\${NAME}"
-InstallDirRegKey HKCU "${UNINST_KEY}" "InstallLocation"
-RequestExecutionLevel user
+InstallDir "$PROGRAMFILES64\${NAME}"
+InstallDirRegKey HKLM "${UNINST_KEY}" "InstallLocation"
+RequestExecutionLevel admin
 BrandingText "${NAME} ${VERSION}"
 
 VIProductVersion "${VERSION}.0"
@@ -36,6 +42,7 @@ VIAddVersionKey "LegalCopyright" "dtbao"
 
 !include "MUI2.nsh"
 !include "FileFunc.nsh"
+!include "LogicLib.nsh"
 
 !define MUI_ICON "${ICON}"
 !define MUI_UNICON "${ICON}"
@@ -62,9 +69,39 @@ VIAddVersionKey "LegalCopyright" "dtbao"
   Sleep 500
 !macroend
 
+; Shortcuts for all users, and the 64-bit registry view: the uninstall key must
+; land where Settings > Apps reads a 64-bit app from.
+!macro MachineScope
+  SetShellVarContext all
+  SetRegView 64
+!macroend
+
+Function .onInit
+  !insertmacro MachineScope
+FunctionEnd
+
+Function un.onInit
+  !insertmacro MachineScope
+FunctionEnd
+
+; The 0.6.0 per-user install: run its own uninstaller in place (_?=) so this
+; waits for it, then drop what an in-place uninstaller cannot delete - itself.
+!macro RemovePerUserInstall
+  ReadRegStr $1 HKCU "${UNINST_KEY}" "InstallLocation"
+  ${If} $1 != ""
+  ${AndIf} $1 != $INSTDIR
+  ${AndIf} ${FileExists} "$1\uninstall.exe"
+    ExecWait '"$1\uninstall.exe" /S _?=$1'
+    Delete "$1\uninstall.exe"
+    RMDir "$1"
+  ${EndIf}
+  DeleteRegKey HKCU "${UNINST_KEY}"
+!macroend
+
 Section "${NAME}" SecApp
   SectionIn RO
   !insertmacro StopApp
+  !insertmacro RemovePerUserInstall
   ; An update must not keep files the new build dropped: they would shadow it.
   RMDir /r "$INSTDIR\_internal"
   SetOutPath "$INSTDIR"
@@ -74,17 +111,17 @@ Section "${NAME}" SecApp
 
   CreateShortcut "$SMPROGRAMS\${NAME}.lnk" "$INSTDIR\${EXE}" "" "$INSTDIR\voice-tts.ico"
 
-  WriteRegStr HKCU "${UNINST_KEY}" "DisplayName" "${NAME}"
-  WriteRegStr HKCU "${UNINST_KEY}" "DisplayVersion" "${VERSION}"
-  WriteRegStr HKCU "${UNINST_KEY}" "DisplayIcon" "$INSTDIR\voice-tts.ico"
-  WriteRegStr HKCU "${UNINST_KEY}" "Publisher" "dtbao"
-  WriteRegStr HKCU "${UNINST_KEY}" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "${UNINST_KEY}" "UninstallString" '"$INSTDIR\uninstall.exe"'
-  WriteRegStr HKCU "${UNINST_KEY}" "QuietUninstallString" '"$INSTDIR\uninstall.exe" /S'
-  WriteRegDWORD HKCU "${UNINST_KEY}" "NoModify" 1
-  WriteRegDWORD HKCU "${UNINST_KEY}" "NoRepair" 1
+  WriteRegStr HKLM "${UNINST_KEY}" "DisplayName" "${NAME}"
+  WriteRegStr HKLM "${UNINST_KEY}" "DisplayVersion" "${VERSION}"
+  WriteRegStr HKLM "${UNINST_KEY}" "DisplayIcon" "$INSTDIR\voice-tts.ico"
+  WriteRegStr HKLM "${UNINST_KEY}" "Publisher" "dtbao"
+  WriteRegStr HKLM "${UNINST_KEY}" "InstallLocation" "$INSTDIR"
+  WriteRegStr HKLM "${UNINST_KEY}" "UninstallString" '"$INSTDIR\uninstall.exe"'
+  WriteRegStr HKLM "${UNINST_KEY}" "QuietUninstallString" '"$INSTDIR\uninstall.exe" /S'
+  WriteRegDWORD HKLM "${UNINST_KEY}" "NoModify" 1
+  WriteRegDWORD HKLM "${UNINST_KEY}" "NoRepair" 1
   ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
-  WriteRegDWORD HKCU "${UNINST_KEY}" "EstimatedSize" $0
+  WriteRegDWORD HKLM "${UNINST_KEY}" "EstimatedSize" $0
 SectionEnd
 
 Section "Lối tắt trên Desktop" SecDesktop
@@ -102,5 +139,5 @@ Section "Uninstall"
   Delete "$INSTDIR\voice-tts.ico"
   Delete "$INSTDIR\uninstall.exe"
   RMDir "$INSTDIR"
-  DeleteRegKey HKCU "${UNINST_KEY}"
+  DeleteRegKey HKLM "${UNINST_KEY}"
 SectionEnd

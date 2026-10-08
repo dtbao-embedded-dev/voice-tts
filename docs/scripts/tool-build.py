@@ -264,7 +264,13 @@ def smoke_installer(setup_exe: Path) -> int:
 
     target = Path(tempfile.mkdtemp(prefix="voice-tts-install-")) / "Voice TTS"
     # NSIS wants /D last and unquoted, even with spaces in it - hence one string.
-    subprocess.run(f'"{setup_exe.resolve()}" /S /D={target}', check=True)
+    try:
+        subprocess.run(f'"{setup_exe.resolve()}" /S /D={target}', check=True)
+    except OSError as exc:
+        # 740: the installer asks for admin, which CreateProcess cannot grant.
+        if getattr(exc, "winerror", None) == 740:
+            sys.exit("ERROR: the installer needs admin - run this from an elevated terminal")
+        raise
     exe = target / "VoiceTTS.exe"
     if not exe.exists():
         sys.exit(f"ERROR: the installer did not put {exe.name} in {target}")

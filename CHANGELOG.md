@@ -6,6 +6,20 @@ Every user-visible change, newest first. The format follows
 (`tool-build.py --release-notes <version>`), and a tag without a section here fails
 the release before it builds.
 
+## [Unreleased]
+
+### Changed
+
+- The Windows installer installs for every user into `C:\Program Files\Voice TTS`
+  and asks for admin, with the Start Menu entry and desktop shortcut for all users.
+  It first removes a 0.6.0 install from `%LOCALAPPDATA%\Programs\Voice TTS`, so
+  Settings > Apps lists the app once.
+
+### Fixed
+
+- The installer's Vietnamese text was garbled (*Mở Voice TTS* read *Má»Ÿ Voice
+  TTS*): the script is now compiled as UTF-8.
+
 ## [0.6.0] - 2026-10-08
 
 ### Changed

@@ -1,5 +1,5 @@
 # Release builds, model inside, each smoke-tested offline before it ships:
-# a Windows installer (NSIS, per user, no admin) and a one-file Linux server.
+# a Windows installer (NSIS, all users, Program Files) and a one-file Linux server.
 #
 #   git tag v0.5.0 && git push origin v0.5.0   # build, test, publish a GitHub Release
 #                                              # (notes: that version's CHANGELOG.md section)

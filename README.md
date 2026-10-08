@@ -143,8 +143,9 @@ the `PATH` entry, and leaves the HuggingFace model cache alone.
 
 This is the install that gives a working CLI. The release installer's `VoiceTTS.exe`
 is a windowed build with no console, so it is for the window and `serve --tray` only.
-The two live side by side: this one in `Programs\VoiceTTS`, the installer's in
-`Programs\Voice TTS`; whichever ran last owns the Start Menu shortcut.
+The two live side by side: this one in `%LOCALAPPDATA%\Programs\VoiceTTS` with a
+shortcut for this user, the installer's in `C:\Program Files\Voice TTS` with one for
+every user, so the Start Menu lists *Voice TTS* twice while both are installed.
 
 ### Linux (Docker)
 
@@ -454,13 +455,13 @@ notes are that section, with these files and `SHA256SUMS`:
 
 | File | What it is |
 | --- | --- |
-| `VoiceTTS-windows-x64-setup.exe` | the desktop app's installer (per user, no admin): window + tray + every subcommand, model inside |
+| `VoiceTTS-windows-x64-setup.exe` | the desktop app's installer (all users, `C:\Program Files`, asks for admin): window + tray + every subcommand, model inside |
 | `voice-tts-linux-x86_64` | console server + CLI (`serve`, `speak`, `voices`, `status`), model inside, no window |
 
 Each file is smoke-tested before it ships: `tool-build.py --smoke <file>` starts it
 as a server with `HF_HUB_OFFLINE=1`, waits for the bundled model and has it read a
 mixed sentence. The installer gets the same test after a silent install into a temp
-folder (`--smoke-installer`), and then must uninstall without leaving a file
+folder (`--smoke-installer`, from an elevated terminal locally), and then must uninstall without leaving a file
 behind. *Run workflow* in the Actions tab does the build and the test
 without publishing; the files stay as artifacts for 14 days. The Linux binary is
 built on `ubuntu-latest`, so it needs a glibc at least as new as that runner's;
