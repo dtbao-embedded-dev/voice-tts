@@ -235,11 +235,36 @@ plain HTTP: fine on a home LAN, not for the internet.
 | Endpoint | Response |
 | --- | --- |
 | `GET /api/status` | `{"state": "loading" \| "ready" \| "error"}` while the model warms up |
-| `GET /api/voices` | 25 preset voices with region, gender and description, plus `maxChars` |
+| `GET /api/voices` | the 25 preset voices with region, gender and description, the default voice, `sampleRate` and `maxChars` |
 | `POST /api/tts/stream` | raw float32 LE mono at 48 kHz, streamed as it is generated; or one 16-bit WAV file with `"format": "wav"` |
 
+`GET /api/voices` is the list of voices a request may name - featured voices first,
+then the rest in the engine's order (shortened here):
+
+```json
+{
+  "voices": [
+    {"name": "Adam bựa", "region": "Bắc", "gender": "male",
+     "description": "Nam · Bắc · Phong cách tự nhiên", "featured": true},
+    {"name": "Hải Đăng", "region": "Bắc", "gender": "male",
+     "description": "Nam · Bắc · Phong cách tự nhiên", "featured": true},
+    {"name": "Quốc Tuấn", "region": "Bắc", "gender": "male",
+     "description": "Nam · Bắc · Phong cách tự nhiên", "featured": false}
+  ],
+  "default": "Hải Đăng",
+  "sampleRate": 48000,
+  "maxChars": 20000
+}
+```
+
+`region` is `Bắc`, `Trung` or `Nam`; `default` is the voice used when a request names
+none. The list comes from the installed `vieneu` SDK, so it changes with an SDK
+upgrade: since 3.8.3 `Minh Quân Pro` is `Hải Đăng`, `Anh Khôi` is `Thiện Minh` and
+`Mạnh Dũng` is `Quốc Tuấn`. The old names (and `Minh Quân`) are still accepted as
+`voice` and read with the renamed voice; they are just no longer listed.
+
 `POST /api/tts/stream` takes `{"text", "voice", "speed", "format"}`: `text` up to
-20 000 characters, `voice` an exact name from `/api/voices` (omit it for the
+20 000 characters, `voice` a name from `/api/voices` (omit it for the
 default), `speed` between `0.5` and `2.0` (default `1.0`), `format` either `"f32"`
 (default) or `"wav"`.
 
@@ -360,11 +385,14 @@ carries on without one: the window closes as before, `serve` keeps serving.
 ## Notes
 
 - **No GPU is required.** The default install is the torch-free ONNX build, and
-  streaming runs on the CPU engine either way. `int8` precision is used for speed.
+  streaming runs on the CPU engine either way. The model is
+  [`pnnbao-ump/VieNeu-TTS-v3-Turbo`](https://huggingface.co/pnnbao-ump/VieNeu-TTS-v3-Turbo)
+  through the `vieneu` SDK (`requirements.txt`), with its `int8` ONNX graphs for
+  speed (about 2x the fp32 ones; a CPU without VNNI may sound distorted).
 - **The first launch downloads the model** (HuggingFace cache, `~/.cache/huggingface`).
   The window shows *Đang tải model…* until it is ready. This applies to a source
   checkout only.
-- **The packaged build is one self-contained `VoiceTTS.exe`** (~610 MB): the runtime,
+- **The packaged build is one self-contained `VoiceTTS.exe`** (~400 MB): the runtime,
   the web view, the tray icon and both model repos (backbone + audio codec) are
   inside it, and it takes the same subcommands as `app.py` (`VoiceTTS.exe serve
   --tray`, say) - but, being windowed, it prints nothing; the CLI is the installed
@@ -379,8 +407,16 @@ carries on without one: the window closes as before, `serve` keeps serving.
   the duration and leave the pitch where it is, so the voice at 0.75× is the voice at
   1×, only slower. The stream is always 48 kHz and a saved WAV is a plain 48 kHz file
   carrying the speed it was read at.
-- **The voices are licensed for non-commercial use only.** Bundling them into the exe
-  redistributes them; check the VieNeu terms before handing the file to anyone.
+- **Licence.** The model card puts every shipped artifact - weights, ONNX exports and
+  the preset-voice assets - under Apache-2.0 and allows commercial use of the audio;
+  keep the notices of [pnnbao97/VieNeu-TTS](https://github.com/pnnbao97/VieNeu-TTS)
+  and the model repo when redistributing the exe. Cloning a voice you have no rights
+  to is not covered.
+- **One icon everywhere.** `icon.py` draws the white sound wave on a black disc for
+  the tray, the window title bar and taskbar button, the Start Menu shortcut, the
+  `VoiceTTS.exe` file and the page's `/favicon.svg`. The window sets its own taskbar
+  app id (`VoiceTTS.Desktop`), so a source run is not grouped under `pythonw.exe`
+  and its Python logo.
 - **The UI is iOS dark, dark only.** A true-black background under `#1C1C1E` grouped
   surfaces, Apple's dark label colours and `systemBlue` as the one tint (the *Đọc*
   button, the chosen speed, the selected voice). There is no light variant and no
@@ -396,12 +432,16 @@ installer. The real-model smoke test runs locally (`tool-build.py --check`).
 
 ## Release
 
+Write the version's section in `CHANGELOG.md` first, bump `cli.__version__`, then:
+
 ```
-git tag v0.4.0 && git push origin v0.4.0
+git tag v0.5.0 && git push origin v0.5.0
 ```
 
-`.github/workflows/release.yml` checks that the tag matches `cli.__version__`, then
-builds on both platforms and attaches to a GitHub Release, with `SHA256SUMS`:
+`.github/workflows/release.yml` checks that the tag matches `cli.__version__` and that
+`CHANGELOG.md` has a `## [<version>]` section - either missing fails the run before
+the build. It then builds on both platforms and publishes a GitHub Release whose
+notes are that section, with these files and `SHA256SUMS`:
 
 | File | What it is |
 | --- | --- |
@@ -413,12 +453,13 @@ as a server with `HF_HUB_OFFLINE=1`, waits for the bundled model and has it read
 mixed sentence. *Run workflow* in the Actions tab does the build and the test
 without publishing; the files stay as artifacts for 14 days. The Linux binary is
 built on `ubuntu-latest`, so it needs a glibc at least as new as that runner's;
-older distributions use the Docker image instead. The voices are licensed for
-non-commercial use - a release redistributes them.
+older distributions use the Docker image instead. A release redistributes the model
+and its preset voices (Apache-2.0, see *Licence* under Notes).
 
 ```
 python docs/scripts/tool-build.py --package --server-only   # dist/voice-tts, locally
 python docs/scripts/tool-build.py --smoke dist/voice-tts
+python docs/scripts/tool-build.py --release-notes 0.5.0     # the notes a v0.5.0 tag publishes
 ```
 
 ## Layout
@@ -426,9 +467,11 @@ python docs/scripts/tool-build.py --smoke dist/voice-tts
 ```
 app.py                    FastAPI backend + native window entry point
 tray.py                   system tray icon and its menu (pystray)
+icon.py                   the app icon, one geometry: tray/window/exe .ico and /favicon.svg
 cli.py                    command line: subcommands and flags, stdlib-only at import
 test_tts.py               assert-based smoke test over the real HTTP path
 test_cli.py               fast checks with a stub engine: CLI (local + remote), token guard
+CHANGELOG.md              user-visible changes per version; a release publishes its section
 web/                      index.html, app.css, app.js - no build step
 requirements.txt          server + CLI core (what Docker installs)
 requirements-desktop.txt  core + window + tray (what tool-build.py installs)

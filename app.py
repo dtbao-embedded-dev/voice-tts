@@ -378,6 +378,15 @@ def index(token: str | None = None) -> FileResponse:
     return page
 
 
+@app.get("/favicon.svg")
+def favicon() -> Response:
+    """The app icon, drawn from the same geometry as the tray and the window icon."""
+    import icon
+
+    return Response(icon.svg(), media_type="image/svg+xml",
+                    headers={"Cache-Control": "max-age=86400"})
+
+
 app.mount("/web", StaticFiles(directory=WEB_DIR), name="web")
 
 
@@ -450,6 +459,29 @@ def serve(host: str = "127.0.0.1", port: int = 8760, log_level: str = "info",
         thread.join()  # no tray on this desktop: keep serving in the foreground
 
 
+def window_icon() -> str | None:
+    """Write the app icon as an ``.ico`` for the window; None if that fails.
+
+    Without one, pywebview takes the icon of ``sys.executable`` - the Python
+    logo for ``pythonw app.py``. The file is rewritten on every launch (it takes
+    milliseconds), so it can live in the temp dir and never goes stale.
+    """
+    import tempfile
+
+    import icon
+
+    target = Path(tempfile.gettempdir()) / "voice-tts.ico"
+    # Write beside it and swap in, so two windows starting at once never hand
+    # WinForms a half-written file.
+    staged = target.with_name(f"voice-tts-{os.getpid()}.ico")
+    try:
+        os.replace(icon.save_ico(staged), target)
+        return str(target)
+    except (OSError, ImportError, ValueError):  # no icon is cosmetic, not fatal
+        staged.unlink(missing_ok=True)
+        return None
+
+
 def run_gui(port: int = 0, tray: bool = True) -> None:
     """The desktop app: the backend on loopback plus a native window over it.
 
@@ -461,6 +493,14 @@ def run_gui(port: int = 0, tray: bool = True) -> None:
     # WebView2 cancels every download while this is off - that is why "Lưu WAV"
     # used to do nothing at all. With it on, the platform shows its Save dialog.
     webview.settings["ALLOW_DOWNLOADS"] = True
+
+    if sys.platform == "win32":
+        # The taskbar groups windows by app id, and by default that is the
+        # interpreter's: the button would show pythonw's logo, not ours. Set it
+        # before the first window exists.
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("VoiceTTS.Desktop")
 
     _, port, _ = start_server(port)
     url = f"http://127.0.0.1:{port}/"
@@ -508,7 +548,8 @@ def run_gui(port: int = 0, tray: bool = True) -> None:
         else:
             icon = None  # no tray here: closing the window quits, as before
 
-    webview.start()  # returns when the window is destroyed; daemon threads go with it
+    # Returns when the window is destroyed; daemon threads go with it.
+    webview.start(icon=window_icon())
     if icon is not None:
         icon.stop()
 
