@@ -238,8 +238,10 @@ carries on without one: the window closes as before, `serve` keeps serving.
   carrying the speed it was read at.
 - **The voices are licensed for non-commercial use only.** Bundling them into the exe
   redistributes them; check the VieNeu terms before handing the file to anyone.
-- **The UI is black and white, dark only.** There is no light variant and no theme
-  switch; status is told apart by shape, not colour.
+- **The UI is iOS dark, dark only.** A true-black background under `#1C1C1E` grouped
+  surfaces, Apple's dark label colours and `systemBlue` as the one tint (the *Đọc*
+  button, the chosen speed, the selected voice). There is no light variant and no
+  theme switch; status is told apart by shape (ring, dot, square) as well as colour.
 
 ## CI
 
