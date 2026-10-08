@@ -63,6 +63,33 @@ the `PATH` entry, and leaves the HuggingFace model cache alone.
 This is the install that gives a working CLI. The packaged `VoiceTTS.exe` is a
 windowed build with no console, so it is for the window and `serve --tray` only.
 
+### Linux (Docker)
+
+```
+python3 docs/scripts/tool-install.py                                   # on the Linux box
+python docs/scripts/tool-install.py --remote panboy@192.168.0.137      # from any machine, over ssh
+python docs/scripts/tool-install.py --remote panboy@192.168.0.137 --uninstall
+```
+
+The Linux box needs Docker (with compose v2) and `python3`, nothing else - not even
+`python3-venv`. The install copies the app and the Docker files to `~/voice-tts`,
+writes `~/voice-tts/.env` (mode 600) with a generated token unless one is there
+already or `--token` gives one, runs `docker compose up -d --build` and waits for
+the model. `~/.local/bin/voice-tts` is the CLI: it runs `cli.py` on the system
+`python3` with `VOICE_TTS_SERVER` and `VOICE_TTS_TOKEN` taken from that `.env`, so
+`speak`, `voices` and `status` talk to the container. `--port` changes the host
+port. `--remote` packs the needed files, runs the same install on the host and
+deletes its staging copy afterwards; re-running it updates the server in place and
+keeps the token. Uninstall stops and removes the container and its image, and keeps
+the `voice-tts-hf` model volume.
+
+The page is then at `http://<host>:8760/?token=<token>` - once per browser, the
+cookie remembers it - and any machine with this repo can use the CLI against it:
+
+```
+voice-tts speak "Xin chào" --server http://192.168.0.137:8760 --token <token>
+```
+
 ## Command line
 
 ```
@@ -222,5 +249,5 @@ requirements.txt          server + CLI core (what Docker installs)
 requirements-desktop.txt  core + window + tray (what tool-build.py installs)
 Dockerfile, compose.yaml  Linux server image, token from .env
 docs/scripts/tool-build.py  setup / run / check / package
-docs/scripts/tool-install.py  install / uninstall (Windows; Linux via Docker)
+docs/scripts/tool-install.py  install / uninstall: Windows venv, Linux Docker, --remote over ssh
 ```
