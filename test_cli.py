@@ -337,6 +337,22 @@ def check_local(tmp: Path) -> None:
     print("local: in-process engine, speed, validation -> 2")
 
 
+def check_gui_host(base: str) -> None:
+    """The window's backend answers its own address only: a page that rebinds
+    a hostname to 127.0.0.1 sends that hostname, and is refused."""
+    port = base.rsplit(":", 1)[1]
+    app.set_gui_hosts(int(port))
+    try:
+        for host, want in ((f"127.0.0.1:{port}", 200), (f"localhost:{port}", 200),
+                           (f"evil.example:{port}", 421), ("127.0.0.1:1", 421)):
+            assert request(f"{base}/api/status", {"Host": host})[0] == want, host
+        assert request(f"{base}/", {"Host": f"evil.example:{port}"})[0] == 421, "page served"
+    finally:
+        app.set_gui_hosts(None)
+    assert request(f"{base}/api/status", {"Host": "evil.example"})[0] == 200, "serve mode refused"
+    print("gui host: only 127.0.0.1/localhost on its port; serve mode takes any")
+
+
 def check_gui_port() -> None:
     """The window's backend keeps one port, so the page's storage keeps one origin;
     a port already taken - by another app or a second window - falls back."""
@@ -677,6 +693,7 @@ def main() -> int:
     _, port, _ = app.start_server(host="127.0.0.1", port=0)
     base = f"http://127.0.0.1:{port}"
     check_token(base)
+    check_gui_host(base)
     with tempfile.TemporaryDirectory() as tmp:
         check_remote(base, Path(tmp))
         check_wav_format(base)

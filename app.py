@@ -81,6 +81,26 @@ def _token_ok(candidate: str | None) -> bool:
     return candidate is not None and hmac.compare_digest(candidate.encode(), _token.encode())
 
 
+# The desktop window's backend sits on a fixed loopback port. A web page that
+# rebinds its own hostname to 127.0.0.1 would be same-origin with it; such a
+# request still carries that hostname, so the window's backend accepts only its
+# own. None (serve mode) accepts any Host - the token guards a LAN server.
+_gui_hosts: frozenset[str] | None = None
+
+
+def set_gui_hosts(port: int | None) -> None:
+    global _gui_hosts
+    _gui_hosts = None if port is None else frozenset(
+        {f"127.0.0.1:{port}", f"localhost:{port}"})
+
+
+@app.middleware("http")
+async def require_host(request: Request, call_next):
+    if _gui_hosts is not None and request.headers.get("host", "").lower() not in _gui_hosts:
+        return JSONResponse({"detail": "Sai địa chỉ."}, status_code=421)
+    return await call_next(request)
+
+
 @app.middleware("http")
 async def require_token(request: Request, call_next):
     """Guard the API, not the page: the page is static and carries nothing.
@@ -658,6 +678,7 @@ def run_gui(port: int = 0, tray: bool = True) -> None:
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("VoiceTTS.Desktop")
 
     _, port, _ = start_gui_server(port)
+    set_gui_hosts(port)
     url = f"http://127.0.0.1:{port}/"
     # pywebview asks WinForms for FormStartPosition.CenterScreen, but it does so
     # after the form handle exists, so the window lands at 78,78 instead. Passing
