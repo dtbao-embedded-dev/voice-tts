@@ -87,6 +87,9 @@ h1 {
   letter-spacing: -0.0255em;    /* SF tracking at 17pt */
 }
 
+.tools { display: flex; gap: 18px; margin-left: 12px; font-size: 0.9375rem; }
+.tools .link { margin-left: 0; }
+
 .status {
   margin-left: auto;
   display: flex; align-items: center; gap: 7px;
@@ -207,6 +210,7 @@ textarea::selection { background: rgba(10, 132, 255, 0.45); }
 }
 .link:active:not(:disabled) { opacity: 0.6; }
 .link:disabled { opacity: 0.35; }
+.link--danger { color: var(--red); }
 
 /* A file held over the window: the card is where it lands. */
 .reader[hidden], textarea[hidden] { display: none; }
@@ -341,6 +345,74 @@ button.row:active { background: var(--surface-2); transition: none; }
               #000 calc(100% - 12px), transparent 100%);
 }
 .sheet__list::-webkit-scrollbar { width: 0; height: 0; }
+.sheet__hint { margin: 0 0 12px; font-size: 0.8125rem; color: var(--label-2); }
+.sheet__hint b { font-weight: 600; color: var(--label); }
+.sheet__error { margin: 8px 0 0; font-size: 0.8125rem; color: var(--red); }
+
+/* ---- Lexicon sheet ------------------------------------------------------ */
+
+.btn--small { min-height: 36px; padding: 6px 14px; font-size: 0.9375rem; }
+.btn--small.btn--primary { min-width: 0; }
+
+.field {
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: var(--surface-2);
+  color: var(--label);
+  font: inherit; font-size: 0.9375rem;
+  user-select: text; -webkit-user-select: text;
+}
+.field::placeholder { color: var(--label-3); }
+.field:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+
+.lex-form {
+  display: grid;
+  grid-template-columns: 1fr 1.6fr auto auto auto;
+  align-items: center;
+  gap: 8px;
+}
+.lex-form__case {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 0.875rem; color: var(--label-2);
+}
+.lex-form__case input { accent-color: var(--accent); }
+
+.lex-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  background: var(--surface-2);
+  font-size: 0.9375rem;
+}
+.lex-item:not(:has(.link--danger)) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto; }
+.voice-group + .lex-item, .lex-empty + .lex-item { border-radius: var(--r-group) var(--r-group) 0 0; }
+.lex-item:has(+ .voice-group), .lex-item:last-child { border-radius: 0 0 var(--r-group) var(--r-group); }
+.voice-group + .lex-item:has(+ .voice-group),
+.voice-group + .lex-item:last-child { border-radius: var(--r-group); }
+.lex-item + .lex-item::before {
+  content: "";
+  position: absolute; top: 0; left: 16px; right: 0;
+  height: 0.5px;
+  background: var(--separator);
+}
+.lex-item__word { font-weight: 600; overflow-wrap: anywhere; }
+.lex-item__case {
+  margin-left: 6px; padding: 0 5px;
+  border-radius: 4px;
+  background: var(--fill);
+  font-size: 0.6875rem; font-weight: 600;
+  color: var(--label-2);
+}
+.lex-item__say { color: var(--label-2); overflow-wrap: anywhere; }
+.lex-item--overridden .lex-item__word,
+.lex-item--overridden .lex-item__say { text-decoration: line-through; opacity: 0.6; }
+.lex-empty { margin: 0 0 0 16px; font-size: 0.875rem; color: var(--label-3); }
 
 .voice-group {
   margin: 18px 0 6px 16px;

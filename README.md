@@ -47,7 +47,8 @@ it (plus a one-off download for a source install).
 3. **Giọng đọc** picks the voice (★ = featured); **Tốc độ** picks 0.75×-1.5×.
 4. **Phát âm** is *Thường* (the text as typed: `POST` is spelled *phê ô ét tê*) or
    *Đặc biệt* (`POST` read "post", `AP` "ây pi", `Board` "bo", `ESP32` "i ét pi ba
-   hai").
+   hai"). **Từ điển** at the top adds your own words for *Đặc biệt* - a word, how to
+   read it, and *Nghe thử* to hear that spelling first.
 5. **Đọc** (`Ctrl+Enter`) reads it as it is generated. The same button then pauses
    (*Tạm dừng*), carries on (*Tiếp tục*) and, at the end, plays it again (*Phát
    lại*); the bar beside it seeks. All of that plays what was already read - the
@@ -474,8 +475,8 @@ carries on without one: the window closes as before, `serve` keeps serving.
   also `ESP 32`) as *i ét pi ba hai*. `POSTMAN`, `APP` and `onboard` are left alone,
   and so is anything inside `<en>...</en>`. Another built-in word is one more line
   in `ENTRIES`.
-- **Your own words.** `voice-tts lexicon add` or `PUT /api/lexicon` add words on top
-  of the built-ins, read in `special` only (`normal` stays the text as typed). They live in `lexicon.json` in the data dir: `$VOICE_TTS_DATA`,
+- **Your own words.** *Từ điển* in the window, `voice-tts lexicon add` or
+  `PUT /api/lexicon` add words on top of the built-ins, read in `special` only (`normal` stays the text as typed). They live in `lexicon.json` in the data dir: `$VOICE_TTS_DATA`,
   else `%APPDATA%\VoiceTTS` on Windows and `~/.local/share/voice-tts` on Linux;
   the Docker image keeps it in the `voice-tts-data` volume (`/data/app`). A word you
   add replaces a built-in one with the same spelling, and where two words start at

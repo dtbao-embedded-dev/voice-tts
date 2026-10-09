@@ -10,6 +10,9 @@ const els = {
   saveBtn: $('saveBtn'), timecode: $('timecode'), meter: $('meter'),
   pron: $('pron'), stopBtn: $('stopBtn'), seek: $('seek'), format: $('format'),
   card: $('card'), openBtn: $('openBtn'), fileInput: $('fileInput'), reader: $('reader'),
+  lexBtn: $('lexBtn'), lexSheet: $('lexSheet'), lexForm: $('lexForm'), lexWord: $('lexWord'),
+  lexSay: $('lexSay'), lexCase: $('lexCase'), lexTry: $('lexTry'), lexError: $('lexError'),
+  lexList: $('lexList'),
 };
 
 const REGIONS = ['Bắc', 'Trung', 'Nam'];
@@ -104,37 +107,45 @@ function spring(from, to, onFrame, { damping = 1.0, response = 0.4, velocity = 0
   return () => cancelAnimationFrame(raf);
 }
 
-/* ---- Voice sheet: 1:1 drag, rubber-band, momentum projection ----------- */
+/* ---- Sheets: 1:1 drag, rubber-band, momentum projection ----------------- */
 
-const sheetState = { open: false, y: 0, cancel: () => {}, height: 0 };
+// One state per sheet; one sheet open at a time, over one shared scrim.
+const sheetOf = (el) => ({ el, open: false, y: 0, cancel: () => {}, height: 0 });
+let activeSheet = null;
 
-function setSheetY(y) {
-  sheetState.y = y;
-  els.sheet.style.transform = `translateY(${y}px)`;
-  const p = sheetState.height ? 1 - y / sheetState.height : 0;
+function setSheetY(st, y) {
+  st.y = y;
+  st.el.style.transform = `translateY(${y}px)`;
+  const p = st.height ? 1 - y / st.height : 0;
   els.scrim.style.opacity = String(Math.max(0, Math.min(1, p)) * 0.45);
 }
 
-function openSheet() {
-  if (sheetState.open) return;
-  sheetState.open = true;
-  els.sheet.hidden = false;
+function openSheet(st) {
+  if (st.open) return;
+  if (activeSheet) closeSheet(activeSheet);
+  activeSheet = st;
+  st.open = true;
+  st.el.hidden = false;
   els.scrim.hidden = false;
-  sheetState.height = els.sheet.offsetHeight;
-  setSheetY(sheetState.height);
-  sheetState.cancel();
+  st.height = st.el.offsetHeight;
+  setSheetY(st, st.height);
+  st.cancel();
   // A sheet arrives with a little momentum of its own.
-  sheetState.cancel = spring(sheetState.height, 0, setSheetY, { damping: 0.8, response: 0.3 });
+  st.cancel = spring(st.height, 0, (y) => setSheetY(st, y), { damping: 0.8, response: 0.3 });
 }
 
-function closeSheet(velocity = 0) {
-  if (!sheetState.open) return;
-  sheetState.open = false;
-  sheetState.cancel();
+function closeSheet(st = activeSheet, velocity = 0) {
+  if (!st || !st.open) return;
+  st.open = false;
+  if (activeSheet === st) activeSheet = null;
+  st.cancel();
   // It leaves along the path it came in on.
-  sheetState.cancel = spring(sheetState.y, sheetState.height, (y, done) => {
-    setSheetY(y);
-    if (done) { els.sheet.hidden = true; els.scrim.hidden = true; }
+  st.cancel = spring(st.y, st.height, (y, done) => {
+    setSheetY(st, y);
+    if (done) {
+      st.el.hidden = true;
+      if (!activeSheet) els.scrim.hidden = true;
+    }
   }, { damping: 1.0, response: 0.3, velocity });
 }
 
@@ -146,44 +157,52 @@ function rubberband(overshoot, dimension, constant = 0.55) {
   return (overshoot * dimension * constant) / (dimension + constant * Math.abs(overshoot));
 }
 
-els.sheet.addEventListener('pointerdown', (e) => {
-  if (e.target.closest('.voice-item, .sheet__list')) return; // let the list scroll
-  els.sheet.setPointerCapture(e.pointerId);
-  sheetState.cancel();
-  const grabY = e.clientY, grabAt = sheetState.y;
-  const history = [];
+function draggable(st) {
+  st.el.addEventListener('pointerdown', (e) => {
+    // Lists scroll and controls take their own presses; the rest drags.
+    if (e.target.closest('.sheet__list, button, input, label')) return;
+    st.el.setPointerCapture(e.pointerId);
+    st.cancel();
+    const grabY = e.clientY, grabAt = st.y;
+    const history = [];
 
-  const move = (ev) => {
-    const raw = grabAt + (ev.clientY - grabY);
-    // Past the top there is nothing more: resist instead of stopping dead.
-    const y = raw < 0 ? -rubberband(-raw, sheetState.height) : raw;
-    setSheetY(y);
-    history.push([performance.now(), ev.clientY]);
-    if (history.length > 5) history.shift();
-  };
-  const up = () => {
-    els.sheet.removeEventListener('pointermove', move);
-    els.sheet.removeEventListener('pointerup', up);
-    els.sheet.removeEventListener('pointercancel', up);
-    const [t0, y0] = history[0] || [performance.now(), grabY];
-    const [t1, y1] = history[history.length - 1] || [performance.now() + 1, grabY];
-    const v = t1 > t0 ? ((y1 - y0) / (t1 - t0)) * 1000 : 0;
-    // Decide from where the flick is heading, not from where the finger stopped.
-    if (sheetState.y + project(v) > sheetState.height * 0.4) {
-      sheetState.open = true; closeSheet(v);
-    } else {
-      sheetState.cancel();
-      sheetState.cancel = spring(sheetState.y, 0, setSheetY, { damping: 0.8, response: 0.3, velocity: v });
-    }
-  };
-  els.sheet.addEventListener('pointermove', move);
-  els.sheet.addEventListener('pointerup', up);
-  els.sheet.addEventListener('pointercancel', up);
-});
+    const move = (ev) => {
+      const raw = grabAt + (ev.clientY - grabY);
+      // Past the top there is nothing more: resist instead of stopping dead.
+      const y = raw < 0 ? -rubberband(-raw, st.height) : raw;
+      setSheetY(st, y);
+      history.push([performance.now(), ev.clientY]);
+      if (history.length > 5) history.shift();
+    };
+    const up = () => {
+      st.el.removeEventListener('pointermove', move);
+      st.el.removeEventListener('pointerup', up);
+      st.el.removeEventListener('pointercancel', up);
+      const [t0, y0] = history[0] || [performance.now(), grabY];
+      const [t1, y1] = history[history.length - 1] || [performance.now() + 1, grabY];
+      const v = t1 > t0 ? ((y1 - y0) / (t1 - t0)) * 1000 : 0;
+      // Decide from where the flick is heading, not from where the finger stopped.
+      if (st.y + project(v) > st.height * 0.4) {
+        closeSheet(st, v);
+      } else {
+        st.cancel();
+        st.cancel = spring(st.y, 0, (y) => setSheetY(st, y),
+          { damping: 0.8, response: 0.3, velocity: v });
+      }
+    };
+    st.el.addEventListener('pointermove', move);
+    st.el.addEventListener('pointerup', up);
+    st.el.addEventListener('pointercancel', up);
+  });
+}
+
+const voiceSheet = sheetOf(els.sheet);
+const lexSheet = sheetOf(els.lexSheet);
+draggable(voiceSheet);
+draggable(lexSheet);
 
 els.scrim.addEventListener('pointerdown', () => closeSheet());
-els.voiceBtn.addEventListener('click', openSheet);
-addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
+els.voiceBtn.addEventListener('click', () => openSheet(voiceSheet));
 
 /* ---- Voices ------------------------------------------------------------ */
 
@@ -222,7 +241,7 @@ function renderVoices() {
       sub.className = 'voice-item__sub';
       sub.textContent = v.description;
       b.append(title, sub);
-      b.addEventListener('click', () => { pickVoice(v.name); closeSheet(); });
+      b.addEventListener('click', () => { pickVoice(v.name); closeSheet(voiceSheet); });
       els.voiceList.append(b);
     }
   }
@@ -336,7 +355,8 @@ let synthesizing = false;
 // What a reading depends on. The tape answers for this key only: change the
 // text, the voice, the speed or the pronunciation and the next press reads anew.
 function readingKey() {
-  return JSON.stringify([els.text.value.trim(), voice, speed, pronunciation]);
+  const lex = pronunciation === 'special' ? lexVersion : 0;
+  return JSON.stringify([els.text.value.trim(), voice, speed, pronunciation, lex]);
 }
 
 // A tape that can be played: it matches what is on screen, and it is either
@@ -795,6 +815,158 @@ els.saveBtn.addEventListener('click', () => {
   if (tape.length) saveTape(tape.chunks, tape.rate, saveFormat);
 });
 
+/* ---- Lexicon: the words the special pronunciation respells ------------- */
+
+// The server's list (one per server: on a LAN server everyone with the token
+// shares it). `lexVersion` goes into the reading key, so a changed list makes
+// a special-pronunciation reading read anew instead of replaying the old tape.
+let lexicon = { builtin: [], user: [] };
+let lexVersion = 0;
+
+function lexError(message) {
+  els.lexError.textContent = message;
+  els.lexError.hidden = !message;
+}
+
+const detailOf = (body, res) =>
+  (typeof body.detail === 'string' ? body.detail : `Lỗi ${res.status}`);
+
+async function loadLexicon() {
+  try {
+    const res = await fetch('/api/lexicon');
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) { lexError(detailOf(body, res)); return; }
+    lexicon = body;
+    lexError('');
+  } catch {
+    lexError('Không gọi được backend');
+  }
+  renderLexicon();
+}
+
+async function storeLexicon(user) {
+  try {
+    const res = await fetch('/api/lexicon', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) { lexError(detailOf(body, res)); return false; }
+    lexicon = body;
+  } catch {
+    lexError('Không gọi được backend');
+    return false;
+  }
+  lexError('');
+  lexVersion++;
+  renderLexicon();
+  render();
+  return true;
+}
+
+// "Nghe thử": how the engine says a spelling, in a throwaway player of its own.
+let tryAudio = null;
+async function tryWord(say) {
+  if (!say.trim()) return;
+  try {
+    const res = await fetch('/api/tts/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: say, voice, speed, pronunciation: 'normal', format: 'wav' }),
+    });
+    if (!res.ok) { lexError(detailOf(await res.json().catch(() => ({})), res)); return; }
+    const url = URL.createObjectURL(await res.blob());
+    if (tryAudio) tryAudio.pause();
+    tryAudio = new Audio(url);
+    tryAudio.onended = () => URL.revokeObjectURL(url);
+    await tryAudio.play();
+  } catch {
+    lexError('Không gọi được backend');
+  }
+}
+
+const sameWord = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+function lexRow(entry, mine, overridden) {
+  const row = document.createElement('div');
+  row.className = 'lex-item' + (overridden ? ' lex-item--overridden' : '');
+  const word = document.createElement('span');
+  word.className = 'lex-item__word';
+  word.textContent = entry.word;
+  if (entry.matchCase) {
+    const badge = document.createElement('span');
+    badge.className = 'lex-item__case';
+    badge.textContent = 'Aa';
+    badge.title = 'Chỉ đúng chữ hoa/thường này';
+    word.append(badge);
+  }
+  const say = document.createElement('span');
+  say.className = 'lex-item__say';
+  say.textContent = entry.say;
+  const listen = document.createElement('button');
+  listen.type = 'button';
+  listen.className = 'link';
+  listen.textContent = 'Nghe';
+  listen.addEventListener('click', () => tryWord(entry.say));
+  row.append(word, say, listen);
+  if (mine) {
+    // A press on the word puts it in the form, to change how it is read.
+    word.addEventListener('click', () => {
+      els.lexWord.value = entry.word;
+      els.lexSay.value = entry.say;
+      els.lexCase.checked = entry.matchCase;
+      els.lexSay.focus();
+    });
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'link link--danger';
+    del.textContent = 'Xoá';
+    del.addEventListener('click', () =>
+      storeLexicon(lexicon.user.filter((e) => !sameWord(e.word, entry.word))));
+    row.append(del);
+  }
+  return row;
+}
+
+function renderLexicon() {
+  const list = els.lexList;
+  list.replaceChildren();
+  const group = (title) => {
+    const h = document.createElement('div');
+    h.className = 'voice-group';
+    h.textContent = title;
+    list.append(h);
+  };
+  group(`Của bạn · ${lexicon.user.length}`);
+  if (!lexicon.user.length) {
+    const empty = document.createElement('p');
+    empty.className = 'lex-empty';
+    empty.textContent = 'Chưa có từ nào. Thêm ở trên, ví dụ MQTT → em kiu ti ti.';
+    list.append(empty);
+  }
+  for (const e of lexicon.user) list.append(lexRow(e, true, false));
+  group('Có sẵn');
+  for (const e of lexicon.builtin) {
+    list.append(lexRow(e, false, lexicon.user.some((u) => sameWord(u.word, e.word))));
+  }
+}
+
+els.lexForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const entry = { word: els.lexWord.value.trim(), say: els.lexSay.value.trim(),
+    matchCase: els.lexCase.checked };
+  if (!entry.word || !entry.say) return;
+  // The same word again changes how it is read rather than adding a twin.
+  const user = [...lexicon.user.filter((u) => !sameWord(u.word, entry.word)), entry];
+  if (await storeLexicon(user)) {
+    els.lexForm.reset();
+    els.lexWord.focus();
+  }
+});
+els.lexTry.addEventListener('click', () => tryWord(els.lexSay.value));
+els.lexBtn.addEventListener('click', () => { openSheet(lexSheet); loadLexicon(); });
+
 /* ---- Opening a file: picked, Ctrl+O, or dropped on the window ---------- */
 
 const MAX_FILE_BYTES = 4 * 1024 * 1024;   // far past 20 000 characters of text
@@ -867,7 +1039,11 @@ addEventListener('keydown', (e) => {
     e.preventDefault();
     primary();
   }
-  if (e.key === 'Escape' && !sheetState.open && !els.stopBtn.disabled) stop();
+  // Escape closes an open sheet first; only with none open does it stop.
+  if (e.key === 'Escape') {
+    if (activeSheet) closeSheet();
+    else if (!els.stopBtn.disabled) stop();
+  }
 });
 
 async function boot() {

@@ -21,6 +21,9 @@ the release before it builds.
   `lexicon.json` in the data dir (`$VOICE_TTS_DATA`, `%APPDATA%\VoiceTTS`,
   `~/.local/share/voice-tts`; the `voice-tts-data` volume in Docker). A user word
   replaces a built-in one with the same spelling, and the longest word wins.
+- *Từ điển* in the window lists the built-in words and yours, adds, changes and
+  removes yours, and plays how a spelling sounds (*Nghe*, *Nghe thử*). A changed
+  list makes the next special-pronunciation reading read anew.
 - Open a `.txt` or `.md` file in the window: *Mở file…*, `Ctrl+O`, or drop it on the
   window. Markdown is read for its words (marks, URLs and code blocks left out);
   past 20 000 characters the rest is cut, and the status line says so.
