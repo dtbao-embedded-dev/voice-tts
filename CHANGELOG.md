@@ -26,6 +26,16 @@ the release before it builds.
   không bốn*, was *một trăm lẻ bốn*; `tụ 22p` *pi cô*, was *hai mươi hai phút*),
   hex (`0x3C`, was *không nhân ba xê*) and `−40°C` (the minus sign was dropped) too.
   [docs/pronunciation.md](docs/pronunciation.md) has the full table.
+- The `special` pronunciation spells upper-case acronyms the engine does not know
+  with English letter names for the digital side (`UART` *iu ây a ti*, was *u a rờ
+  tê* and heard as "UAZT"; `RX` *a ích*, was heard as "ZX"; `MQTT` *em kiu ti ti*)
+  and Vietnamese ones for power, analog parts and reference designators (`GND` *gờ
+  nờ đê*, `LM358` *lờ mờ ba năm tám*, `R1` *rờ một*). `NE555` keeps its three fives
+  (one was dropped), `2N2222` is read digit by digit, and `INFO`, `HIGH`, `BOOT`,
+  `RESET` are read as words. Acronyms the engine already read in English letters
+  now use the same letter names: `I2C` was *i hai xê* and is *ai hai xi*, `HTTP`,
+  `USB` and `IP` sound slightly different. `voice-tts lexicon add` keeps any old
+  spelling.
 
 ## [0.8.2] - 2026-10-09
 
