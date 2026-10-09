@@ -335,6 +335,22 @@ in parallel adds no throughput and only slows both (i5-8500T: RTF 0.79 alone, 1.
 each for two, 2.5 each for three), so the default is 1. `VOICE_TTS_MAX_STREAMS=<n>`
 in the environment (the systemd `.env`, or `compose.yaml`) lets `n` run at once.
 
+Every reading logs three lines on stderr, whatever `--log-level` says - under
+systemd, `journalctl --user -u voice-tts -f` shows them:
+
+```text
+reading #7 queue client=192.168.0.223 format=f32 ahead=1 reading=1 waiting=0
+reading #7 start waited=9.84s voice=<voice> speed=1.00 pronunciation=normal chars=532 spoken_chars=532
+reading #7 done audio=34.10s compute=26.90s rtf=0.79 first=10.95s chunks=9 wall=35.02s
+```
+
+`ahead` is how many readings were running or waiting when it arrived; `waited` the
+time until its turn; `compute` the time spent in the engine alone, so `rtf` stays
+honest while a stream waits on its listener; `first` the time from arrival to the
+first audio; `wall` arrival to end. The last line is `done`, `hung-up` (the
+listener left) or `error ... error=<exception>`. The text is not logged unless
+`VOICE_TTS_LOG_TEXT=1`: it is what someone typed, and the journal keeps it.
+
 ## HTTP API
 
 | Endpoint | Response |
