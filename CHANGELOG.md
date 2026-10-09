@@ -13,6 +13,9 @@ the release before it builds.
 - The project is licensed under the Apache License 2.0 (`LICENSE`).
 - `GET /api/version` answers `{"version": "<version>"}`, the version the server
   runs - `voice-tts --version` only ever told the CLI's own.
+- MP3 and OGG (Vorbis) output: `"format": "mp3"` / `"ogg"` on `POST /api/tts/stream`,
+  `POST /api/encode?format=` to encode 16-bit PCM a client already holds, and
+  `voice-tts speak -o out.mp3` (format from the extension, or `--format`).
 
 ## [0.7.0] - 2026-10-09
 

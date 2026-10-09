@@ -226,9 +226,76 @@ def check_wav_format(base: str) -> None:
     assert headers["content-type"] == "application/octet-stream", "default is no longer raw"
     assert len(body) == 2 * WORD * 4, "raw stream length changed"
 
-    assert post(base, {"text": "xin chào", "format": "mp3"})[0] == 422, "unknown format accepted"
+    assert post(base, {"text": "xin chào", "format": "flac"})[0] == 422, "unknown format accepted"
     assert post(base, {"text": " ", "format": "wav"})[0] == 400, "empty text as wav accepted"
     print("format: wav is a whole 16-bit file with its length, raw stays the default")
+
+
+MAGIC = {"mp3": (b"ID3", b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"), "ogg": (b"OggS",)}
+
+
+def decoded_frames(data: bytes, fmt: str) -> int:
+    """Frames in an MP3/OGG file, checked to be 48 kHz mono and not silent."""
+    import soundfile
+
+    assert data.startswith(MAGIC[fmt]), f"{fmt} starts with {data[:4]!r}"
+    audio, rate = soundfile.read(io.BytesIO(data), dtype="float32")
+    assert rate == app.SAMPLE_RATE and audio.ndim == 1, f"{fmt}: {rate} Hz, shape {audio.shape}"
+    assert np.abs(audio).max() > 0.1, f"{fmt} is silent"
+    return len(audio)
+
+
+def check_encode(base: str, tmp: Path) -> None:
+    """MP3 and OGG: whole readings over HTTP, encoded tapes, and the CLI."""
+    # Encoder priming and padding move the length a little; 50 ms is far below
+    # the 100 ms one stub word lasts.
+    slack = app.SAMPLE_RATE // 20
+    for fmt, mime in (("mp3", "audio/mpeg"), ("ogg", "audio/ogg")):
+        status, headers, body = post(base, {"text": "xin chào", "format": fmt})
+        assert status == 200, f"format {fmt}: {status} {body[:200]!r}"
+        assert headers["content-type"] == mime, headers["content-type"]
+        assert abs(decoded_frames(body, fmt) - 2 * WORD) <= slack, f"{fmt} length is off"
+
+        # What the window sends: the 16-bit tape it already holds.
+        tone = (0.3 * np.sin(2 * np.pi * 220 * np.arange(3 * WORD) / app.SAMPLE_RATE))
+        pcm = (tone * 32767).astype("<i2").tobytes()
+        req = urllib.request.Request(f"{base}/api/encode?format={fmt}", data=pcm,
+                                     headers={"Content-Type": "application/octet-stream"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            assert resp.headers["content-type"] == mime, resp.headers["content-type"]
+            assert abs(decoded_frames(resp.read(), fmt) - 3 * WORD) <= slack, f"encode {fmt}"
+
+    def encode_status(query: str, data: bytes) -> int:
+        req = urllib.request.Request(f"{base}/api/encode{query}", data=data,
+                                     headers={"Content-Type": "application/octet-stream"})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return resp.status
+        except urllib.error.HTTPError as exc:
+            return exc.code
+
+    assert encode_status("?format=flac", b"\0\0") == 400, "unknown encode format accepted"
+    assert encode_status("?format=mp3", b"") == 400, "empty tape accepted"
+    assert encode_status("?format=mp3", b"\0\0\0") == 400, "half a sample accepted"
+
+    # The CLI picks the format from the file name, or from --format; locally it
+    # encodes in process, against a server it asks the server to.
+    for flags in ([], ["--server", base]):
+        for name, extra, fmt in (("cli.mp3", [], "mp3"), ("cli.ogg", [], "ogg"),
+                                 ("cli.bin", ["--format", "mp3"], "mp3")):
+            out = tmp / name
+            if flags:
+                code, _, err = run_cli("speak", "một hai ba", "-o", str(out), "-q", *flags, *extra)
+                assert code == 0, f"remote {name}: {err}"
+            else:
+                assert cli.main(["speak", "một hai ba", "-o", str(out), "-q", *extra]) == 0
+            assert abs(decoded_frames(out.read_bytes(), fmt) - 3 * WORD) <= slack, (flags, name)
+    code, stdout, err = run_cli("speak", "một hai", "-o", "-", "-q", "--format", "ogg",
+                                "--server", base)
+    assert code == 0 and abs(decoded_frames(stdout, "ogg") - 2 * WORD) <= slack, err
+    code, _, _ = run_cli("speak", "một", "--raw", "--format", "mp3", "-o", "-", "--server", base)
+    assert code == 2, "--raw with --format must be a usage error"
+    print("encode: mp3/ogg readings, /api/encode tapes, CLI by extension or --format")
 
 
 def check_local(tmp: Path) -> None:
@@ -456,6 +523,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         check_remote(base, Path(tmp))
         check_wav_format(base)
+        check_encode(base, Path(tmp))
         check_lexicon(base, Path(tmp))
         check_local(Path(tmp))
         check_icon(base, Path(tmp))

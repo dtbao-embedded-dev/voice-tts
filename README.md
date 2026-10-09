@@ -189,6 +189,7 @@ voice-tts speak "Xin chào" --server http://192.168.0.137:8760 --token <token>
 voice-tts speak "Xin chào, deploy lên production server."           # play it
 voice-tts speak -f bai-doc.txt -v "Mai Anh" -s 1.25 -o bai-doc.wav  # save it
 echo "Chào bạn" | voice-tts speak -o - > chao.wav                   # pipe it
+voice-tts speak -f bai-doc.txt -o bai-doc.mp3                       # MP3 (or .ogg) by extension
 voice-tts speak "Xin chào" --server http://192.168.0.137:8760 --token <t>
 voice-tts speak "Bật AP trên Board" --pronunciation special     # AP "ây pi", Board "bo"
 voice-tts voices                 # * default, + featured; --json for the raw list
@@ -203,6 +204,7 @@ voice-tts status --wait 600      # exit 0 once the server's model is ready
 | `-o`, `--output` | write to a file, or `-` for stdout; without it the text is played |
 | `--play` / `--no-play` | force playback on or off (default: on unless `-o`) |
 | `--raw` | with `-o`: raw float32 LE mono 48 kHz instead of a 16-bit WAV |
+| `--format F` | `wav`, `mp3` or `ogg` for `-o` (default: from the extension - `.mp3`, `.ogg`, `.oga` - else `wav`); needed for `-o -` |
 | `--pronunciation P` | `normal` reads the text as typed (default); `special` respells POST, AP, Board, ESP32... first |
 | `--server URL`, `--token T` | use a running server instead of loading the model here |
 | `--local` | ignore `$VOICE_TTS_SERVER` |
@@ -251,7 +253,8 @@ plain HTTP: fine on a home LAN, not for the internet.
 | `GET /api/status` | `{"state": "loading" \| "ready" \| "error"}` while the model warms up |
 | `GET /api/version` | `{"version": "0.7.0"}` - the version the server runs (`voice-tts --version` is the CLI's own) |
 | `GET /api/voices` | the 25 preset voices with region, gender and description, the default voice, `sampleRate` and `maxChars` |
-| `POST /api/tts/stream` | raw float32 LE mono at 48 kHz, streamed as it is generated; or one 16-bit WAV file with `"format": "wav"` |
+| `POST /api/tts/stream` | raw float32 LE mono at 48 kHz, streamed as it is generated; or one WAV, MP3 or OGG file with `"format"` |
+| `POST /api/encode?format=mp3\|ogg` | the request body - 16-bit LE mono PCM at 48 kHz - encoded as one MP3 or OGG (Vorbis) file; how the window saves what it already read |
 
 `GET /api/voices` is the list of voices a request may name - featured voices first,
 then the rest in the engine's order (shortened here):
@@ -280,14 +283,19 @@ upgrade: since 3.8.3 `Minh Quân Pro` is `Hải Đăng`, `Anh Khôi` is `Thiện
 
 `POST /api/tts/stream` takes `{"text", "voice", "speed", "format", "pronunciation"}`:
 `text` up to 20 000 characters, `voice` a name from `/api/voices` (omit it for the
-default), `speed` between `0.5` and `2.0` (default `1.0`), `format` either `"f32"`
-(default) or `"wav"`, `pronunciation` either `"normal"` (default, the text as typed)
+default), `speed` between `0.5` and `2.0` (default `1.0`), `format` one of `"f32"`
+(default), `"wav"`, `"mp3"` or `"ogg"`, `pronunciation` either `"normal"` (default, the text as typed)
 or `"special"` (respelled by `lexicon.py`, see Notes).
 
 | `format` | Body | `Content-Type` | Starts arriving |
 | --- | --- | --- | --- |
 | `"f32"` | raw float32 LE mono, 48 kHz, no header | `application/octet-stream` | with the first generated chunk - for live playback |
 | `"wav"` | a complete 16-bit mono WAV, 48 kHz, real length in the header and `Content-Length` | `audio/wav` | once the whole text is synthesized - for saving a file |
+| `"mp3"` | a complete MP3 (LAME through libsndfile), 48 kHz mono | `audio/mpeg` | once the whole text is synthesized |
+| `"ogg"` | a complete Ogg Vorbis file, 48 kHz mono | `audio/ogg` | once the whole text is synthesized |
+
+`POST /api/encode` answers `400` for an unknown `format` or a body that is empty or
+not whole 16-bit samples, and `413` above 400 MB.
 
 The answer is `400` for empty or over-long text, an unknown voice or a speed out
 of range, `422` for an unknown `format` or `pronunciation`, and `401` when the server

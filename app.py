@@ -26,6 +26,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 from numpy.lib.stride_tricks import sliding_window_view
 from pydantic import BaseModel
 
@@ -261,9 +262,9 @@ class SpeakRequest(BaseModel):
     text: str
     voice: str | None = None
     speed: float = 1.0
-    # "f32": raw float32 streamed as it is generated. "wav": the whole reading
-    # as one 16-bit file, sent once it is complete.
-    format: Literal["f32", "wav"] = "f32"
+    # "f32": raw float32 streamed as it is generated. "wav", "mp3", "ogg": the
+    # whole reading as one file, sent once it is complete.
+    format: Literal["f32", "wav", "mp3", "ogg"] = "f32"
     # "normal": the engine reads the text as typed (POST spelled "phê ô ét tê").
     # "special": lexicon.py respells words first (POST as "post", AP as "ây pi").
     pronunciation: Literal["normal", "special"] = "normal"
@@ -279,6 +280,28 @@ def wav_bytes(chunks) -> bytes:
         out.setsampwidth(2)
         out.setframerate(SAMPLE_RATE)
         out.writeframes(pcm.tobytes())
+    return buf.getvalue()
+
+
+# format -> (libsndfile container, codec, media type). The libsndfile that the
+# soundfile wheels bundle carries LAME and Vorbis, so no encoder is installed.
+ENCODINGS = {
+    "mp3": ("MP3", "MPEG_LAYER_III", "audio/mpeg"),
+    "ogg": ("OGG", "VORBIS", "audio/ogg"),
+}
+# A tape the window sends to /api/encode: 20 000 characters read at 0.5x is
+# under an hour of 16-bit audio at 48 kHz, about 330 MB; past that it is a mistake.
+ENCODE_MAX_BYTES = 400 * 1024 * 1024
+
+
+def encode_audio(audio: np.ndarray, fmt: str) -> bytes:
+    """``audio`` (float32 mono at ``SAMPLE_RATE``) as a complete MP3 or OGG file."""
+    import soundfile
+
+    container, codec, _ = ENCODINGS[fmt]
+    buf = io.BytesIO()
+    soundfile.write(buf, np.clip(audio, -1.0, 1.0), SAMPLE_RATE, format=container,
+                    subtype=codec)
     return buf.getvalue()
 
 
@@ -359,21 +382,26 @@ def tts_stream(req: SpeakRequest):
     ``speed`` scales the duration and leaves the pitch where it is, so the
     stream is always 48 kHz and the client plays it back untouched.
 
-    ``format: "wav"`` trades the streaming for a file any player opens: the
-    whole reading is synthesized first, then sent as one 16-bit WAV with its
-    real length in the header and in ``Content-Length``.
+    ``format: "wav"`` (or ``"mp3"``, ``"ogg"``) trades the streaming for a file
+    any player opens: the whole reading is synthesized first, then sent as one
+    file with its real length in ``Content-Length``.
     """
     try:
         _, chunks = synthesize(req.text, req.voice, req.speed, req.pronunciation)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from None
 
-    if req.format == "wav":
+    if req.format != "f32":
+        if req.format == "wav":
+            body, media = wav_bytes(chunks), "audio/wav"
+        else:
+            audio = np.concatenate([np.zeros(0, dtype=np.float32), *chunks])
+            body, media = encode_audio(audio, req.format), ENCODINGS[req.format][2]
         return Response(
-            wav_bytes(chunks),
-            media_type="audio/wav",
+            body,
+            media_type=media,
             headers={"X-Sample-Rate": str(SAMPLE_RATE), "Cache-Control": "no-store",
-                     "Content-Disposition": 'inline; filename="speech.wav"'},
+                     "Content-Disposition": f'inline; filename="speech.{req.format}"'},
         )
 
     def samples():
@@ -387,6 +415,26 @@ def tts_stream(req: SpeakRequest):
         media_type="application/octet-stream",
         headers={"X-Sample-Rate": str(SAMPLE_RATE), "Cache-Control": "no-store"},
     )
+
+
+@app.post("/api/encode")
+async def encode(request: Request, format: str):
+    """Encode a tape the client already holds: 16-bit LE mono PCM at 48 kHz in,
+    an MP3 or OGG file out. Saving a reading as MP3 then costs no second synthesis.
+    """
+    if format not in ENCODINGS:
+        raise HTTPException(400, f"Định dạng phải là {' hoặc '.join(ENCODINGS)}.")
+    if int(request.headers.get("content-length") or 0) > ENCODE_MAX_BYTES:
+        raise HTTPException(413, "Âm thanh quá dài để mã hoá.")
+    body = await request.body()
+    if not body or len(body) % 2:
+        raise HTTPException(400, "Cần âm thanh 16-bit mono 48 kHz.")
+    audio = np.frombuffer(body, dtype="<i2").astype(np.float32) / 32767
+    # Encoding blocks for seconds on a long tape; keep the event loop free.
+    data = await run_in_threadpool(encode_audio, audio, format)
+    return Response(data, media_type=ENCODINGS[format][2],
+                    headers={"Cache-Control": "no-store",
+                             "Content-Disposition": f'inline; filename="speech.{format}"'})
 
 
 @app.get("/")
