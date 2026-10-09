@@ -123,15 +123,19 @@ def save_user(entries, path: Path | None = None) -> list[dict]:
 
 @functools.lru_cache(maxsize=8)
 def _matcher(user: tuple[tuple[str, str, bool], ...]):
-    """One pattern for every word, longest first, and the table to look a match up in.
+    """One pattern for every word, longest first, and what each alternative says.
 
     A single pass, so a spelling one entry produces is never respelled by another.
+    Each word is a named group: the match names its own entry, where a casefold
+    lookup would miss text the case-insensitive match accepts ("Wıfı" for wifi).
     """
     table = {w.casefold(): (w, s, c) for w, s, c in ENTRIES}
     table.update({w.casefold(): (w, s, c) for w, s, c in user})  # the user's word wins
     words = sorted(table.values(), key=lambda e: len(e[0]), reverse=True)
-    alternatives = "|".join(re.escape(w) if c else f"(?i:{re.escape(w)})" for w, _, c in words)
-    return re.compile(rf"(?<!\w)(?:{alternatives})(?!\w)"), table
+    alternatives = "|".join(
+        f"(?P<w{i}>{re.escape(w) if c else f'(?i:{re.escape(w)})'})"
+        for i, (w, _, c) in enumerate(words))
+    return re.compile(rf"(?<!\w)(?:{alternatives})(?!\w)"), [s for _, s, _ in words]
 
 
 def apply(text: str, user=()) -> str:
@@ -139,8 +143,8 @@ def apply(text: str, user=()) -> str:
 
     ``user`` is a list of ``{"word", "say", "matchCase"}`` laid over the built-ins.
     """
-    pattern, table = _matcher(tuple((e["word"], e["say"], e["matchCase"]) for e in user))
-    spoken = lambda m: table[m.group(0).casefold()][1]  # noqa: E731
+    pattern, says = _matcher(tuple((e["word"], e["say"], e["matchCase"]) for e in user))
+    spoken = lambda m: says[int(m.lastgroup[1:])]  # noqa: E731
     parts = _EN_SPAN.split(text)
     for i in range(0, len(parts), 2):  # odd indexes are the <en> spans
         parts[i] = pattern.sub(spoken, parts[i])

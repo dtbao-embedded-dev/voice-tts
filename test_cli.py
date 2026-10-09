@@ -435,6 +435,10 @@ def check_lexicon(base: str, tmp: Path) -> None:
     }
     for text, want in cases.items():
         assert lexicon.apply(text) == want, f"{text!r} -> {lexicon.apply(text)!r}"
+    # The regex matches "Wıfı" case-insensitively, but its casefold is not "wifi":
+    # the respelling must come from the alternative that matched, not a lookup.
+    wifi = [{"word": "wifi", "say": "oai phai", "matchCase": False}]
+    assert lexicon.apply("Bật Wıfı và WIFI", wifi) == "Bật oai phai và oai phai"
 
     # What the engine's own front end makes of it, model-free: the spelled-out
     # Vietnamese letters (phê ô ét tê) are the bug being fixed.
