@@ -845,6 +845,41 @@ def check_install_files() -> None:
     print("install: tool-install.py and the Docker image carry every module the app imports")
 
 
+def check_engine_threads() -> None:
+    """VOICE_TTS_THREADS sets the engine's CPU threads; unset, the engine picks."""
+    import types
+
+    def threads_with(value: str | None) -> int:
+        env = {k: v for k, v in os.environ.items() if k != "VOICE_TTS_THREADS"}
+        if value is not None:
+            env["VOICE_TTS_THREADS"] = value
+        out = subprocess.run([sys.executable, "-c", "import app; print(app.ENGINE_THREADS)"],
+                             cwd=ROOT, env=env, capture_output=True, text=True, timeout=60)
+        assert out.returncode == 0, out.stderr
+        return int(out.stdout.split()[-1])
+
+    assert threads_with(None) == 0, "unset must leave the choice to the engine"
+    assert threads_with("6") == 6
+    assert threads_with("-3") == 0, "a negative count must fall back to the engine's"
+
+    # The engine is built with it: a stand-in vieneu records what engine() passes.
+    made = {}
+    fake = types.ModuleType("vieneu")
+    fake.Vieneu = lambda **kwargs: made.update(kwargs) or StubEngine()
+    saved_module, saved_engine, saved_threads = sys.modules.get("vieneu"), app._engine, app.ENGINE_THREADS
+    sys.modules["vieneu"], app._engine, app.ENGINE_THREADS = fake, None, 6
+    try:
+        app.engine()
+    finally:
+        if saved_module is None:
+            del sys.modules["vieneu"]
+        else:
+            sys.modules["vieneu"] = saved_module
+        app._engine, app.ENGINE_THREADS = saved_engine, saved_threads
+    assert made == {"precision": app.MODEL_PRECISION, "threads": 6}, made
+    print("engine threads: VOICE_TTS_THREADS reaches the engine, unset leaves it at 0")
+
+
 def check_model_precision() -> None:
     """The build fetches and ships the ONNX graphs the app loads, and only those.
 
@@ -894,6 +929,7 @@ def main() -> int:
     check_parser()
     check_install_files()
     check_terms()
+    check_engine_threads()
     check_model_precision()
     check_release_notes()
     check_tray()

@@ -157,7 +157,7 @@ def engine():
             from vieneu import Vieneu
 
             try:
-                _engine = Vieneu(precision=MODEL_PRECISION)
+                _engine = Vieneu(precision=MODEL_PRECISION, threads=ENGINE_THREADS)
             except Exception as exc:  # surfaced to the UI via /api/status
                 _engine_error = f"{type(exc).__name__}: {exc}"
                 raise
@@ -206,6 +206,12 @@ class Turns:
 # faster than real time and finishes the queue sooner on average.
 MAX_STREAMS = max(1, int(os.environ.get("VOICE_TTS_MAX_STREAMS", "1")))
 _turns = Turns(MAX_STREAMS)
+
+# CPU threads one reading runs on. 0 leaves it to the engine: about one per physical
+# core, at most 8. Past the performance cores more threads only slow it: on an
+# i5-14600K (6 P + 8 E cores), fp32, RTF was 0.341 with 2 threads, 0.285 with 4,
+# 0.267 with 6, 0.273 with 8, 0.284 with 12, 0.287 with 14 and 0.296 with 20.
+ENGINE_THREADS = max(0, int(os.environ.get("VOICE_TTS_THREADS", "0")))
 
 # What each reading logs carries no text unless this is set: the text is what a
 # listener typed, and the journal keeps it long after the reading is gone.
