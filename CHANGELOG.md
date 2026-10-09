@@ -8,6 +8,13 @@ the release before it builds.
 
 ## [Unreleased]
 
+### Added
+
+- The server logs every reading: when it queues (and how many are ahead), when its
+  turn comes (and how long it waited), and how it ended - done, hung up or failed -
+  with the audio length, engine time, RTF and time to first audio. The lines go to
+  stderr at any `--log-level`. `VOICE_TTS_LOG_TEXT=1` adds the text itself.
+
 ## [0.8.2] - 2026-10-09
 
 ### Changed
