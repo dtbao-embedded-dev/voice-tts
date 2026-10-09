@@ -21,8 +21,11 @@ the release before it builds.
   `lexicon.json` in the data dir (`$VOICE_TTS_DATA`, `%APPDATA%\VoiceTTS`,
   `~/.local/share/voice-tts`; the `voice-tts-data` volume in Docker). A user word
   replaces a built-in one with the same spelling, and the longest word wins.
-- The window remembers the voice, speed, pronunciation and the draft across a
-  reload and a restart; a browser on the LAN server remembers them per browser.
+- *Lưu dạng* in the window saves a reading as WAV, MP3 or OGG; MP3 and OGG are
+  encoded by `/api/encode` from the audio already read.
+- The window remembers the voice, speed, pronunciation, file format and the draft
+  across a reload and a restart; a browser on the LAN server remembers them per
+  browser.
 - Pause, seek and replay in the window, from what was already read: the main
   button reads, pauses (*Tạm dừng*), carries on (*Tiếp tục*) and plays again (*Phát
   lại*), a bar seeks, and **■** stops. The backend is asked again only once the

@@ -51,9 +51,11 @@ it (plus a one-off download for a source install).
    lại*); the bar beside it seeks. All of that plays what was already read - the
    backend is not asked again until the text, voice, speed or pronunciation
    changes. **■** or `Esc` stops.
-6. **Lưu WAV** saves what was read.
+6. **Lưu dạng** picks WAV, MP3 or OGG, and **Lưu WAV/MP3/OGG** saves what was
+   read. MP3 and OGG are about a tenth of the WAV; the backend encodes the audio the
+   window already holds, so nothing is read twice.
 
-The window remembers the voice, speed and pronunciation you picked and the text you
+The window remembers the voice, speed, pronunciation and file format you picked and the text you
 were typing, across a restart. A browser on the LAN server remembers them per
 browser.
 

@@ -8,7 +8,7 @@ const els = {
   sheet: $('sheet'), scrim: $('scrim'), speed: $('speed'),
   playBtn: $('playBtn'), playIcon: $('playIcon'), playLabel: $('playLabel'),
   saveBtn: $('saveBtn'), timecode: $('timecode'), meter: $('meter'),
-  pron: $('pron'), stopBtn: $('stopBtn'), seek: $('seek'),
+  pron: $('pron'), stopBtn: $('stopBtn'), seek: $('seek'), format: $('format'),
 };
 
 const REGIONS = ['Bắc', 'Trung', 'Nam'];
@@ -22,6 +22,8 @@ let speed = 1;
 // "normal": the engine reads the text as typed. "special": the backend respells
 // the words it gets wrong first (POST, AP, Board, ESP32).
 let pronunciation = 'normal';
+// What "Lưu" writes: a WAV built here, or an MP3/OGG the backend encodes.
+let saveFormat = 'wav';
 // Every start and every stop bumps this. A read carries the value it started
 // with and checks it before touching the UI, so a read the user has already
 // stopped can no longer report into the one that replaced it.
@@ -41,7 +43,7 @@ function loadPrefs() {
 
 function savePrefs() {
   try {
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ voice, speed, pronunciation }));
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ voice, speed, pronunciation, saveFormat }));
   } catch { /* nothing to keep it in */ }
 }
 
@@ -242,6 +244,21 @@ function setPronunciation(value) {
   pronunciation = opt.dataset.pron;
   for (const o of els.pron.children) o.setAttribute('aria-pressed', String(o === opt));
 }
+
+function setFormat(value) {
+  const opt = [...els.format.children].find((o) => o.dataset.format === value);
+  if (!opt) return;
+  saveFormat = opt.dataset.format;
+  for (const o of els.format.children) o.setAttribute('aria-pressed', String(o === opt));
+  els.saveBtn.textContent = `Lưu ${saveFormat.toUpperCase()}`;
+}
+
+els.format.addEventListener('click', (e) => {
+  const opt = e.target.closest('.speed__opt');
+  if (!opt) return;
+  setFormat(opt.dataset.format);
+  savePrefs();
+});
 
 els.speed.addEventListener('click', (e) => {
   const opt = e.target.closest('.speed__opt');
@@ -610,7 +627,7 @@ els.seek.addEventListener('change', () => {
   seek(Number(els.seek.value) * tape.length);
 });
 
-/* ---- WAV export -------------------------------------------------------- */
+/* ---- Saving: WAV built here, MP3/OGG encoded by the backend ------------ */
 
 function toWav(chunks, rate) {
   const n = chunks.reduce((a, c) => a + c.length, 0);
@@ -632,19 +649,48 @@ function toWav(chunks, rate) {
   return new Blob([buf], { type: 'audio/wav' });
 }
 
-els.saveBtn.addEventListener('click', () => {
-  if (!tape.length) return;
-  // The samples already carry the speed they were read at, so this is a plain
-  // 48 kHz file - no sample-rate trickery for a player to refuse.
-  const url = URL.createObjectURL(toWav(tape.chunks, tape.rate));
+function download(blob, ext) {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `voice-tts-${Date.now()}.wav`;
+  a.download = `voice-tts-${Date.now()}.${ext}`;
   a.click();
   // The save dialog is native, so the page never hears how it ended; say what
   // was handed over rather than claiming a file exists.
-  setStatus(player.playing ? 'speaking' : 'ready', 'Đã gửi file WAV sang hộp thoại lưu');
+  setStatus(player.playing ? 'speaking' : 'ready',
+    `Đã gửi file ${ext.toUpperCase()} sang hộp thoại lưu`);
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+// The tape as a file: WAV right here; MP3 and OGG from the backend, which gets
+// the 16-bit samples it would have produced anyway - no second synthesis.
+async function saveTape(chunks, rate, fmt) {
+  // The samples already carry the speed they were read at, so this is a plain
+  // 48 kHz file - no sample-rate trickery for a player to refuse.
+  if (fmt === 'wav') { download(toWav(chunks, rate), 'wav'); return; }
+  els.saveBtn.disabled = true;
+  setStatus('loading', `Đang mã hoá ${fmt.toUpperCase()}…`);
+  try {
+    const res = await fetch(`/api/encode?format=${fmt}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: new Blob(chunks),   // Int16Array views: little-endian on every platform we run on
+    });
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({}));
+      setStatus('error', detail.detail || `Lỗi ${res.status}`);
+      return;
+    }
+    download(await res.blob(), fmt);
+  } catch {
+    setStatus('error', 'Không gọi được backend');
+  } finally {
+    render();
+  }
+}
+
+els.saveBtn.addEventListener('click', () => {
+  if (tape.length) saveTape(tape.chunks, tape.rate, saveFormat);
 });
 
 /* ---- Wiring ------------------------------------------------------------ */
@@ -679,6 +725,7 @@ async function boot() {
   const prefs = loadPrefs();
   setSpeed(prefs.speed);
   setPronunciation(prefs.pronunciation);
+  setFormat(prefs.saveFormat);
   els.text.value = loadDraft();
   renderCount();
   setStatus('loading', 'Đang tải model…');
