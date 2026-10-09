@@ -110,7 +110,7 @@ crystal 40MHz	crystal 40MHz	ok	en	on
 0603	0603	ok	en	on
 0805	0805	ok	en	on
 SOP-8	ét ô phê-8	ok	en	on
-SOT-223	ét ô ti-223	ok	en	on
+SOT-223	sót hai hai ba	ok	en	on
 4k7	4k7	ok	en	on
 4K7	4K7	ok	en	on
 10k	10k	ok	en	on
@@ -949,82 +949,82 @@ mở file main.c		code	mixed	pending
 chạy idf.py build		code	mixed	pending
 bấm Ctrl+C		code	mixed	pending
 bấm Ctrl+]		code	mixed	pending
-OK		lexicon	en	pending
-FIFO		lexicon	en	pending
-fifo		lexicon	en	pending
-LIFO		lexicon	en	pending
-ASCII		lexicon	en	pending
-YAML		lexicon	en	pending
-SPIFFS		lexicon	en	pending
-FATFS		lexicon	en	pending
-ELF		lexicon	en	pending
-TAG		lexicon	en	pending
-MAC		lexicon	en	pending
-SHA		lexicon	en	pending
-SHA256		lexicon	en	pending
-JTAG		lexicon	en	pending
-ARM		lexicon	en	pending
-ARM Cortex-M4		lexicon	en	pending
-RISC-V		lexicon	en	pending
-PSRAM		lexicon	en	pending
-SRAM		lexicon	en	pending
-DRAM		lexicon	en	pending
-IRAM		lexicon	en	pending
-EEPROM		lexicon	en	pending
-ESP-NOW		lexicon	en	pending
-USB-C		lexicon	en	pending
-type-C		lexicon	en	pending
-LEDC		lexicon	en	pending
-SoC		lexicon	en	pending
-MicroSD		lexicon	en	pending
-DevKitC		lexicon	en	pending
-FreeRTOS		lexicon	en	pending
-freertos		lexicon	en	pending
-PlatformIO		lexicon	en	pending
-OpenOCD		lexicon	en	pending
-mDNS		lexicon	en	pending
-nRF52840		lexicon	en	pending
-ATmega328P		lexicon	en	pending
-Raspberry Pi		lexicon	en	pending
-tri-state		lexicon	en	pending
-8N1		lexicon	en	pending
-memcpy		lexicon	en	pending
-printf		lexicon	en	pending
-CMake		lexicon	en	pending
-idf.py		lexicon	en	pending
-base64		lexicon	en	pending
-ota		lexicon	en	pending
-VIN		lexicon	en	pending
-VOUT		lexicon	en	pending
-Vout		lexicon	en	pending
-VREF		lexicon	en	pending
-Vref		lexicon	en	pending
-VBUS		lexicon	en	pending
-VBAT		lexicon	en	pending
-hFE		lexicon	en	pending
-Gerber		lexicon	en	pending
-DIP		lexicon	en	pending
-SOT23		lexicon	en	pending
-SOT-23		lexicon	en	pending
-SOT-23-5		lexicon	en	pending
-LIPO		lexicon	en	pending
-LiPo		lexicon	en	pending
-module		lexicon	en	pending
-mass		lexicon	en	pending
-panic'ed		lexicon	en	pending
-module cảm biến		lexicon	mixed	pending
-cáp USB-C		lexicon	mixed	pending
-địa chỉ MAC		lexicon	mixed	pending
-ic nguồn		lexicon	mixed	pending
-pin LiPo		lexicon	mixed	pending
-pin 18650		lexicon	mixed	pending
-chạm mass		lexicon	mixed	pending
-dây mass		lexicon	mixed	pending
-VĐK		lexicon	vi	pending
-VXL		lexicon	vi	pending
-HĐH		lexicon	vi	pending
-CSDL		lexicon	vi	pending
-CTDL		lexicon	vi	pending
-ĐTDĐ		lexicon	vi	pending
-KTĐT		lexicon	vi	pending
-ĐKTĐ		lexicon	vi	pending
+OK	ô kê	lexicon	en	on
+FIFO	phai phô	lexicon	en	on
+fifo	phai phô	lexicon	en	on
+LIFO	lai phô	lexicon	en	on
+ASCII	ascii	lexicon	en	on
+YAML	yaml	lexicon	en	on
+SPIFFS	spiffs	lexicon	en	on
+FATFS	fat ép ét	lexicon	en	on
+ELF	elf	lexicon	en	on
+TAG	tag	lexicon	en	on
+MAC	mác	lexicon	en	on
+SHA	sha	lexicon	en	on
+SHA256	sha hai năm sáu	lexicon	en	on
+JTAG	giây tag	lexicon	en	on
+ARM	arm	lexicon	en	on
+ARM Cortex-M4	arm Cortex-em bốn	lexicon	en	on
+RISC-V	risk five	lexicon	en	on
+PSRAM	pi ét ram	lexicon	en	on
+SRAM	ét ram	lexicon	en	on
+DRAM	đi ram	lexicon	en	on
+IRAM	ai ram	lexicon	en	on
+EEPROM	i i pi rom	lexicon	en	on
+ESP-NOW	i ét pi nao	lexicon	en	on
+USB-C	iu ét bi xi	lexicon	en	on
+type-C	type xi	lexicon	en	on
+LEDC	led xi	lexicon	en	on
+SoC	ét ô xi	lexicon	en	on
+MicroSD	micro ét đi	lexicon	en	on
+DevKitC	dev kit xi	lexicon	en	on
+FreeRTOS	free a ti ô ét	lexicon	en	on
+freertos	free a ti ô ét	lexicon	en	on
+PlatformIO	platform ai ô	lexicon	en	on
+OpenOCD	open ô xi đi	lexicon	en	on
+mDNS	em đi en ét	lexicon	en	on
+nRF52840	en a ép năm hai tám bốn không	lexicon	en	on
+ATmega328P	ây ti mega ba hai tám pi	lexicon	en	on
+Raspberry Pi	raspberry pai	lexicon	en	on
+tri-state	try state	lexicon	en	on
+8N1	tám en một	lexicon	en	on
+memcpy	mem copy	lexicon	en	on
+printf	print ép	lexicon	en	on
+CMake	xi make	lexicon	en	on
+idf.py	ai đi ép chấm pai	lexicon	en	on
+base64	base sáu tư	lexicon	en	on
+ota	ô ti ây	lexicon	en	on
+VIN	vê in	lexicon	en	on
+VOUT	vê ao	lexicon	en	on
+Vout	vê ao	lexicon	en	on
+VREF	vê rép	lexicon	en	on
+Vref	vê rép	lexicon	en	on
+VBUS	vê bớt	lexicon	en	on
+VBAT	vê bát	lexicon	en	on
+hFE	hát ép e	lexicon	en	on
+Gerber	gơ bơ	lexicon	en	on
+DIP	đíp	lexicon	en	on
+SOT23	sót hai ba	lexicon	en	on
+SOT-23	sót hai ba	lexicon	en	on
+SOT-23-5	sót hai ba năm	lexicon	en	on
+LIPO	li pô	lexicon	en	on
+LiPo	li pô	lexicon	en	on
+module	mô đun	lexicon	en	on
+mass	mát	lexicon	en	on
+panic'ed	panic	lexicon	en	on
+module cảm biến	mô đun cảm biến	lexicon	mixed	on
+cáp USB-C	cáp iu ét bi xi	lexicon	mixed	on
+địa chỉ MAC	địa chỉ mác	lexicon	mixed	on
+ic nguồn	i xê nguồn	lexicon	mixed	on
+pin LiPo	pin li pô	lexicon	mixed	on
+pin 18650	pin một tám sáu năm không	lexicon	mixed	on
+chạm mass	chạm mát	lexicon	mixed	on
+dây mass	dây mát	lexicon	mixed	on
+VĐK	vi điều khiển	lexicon	vi	on
+VXL	vi xử lý	lexicon	vi	on
+HĐH	hệ điều hành	lexicon	vi	on
+CSDL	cơ sở dữ liệu	lexicon	vi	on
+CTDL	cấu trúc dữ liệu	lexicon	vi	on
+ĐTDĐ	điện thoại di động	lexicon	vi	on
+KTĐT	kỹ thuật điện tử	lexicon	vi	on
+ĐKTĐ	điều khiển tự động	lexicon	vi	on

@@ -48,6 +48,108 @@ ENTRIES = (
     ("esp 32", "i ét pi ba hai", False),
     # On its own ("ESP HTTP client") it read "e ét phê", heard as "ESV" or "es phê".
     ("esp", "i ét pi", False),
+    # Glued variants the esp32 entry cannot reach as a whole word.
+    ("esp32s3", "i ét pi ba hai ét ba", False),
+    ("esp32c3", "i ét pi ba hai xi ba", False),
+    ("esp32c6", "i ét pi ba hai xi sáu", False),
+    ("esp32h2", "i ét pi ba hai ếch hai", False),
+
+    # Upper-case words said as words, which respell.py's acronym rule would spell.
+    ("OK", "ô kê", True),
+    ("FIFO", "phai phô", False),
+    ("LIFO", "lai phô", False),
+    ("ASCII", "ascii", True),
+    ("YAML", "yaml", True),
+    ("SPIFFS", "spiffs", False),
+    ("FATFS", "fat ép ét", False),
+    ("ELF", "elf", True),
+    ("TAG", "tag", True),
+    ("MAC", "mác", True),
+    ("SHA", "sha", True),
+    ("SHA256", "sha hai năm sáu", False),
+    ("JTAG", "giây tag", False),
+    ("ARM", "arm", True),
+    ("RISC-V", "risk five", False),
+    # The RAM kinds keep "ram" as the word it is.
+    ("PSRAM", "pi ét ram", False),
+    ("SRAM", "ét ram", False),
+    ("DRAM", "đi ram", False),
+    ("IRAM", "ai ram", False),
+    # "i i pi rom": with "prom" both "i" flip to English /aɪ/.
+    ("EEPROM", "i i pi rom", False),
+
+    # Mixed case and joined names the rules do not split.
+    ("ESP-NOW", "i ét pi nao", False),
+    ("USB-C", "iu ét bi xi", False),
+    ("type-C", "type xi", False),
+    ("LEDC", "led xi", True),
+    ("SoC", "ét ô xi", True),
+    ("MicroSD", "micro ét đi", False),
+    ("DevKitC", "dev kit xi", False),
+    ("FreeRTOS", "free a ti ô ét", False),
+    ("PlatformIO", "platform ai ô", False),
+    ("OpenOCD", "open ô xi đi", False),
+    ("mDNS", "em đi en ét", True),
+    ("softAP", "soft ây pi", False),
+    ("nRF52840", "en a ép năm hai tám bốn không", False),
+    ("ATmega328P", "ây ti mega ba hai tám pi", False),
+    ("Raspberry Pi", "raspberry pai", False),
+    # "tri" is read /tʃi/ even inside <en>.
+    ("tri-state", "try state", False),
+    ("8N1", "tám en một", False),
+
+    # Code and tools.
+    ("memcpy", "mem copy", True),
+    ("printf", "print ép", True),
+    ("CMake", "xi make", False),
+    ("idf.py", "ai đi ép chấm pai", False),
+    ("base64", "base sáu tư", False),
+    ("ota", "ô ti ây", False),  # in lower case it is read as an English word
+    ("tty", "ti ti oai", True),
+    ("Ctrl+C", "control xi", False),
+    ("Ctrl+]", "control ngoặc vuông", False),
+    ("HTTP/1.1", "ếch ti ti pi một chấm một", True),
+    ("802.11", "tám không hai chấm một một", False),
+    ("b/g/n", "bi di en", False),
+    ("panic'ed", "panic", False),
+
+    # Power rails and transistor quantities, with Vietnamese letter names like GND.
+    # One entry per spelling in any case: "VOUT" and "Vout" would be one key.
+    ("VIN", "vê in", True),  # "Vin" is a brand
+    ("VOUT", "vê ao", False),
+    ("VREF", "vê rép", False),
+    ("VBUS", "vê bớt", False),
+    ("VBAT", "vê bát", False),
+    ("hFE", "hát ép e", True),
+    ("ic", "i xê", False),  # also Ic, the collector current; sea_g2p reads "ic" /aɪk/
+    ("Ib", "i bê", True),
+
+    # Loanwords as Vietnamese engineers say them.
+    ("module", "mô đun", False),
+    ("mass", "mát", False),
+    ("Gerber", "gơ bơ", False),
+    ("DIP", "đíp", True),
+    ("SOT", "sót", True),
+    # Package names, digit by digit: "SOT-23-5" reads as the range "23 to 5".
+    ("SOT23", "sót hai ba", True),
+    ("SOT-23", "sót hai ba", True),
+    ("SOT-23-5", "sót hai ba năm", True),
+    ("SOT-23-6", "sót hai ba sáu", True),
+    ("SOT-223", "sót hai hai ba", True),
+    ("SOT-89", "sót tám chín", True),
+    ("LiPo", "li pô", False),
+    # A cell size, not eighteen thousand.
+    ("18650", "một tám sáu năm không", False),
+
+    # Vietnamese abbreviations, said in full.
+    ("VĐK", "vi điều khiển", True),
+    ("VXL", "vi xử lý", True),
+    ("HĐH", "hệ điều hành", True),
+    ("CSDL", "cơ sở dữ liệu", True),
+    ("CTDL", "cấu trúc dữ liệu", True),
+    ("ĐTDĐ", "điện thoại di động", True),
+    ("KTĐT", "kỹ thuật điện tử", True),
+    ("ĐKTĐ", "điều khiển tự động", True),
 )
 
 ENV_DATA = "VOICE_TTS_DATA"

@@ -601,6 +601,10 @@ def check_lexicon(base: str, tmp: Path) -> None:
     }
     for text, want in cases.items():
         assert lexicon.apply(text) == want, f"{text!r} -> {lexicon.apply(text)!r}"
+    # The table is keyed by the casefolded word: a second entry for "Vout" beside
+    # "VOUT" would silently replace the first.
+    keys = [w.casefold() for w, _, _ in lexicon.ENTRIES]
+    assert len(keys) == len(set(keys)), sorted(k for k in keys if keys.count(k) > 1)
     # The regex matches "Wıfı" case-insensitively, but its casefold is not "wifi":
     # the respelling must come from the alternative that matched, not a lookup.
     wifi = [{"word": "wifi", "say": "oai phai", "matchCase": False}]
