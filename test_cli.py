@@ -14,6 +14,7 @@ import http.client
 import io
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -656,6 +657,49 @@ def check_lexicon(base: str, tmp: Path) -> None:
     print("lexicon: POST/GET/... as English words, AP as ây pi, Board as bo, whole words only")
 
 
+TERM_STATES = ("on", "pending", "listen", "known-limit")
+# Units sea_g2p leaves as English letters ("pf" is pi ép, "mv" em vi): a sign the
+# number in front of them was not read as a quantity.
+LETTER_UNITS = {"pf", "nf", "uf", "mv", "kv", "ns", "mh", "uh", "dbm"}
+VOWELS = re.compile("[aeiouyɑæɐəɛɜɪɔʊʌɚɝɯɤøœɨᵻᵿɒɵʉ]")
+
+
+def check_terms() -> None:
+    """terms.tsv: each checked term reaches the engine as the row says, and as words
+    its front end can say - no spoken punctuation, no syllable without a vowel, no
+    unit left as English letters. Model-free: only sea_g2p, the engine's front end."""
+    import respell
+    from sea_g2p import Normalizer, SEAPipeline
+
+    normalizer, pipeline = Normalizer(lang="vi"), SEAPipeline(lang="vi")
+    lines = (ROOT / "terms.tsv").read_text(encoding="utf-8").splitlines()
+    # "# " starts a comment; "#define" is a term.
+    rows = [line.split("\t") for line in lines if line and not line.startswith("# ")]
+    assert rows[0] == ["input", "expected", "domain", "lang", "state"], rows[0]
+    counts = dict.fromkeys(TERM_STATES, 0)
+    inputs = set()
+    for row in rows[1:]:
+        assert len(row) == 5, f"terms.tsv: {row} has {len(row)} fields"
+        text, want, domain, lang, state = row
+        assert state in TERM_STATES, f"terms.tsv: {text!r} has state {state!r}"
+        assert text not in inputs, f"terms.tsv: {text!r} twice"
+        inputs.add(text)
+        counts[state] += 1
+        if state != "on":
+            continue
+        got = respell.special(text)
+        assert got == want, f"terms.tsv: {text!r} -> {got!r}, want {want!r}"
+        # In a sentence, as the engine meets it: case and context change sea_g2p's mind.
+        said = f"ở đây có {got} nhé"
+        words = normalizer.normalize(said, punc_norm=False)
+        assert "gạch dưới" not in words and "gạch nối" not in words, f"{text!r}: {words!r}"
+        assert not LETTER_UNITS & set(words.split()), f"{text!r}: unit as letters in {words!r}"
+        for syllable in re.split(r"[\s,.;:!?]+", pipeline.run(said, punc_norm=False)):
+            assert not syllable or VOWELS.search(syllable), \
+                f"{text!r}: {syllable!r} has no vowel in {pipeline.run(said, punc_norm=False)!r}"
+    print("terms: " + ", ".join(f"{n} {state}" for state, n in counts.items()))
+
+
 def lexicon_call(base: str, method: str, body=None, headers: dict | None = None):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(f"{base}/api/lexicon", data=data, method=method,
@@ -825,6 +869,7 @@ def main() -> int:
     app._engine = StubEngine()
     check_parser()
     check_install_files()
+    check_terms()
     check_model_precision()
     check_release_notes()
     check_tray()

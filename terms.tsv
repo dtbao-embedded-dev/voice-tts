@@ -1,0 +1,1030 @@
+# Technical terms the special pronunciation must read right. One row per term:
+# input, what respell.special() must send the engine, the rule family, the language,
+# and the state: on (checked), pending (not handled yet), listen (two candidates,
+# settled by ear). Add a row for any term that reads wrong, then make it pass.
+input	expected	domain	lang	state
+CAN	CAN	ok	en	on
+CAN bus	CAN bus	ok	en	on
+LIN	LIN	ok	en	on
+Modbus	Modbus	ok	en	on
+ESP32	i ét pi ba hai	ok	en	on
+ESP32-S3	i ét pi ba hai-S3	ok	en	on
+ESP32 S3	i ét pi ba hai S3	ok	en	on
+LED	LED	ok	en	on
+ROM	ROM	ok	en	on
+RAM	RAM	ok	en	on
+LoRa	LoRa	ok	en	on
+OLED	OLED	ok	en	on
+WIFI	WIFI	ok	en	on
+WiFi	WiFi	ok	en	on
+wifi	wifi	ok	en	on
+Wi-Fi	Wi-Fi	ok	en	on
+Bluetooth	Bluetooth	ok	en	on
+Zigbee	Zigbee	ok	en	on
+Thread	Thread	ok	en	on
+Matter	Matter	ok	en	on
+eFuse	eFuse	ok	en	on
+Flash	Flash	ok	en	on
+flash	flash	ok	en	on
+watchdog	watchdog	ok	en	on
+timer	timer	ok	en	on
+prescaler	prescaler	ok	en	on
+clock	clock	ok	en	on
+crystal	crystal	ok	en	on
+oscillator	oscillator	ok	en	on
+cache	cache	ok	en	on
+strapping pin	strapping pin	ok	en	on
+bootloader	bootloader	ok	en	on
+deep sleep	deep sleep	ok	en	on
+light sleep	light sleep	ok	en	on
+touch pad	touch pad	ok	en	on
+Hall sensor	Hall sensor	ok	en	on
+Xtensa	Xtensa	ok	en	on
+Arduino Uno	Arduino Uno	ok	en	on
+e-paper	e-paper	ok	en	on
+NeoPixel	NeoPixel	ok	en	on
+servo	servo	ok	en	on
+stepper	stepper	ok	en	on
+encoder	encoder	ok	en	on
+relay	relay	ok	en	on
+optocoupler	optocoupler	ok	en	on
+pull-up	pull-up	ok	en	on
+pull-down	pull-down	ok	en	on
+open-drain	open-drain	ok	en	on
+push-pull	push-pull	ok	en	on
+high-Z	high-Z	ok	en	on
+interrupt	interrupt	ok	en	on
+debounce	debounce	ok	en	on
+baudrate	baudrate	ok	en	on
+115200	115200	ok	en	on
+9600	9600	ok	en	on
+parity	parity	ok	en	on
+stop bit	stop bit	ok	en	on
+start bit	start bit	ok	en	on
+endianness	endianness	ok	en	on
+little-endian	little-endian	ok	en	on
+big-endian	big-endian	ok	en	on
+register	register	ok	en	on
+bitmask	bitmask	ok	en	on
+3V3	3V3	ok	en	on
+DevKit	DevKit	ok	en	on
+firmware	firmware	ok	en	on
+resistor	resistor	ok	en	on
+capacitor	capacitor	ok	en	on
+inductor	inductor	ok	en	on
+diode	diode	ok	en	on
+Zener	Zener	ok	en	on
+Schottky	Schottky	ok	en	on
+transistor	transistor	ok	en	on
+MOSFET	MOSFET	ok	en	on
+gate	gate	ok	en	on
+drain	drain	ok	en	on
+source	source	ok	en	on
+op-amp	op-amp	ok	en	on
+comparator	comparator	ok	en	on
+buck	buck	ok	en	on
+boost	boost	ok	en	on
+buck-boost	buck-boost	ok	en	on
+regulator	regulator	ok	en	on
+ferrite bead	ferrite bead	ok	en	on
+schematic	schematic	ok	en	on
+footprint	footprint	ok	en	on
+via	via	ok	en	on
+trace	trace	ok	en	on
+copper pour	copper pour	ok	en	on
+ground plane	ground plane	ok	en	on
+ripple	ripple	ok	en	on
+decoupling	decoupling	ok	en	on
+bypass	bypass	ok	en	on
+bulk capacitor	bulk capacitor	ok	en	on
+multimeter	multimeter	ok	en	on
+oscilloscope	oscilloscope	ok	en	on
+logic analyzer	logic analyzer	ok	en	on
+probe	probe	ok	en	on
+solder	solder	ok	en	on
+flux	flux	ok	en	on
+hot air	hot air	ok	en	on
+SS34	SS34	ok	en	on
+crystal 40MHz	crystal 40MHz	ok	en	on
+0402	0402	ok	en	on
+0603	0603	ok	en	on
+0805	0805	ok	en	on
+SOP-8	SOP-8	ok	en	on
+SOT-223	SOT-223	ok	en	on
+4k7	4k7	ok	en	on
+4K7	4K7	ok	en	on
+10k	10k	ok	en	on
+10K	10K	ok	en	on
+68K	68K	ok	en	on
+1%	1%	ok	en	on
+5%	5%	ok	en	on
+±5%	±5%	ok	en	on
+±0.5%	±0.5%	ok	en	on
+0.25W	0.25W	ok	en	on
+1V8	1V8	ok	en	on
+470 Ω	470 Ω	ok	en	on
+100 kHz	100 kHz	ok	en	on
+16 MHz	16 MHz	ok	en	on
+50 Hz	50 Hz	ok	en	on
+100 ms	100 ms	ok	en	on
+1–2 m	1–2 m	ok	en	on
+30 cm	30 cm	ok	en	on
+5 mm	5 mm	ok	en	on
+25°C	25°C	ok	en	on
+-40°C	-40°C	ok	en	on
+85°C	85°C	ok	en	on
+-40°C đến 85°C	-40°C đến 85°C	ok	en	on
+3 dB	3 dB	ok	en	on
+10 bit	10 bit	ok	en	on
+12-bit	12-bit	ok	en	on
+4096	4096	ok	en	on
+Vce	Vce	ok	en	on
+Vbe	Vbe	ok	en	on
+Vf	Vf	ok	en	on
+Vgs	Vgs	ok	en	on
+Vds	Vds	ok	en	on
+Id	Id	ok	en	on
+Vcc/2	Vcc/2	ok	en	on
+80ms	80ms	ok	en	on
+12dB	12dB	ok	en	on
+100kHz	100kHz	ok	en	on
+task	task	ok	en	on
+xTaskCreate	xTaskCreate	ok	en	on
+xQueueSend	xQueueSend	ok	en	on
+xSemaphoreTake	xSemaphoreTake	ok	en	on
+portMAX_DELAY	portMAX_DELAY	ok	en	on
+scheduler	scheduler	ok	en	on
+preemptive	preemptive	ok	en	on
+tick	tick	ok	en	on
+mutex	mutex	ok	en	on
+semaphore	semaphore	ok	en	on
+queue	queue	ok	en	on
+event group	event group	ok	en	on
+callback	callback	ok	en	on
+handler	handler	ok	en	on
+heap	heap	ok	en	on
+stack	stack	ok	en	on
+stack overflow	stack overflow	ok	en	on
+malloc	malloc	ok	en	on
+free	free	ok	en	on
+struct	struct	ok	en	on
+enum	enum	ok	en	on
+typedef	typedef	ok	en	on
+union	union	ok	en	on
+volatile	volatile	ok	en	on
+const	const	ok	en	on
+static	static	ok	en	on
+extern	extern	ok	en	on
+inline	inline	ok	en	on
+pointer	pointer	ok	en	on
+nullptr	nullptr	ok	en	on
+void	void	ok	en	on
+sizeof	sizeof	ok	en	on
+bool	bool	ok	en	on
+macro	macro	ok	en	on
+#define	#define	ok	en	on
+#include	#include	ok	en	on
+#ifdef	#ifdef	ok	en	on
+#endif	#endif	ok	en	on
+header	header	ok	en	on
+app_main	app_main	ok	en	on
+app_main()	app_main()	ok	en	on
+Make	Make	ok	en	on
+Ninja	Ninja	ok	en	on
+Clang	Clang	ok	en	on
+linker	linker	ok	en	on
+compiler	compiler	ok	en	on
+toolchain	toolchain	ok	en	on
+build	build	ok	en	on
+monitor	monitor	ok	en	on
+menuconfig	menuconfig	ok	en	on
+sdkconfig	sdkconfig	ok	en	on
+Kconfig	Kconfig	ok	en	on
+partition table	partition table	ok	en	on
+LittleFS	LittleFS	ok	en	on
+driver	driver	ok	en	on
+component	component	ok	en	on
+Git	Git	ok	en	on
+GitHub	GitHub	ok	en	on
+commit	commit	ok	en	on
+branch	branch	ok	en	on
+merge	merge	ok	en	on
+pull request	pull request	ok	en	on
+Docker	Docker	ok	en	on
+Linux	Linux	ok	en	on
+Ubuntu	Ubuntu	ok	en	on
+Windows	Windows	ok	en	on
+macOS	macOS	ok	en	on
+Python	Python	ok	en	on
+pip	pip	ok	en	on
+http	http	ok	en	on
+GET	get	ok	en	on
+POST	post	ok	en	on
+broker	broker	ok	en	on
+publish	publish	ok	en	on
+subscribe	subscribe	ok	en	on
+WebSocket	WebSocket	ok	en	on
+IPv4	IPv4	ok	en	on
+IPv6	IPv6	ok	en	on
+password	password	ok	en	on
+router	router	ok	en	on
+station	station	ok	en	on
+AP	ây pi	ok	en	on
+LwIP	LwIP	ok	en	on
+socket	socket	ok	en	on
+port 80	port 80	ok	en	on
+localhost	localhost	ok	en	on
+192.168.1.1	192.168.1.1	ok	en	on
+10.0.0.1	10.0.0.1	ok	en	on
+255.255.255.0	255.255.255.0	ok	en	on
+5.3.1	5.3.1	ok	en	on
+crash	crash	ok	en	on
+panic	panic	ok	en	on
+backtrace	backtrace	ok	en	on
+core dump	core dump	ok	en	on
+abort	abort	ok	en	on
+assert	assert	ok	en	on
+segmentation fault	segmentation fault	ok	en	on
+watchdog reset	watchdog reset	ok	en	on
+brownout	brownout	ok	en	on
+log level	log level	ok	en	on
+debug	debug	ok	en	on
+release	release	ok	en	on
+unit test	unit test	ok	en	on
+Unity	Unity	ok	en	on
+mock	mock	ok	en	on
+buffer	buffer	ok	en	on
+ring buffer	ring buffer	ok	en	on
+state machine	state machine	ok	en	on
+polling	polling	ok	en	on
+blocking	blocking	ok	en	on
+non-blocking	non-blocking	ok	en	on
+async	async	ok	en	on
+json	json	ok	en	on
+Json	Json	ok	en	on
+mqtt	mqtt	ok	en	on
+Mqtt	Mqtt	ok	en	on
+rtos	rtos	ok	en	on
+yaml	yaml	ok	en	on
+spiffs	spiffs	ok	en	on
+100ms	100ms	ok	en	on
+==	==	ok	en	on
+->	->	ok	en	on
+++	++	ok	en	on
+%s	%s	ok	en	on
+vi điều khiển	vi điều khiển	ok	vi	on
+vi xử lý	vi xử lý	ok	vi	on
+chân	chân	ok	vi	on
+chân nạp	chân nạp	ok	vi	on
+chân ngắt	chân ngắt	ok	vi	on
+ngắt ngoài	ngắt ngoài	ok	vi	on
+ngắt ngoài cạnh lên	ngắt ngoài cạnh lên	ok	vi	on
+cạnh xuống	cạnh xuống	ok	vi	on
+sườn lên	sườn lên	ok	vi	on
+bộ định thời	bộ định thời	ok	vi	on
+bộ đếm	bộ đếm	ok	vi	on
+xung nhịp	xung nhịp	ok	vi	on
+tần số	tần số	ok	vi	on
+độ rộng xung	độ rộng xung	ok	vi	on
+băm xung	băm xung	ok	vi	on
+chu kỳ nhiệm vụ	chu kỳ nhiệm vụ	ok	vi	on
+bộ chuyển đổi tương tự số	bộ chuyển đổi tương tự số	ok	vi	on
+giao tiếp nối tiếp	giao tiếp nối tiếp	ok	vi	on
+truyền thông	truyền thông	ok	vi	on
+thanh ghi	thanh ghi	ok	vi	on
+bộ nhớ đệm	bộ nhớ đệm	ok	vi	on
+bộ nhớ trong	bộ nhớ trong	ok	vi	on
+nạp chương trình	nạp chương trình	ok	vi	on
+chế độ ngủ sâu	chế độ ngủ sâu	ok	vi	on
+đánh thức	đánh thức	ok	vi	on
+mức cao	mức cao	ok	vi	on
+mức thấp	mức thấp	ok	vi	on
+kéo lên	kéo lên	ok	vi	on
+kéo xuống	kéo xuống	ok	vi	on
+điện trở kéo lên	điện trở kéo lên	ok	vi	on
+cổng nối tiếp	cổng nối tiếp	ok	vi	on
+mạch nạp	mạch nạp	ok	vi	on
+cảm biến nhiệt độ	cảm biến nhiệt độ	ok	vi	on
+cảm biến độ ẩm	cảm biến độ ẩm	ok	vi	on
+cảm biến gia tốc	cảm biến gia tốc	ok	vi	on
+con quay hồi chuyển	con quay hồi chuyển	ok	vi	on
+động cơ bước	động cơ bước	ok	vi	on
+rơ le	rơ le	ok	vi	on
+nút nhấn	nút nhấn	ok	vi	on
+chống dội phím	chống dội phím	ok	vi	on
+ma trận phím	ma trận phím	ok	vi	on
+còi chíp	còi chíp	ok	vi	on
+bảng mạch	bảng mạch	ok	vi	on
+con chip	con chip	ok	vi	on
+nhân kép	nhân kép	ok	vi	on
+lõi	lõi	ok	vi	on
+đa nhân	đa nhân	ok	vi	on
+thạch anh	thạch anh	ok	vi	on
+tụ lọc	tụ lọc	ok	vi	on
+nối đất	nối đất	ok	vi	on
+cờ ngắt	cờ ngắt	ok	vi	on
+tràn bộ đếm	tràn bộ đếm	ok	vi	on
+bộ chia tần	bộ chia tần	ok	vi	on
+hệ số chia	hệ số chia	ok	vi	on
+chế độ ngủ nhẹ	chế độ ngủ nhẹ	ok	vi	on
+mạch in	mạch in	ok	vi	on
+mô-đun	mô-đun	ok	vi	on
+lập trình nhúng	lập trình nhúng	ok	vi	on
+hệ thống nhúng	hệ thống nhúng	ok	vi	on
+hệ điều hành thời gian thực	hệ điều hành thời gian thực	ok	vi	on
+tác vụ	tác vụ	ok	vi	on
+luồng	luồng	ok	vi	on
+tiến trình	tiến trình	ok	vi	on
+hàng đợi	hàng đợi	ok	vi	on
+khóa	khóa	ok	vi	on
+cờ	cờ	ok	vi	on
+cờ báo	cờ báo	ok	vi	on
+biến toàn cục	biến toàn cục	ok	vi	on
+biến cục bộ	biến cục bộ	ok	vi	on
+con trỏ	con trỏ	ok	vi	on
+con trỏ hàm	con trỏ hàm	ok	vi	on
+mảng	mảng	ok	vi	on
+chuỗi	chuỗi	ok	vi	on
+kiểu dữ liệu	kiểu dữ liệu	ok	vi	on
+hàm	hàm	ok	vi	on
+hàm ngắt	hàm ngắt	ok	vi	on
+trình phục vụ ngắt	trình phục vụ ngắt	ok	vi	on
+vòng lặp	vòng lặp	ok	vi	on
+vòng lặp vô hạn	vòng lặp vô hạn	ok	vi	on
+rẽ nhánh	rẽ nhánh	ok	vi	on
+đệ quy	đệ quy	ok	vi	on
+cấp phát động	cấp phát động	ok	vi	on
+cấp phát bộ nhớ	cấp phát bộ nhớ	ok	vi	on
+rò rỉ bộ nhớ	rò rỉ bộ nhớ	ok	vi	on
+tràn bộ nhớ	tràn bộ nhớ	ok	vi	on
+trình biên dịch	trình biên dịch	ok	vi	on
+biên dịch	biên dịch	ok	vi	on
+liên kết	liên kết	ok	vi	on
+gỡ lỗi	gỡ lỗi	ok	vi	on
+sửa lỗi	sửa lỗi	ok	vi	on
+log lỗi	log lỗi	ok	vi	on
+mã nguồn	mã nguồn	ok	vi	on
+thư viện	thư viện	ok	vi	on
+thư mục	thư mục	ok	vi	on
+tệp tin	tệp tin	ok	vi	on
+file cấu hình	file cấu hình	ok	vi	on
+phân vùng	phân vùng	ok	vi	on
+cập nhật từ xa	cập nhật từ xa	ok	vi	on
+bảo mật	bảo mật	ok	vi	on
+mã hóa	mã hóa	ok	vi	on
+giải mã	giải mã	ok	vi	on
+chữ ký số	chữ ký số	ok	vi	on
+khóa bí mật	khóa bí mật	ok	vi	on
+máy chủ	máy chủ	ok	vi	on
+máy khách	máy khách	ok	vi	on
+giao thức	giao thức	ok	vi	on
+gói tin	gói tin	ok	vi	on
+cổng	cổng	ok	vi	on
+mất kết nối	mất kết nối	ok	vi	on
+kết nối lại	kết nối lại	ok	vi	on
+thời gian chờ	thời gian chờ	ok	vi	on
+hết thời gian chờ	hết thời gian chờ	ok	vi	on
+độ trễ	độ trễ	ok	vi	on
+băng thông	băng thông	ok	vi	on
+bản phát hành	bản phát hành	ok	vi	on
+nhánh	nhánh	ok	vi	on
+kho mã	kho mã	ok	vi	on
+kéo code về	kéo code về	ok	vi	on
+gộp nhánh	gộp nhánh	ok	vi	on
+kiểm thử	kiểm thử	ok	vi	on
+kiểm thử đơn vị	kiểm thử đơn vị	ok	vi	on
+phiên bản 5.3	phiên bản 5.3	ok	vi	on
+điện trở	điện trở	ok	vi	on
+tụ điện	tụ điện	ok	vi	on
+tụ gốm	tụ gốm	ok	vi	on
+tụ hóa	tụ hóa	ok	vi	on
+tụ hoá	tụ hoá	ok	vi	on
+cuộn cảm	cuộn cảm	ok	vi	on
+cuộn dây	cuộn dây	ok	vi	on
+đi-ốt	đi-ốt	ok	vi	on
+điốt	điốt	ok	vi	on
+cầu chỉnh lưu	cầu chỉnh lưu	ok	vi	on
+bóng bán dẫn	bóng bán dẫn	ok	vi	on
+sò công suất	sò công suất	ok	vi	on
+ổn áp tuyến tính	ổn áp tuyến tính	ok	vi	on
+nguồn xung	nguồn xung	ok	vi	on
+nguồn tổ ong	nguồn tổ ong	ok	vi	on
+mạch hạ áp	mạch hạ áp	ok	vi	on
+mạch tăng áp	mạch tăng áp	ok	vi	on
+mạch sạc	mạch sạc	ok	vi	on
+điện áp	điện áp	ok	vi	on
+dòng điện	dòng điện	ok	vi	on
+công suất	công suất	ok	vi	on
+điện dung	điện dung	ok	vi	on
+điện cảm	điện cảm	ok	vi	on
+trở kháng	trở kháng	ok	vi	on
+điện áp rơi	điện áp rơi	ok	vi	on
+sụt áp	sụt áp	ok	vi	on
+gợn sóng	gợn sóng	ok	vi	on
+nhiễu	nhiễu	ok	vi	on
+lọc nhiễu	lọc nhiễu	ok	vi	on
+chống nhiễu	chống nhiễu	ok	vi	on
+mát	mát	ok	vi	on
+ngắn mạch	ngắn mạch	ok	vi	on
+chập mạch	chập mạch	ok	vi	on
+hở mạch	hở mạch	ok	vi	on
+quá dòng	quá dòng	ok	vi	on
+quá áp	quá áp	ok	vi	on
+cầu chì	cầu chì	ok	vi	on
+cầu chì tự phục hồi	cầu chì tự phục hồi	ok	vi	on
+mạch in hai lớp	mạch in hai lớp	ok	vi	on
+đường mạch	đường mạch	ok	vi	on
+lớp đồng	lớp đồng	ok	vi	on
+phủ đồng	phủ đồng	ok	vi	on
+lỗ via	lỗ via	ok	vi	on
+chân linh kiện	chân linh kiện	ok	vi	on
+linh kiện dán	linh kiện dán	ok	vi	on
+linh kiện cắm	linh kiện cắm	ok	vi	on
+hàn	hàn	ok	vi	on
+hàn thiếc	hàn thiếc	ok	vi	on
+mỏ hàn	mỏ hàn	ok	vi	on
+khò	khò	ok	vi	on
+máy khò	máy khò	ok	vi	on
+nhựa thông	nhựa thông	ok	vi	on
+thiếc hàn	thiếc hàn	ok	vi	on
+đồng hồ vạn năng	đồng hồ vạn năng	ok	vi	on
+đồng hồ đo	đồng hồ đo	ok	vi	on
+máy hiện sóng	máy hiện sóng	ok	vi	on
+que đo	que đo	ok	vi	on
+đo thông mạch	đo thông mạch	ok	vi	on
+trở 1 ôm	trở 1 ôm	ok	vi	on
+trở 220	trở 220	ok	vi	on
+trở 0 ôm	trở 0 ôm	ok	vi	on
+trở 1k	trở 1k	ok	vi	on
+trở 10k	trở 10k	ok	vi	on
+trở 4k7	trở 4k7	ok	vi	on
+tụ 470	tụ 470	ok	vi	on
+sau 5p thì xong	sau 5p thì xong	ok	vi	on
+nạp code	nạp code	ok	mixed	on
+nạp firmware	nạp firmware	ok	mixed	on
+mức logic	mức logic	ok	mixed	on
+bus dữ liệu	bus dữ liệu	ok	mixed	on
+board mạch	bo mạch	ok	mixed	on
+kit phát triển	kit phát triển	ok	mixed	on
+động cơ servo	động cơ servo	ok	mixed	on
+màn hình OLED	màn hình OLED	ok	mixed	on
+đèn LED	đèn LED	ok	mixed	on
+LED đơn	LED đơn	ok	mixed	on
+LED ma trận	LED ma trận	ok	mixed	on
+ngắt timer	ngắt timer	ok	mixed	on
+cổng COM	cổng COM	ok	mixed	on
+điện trở 10k	điện trở 10k	ok	mixed	on
+chân 3V3	chân 3V3	ok	mixed	on
+tốc độ baud 115200	tốc độ baud 115200	ok	mixed	on
+tốc độ 240MHz	tốc độ 240MHz	ok	mixed	on
+độ phân giải 12 bit	độ phân giải 12 bit	ok	mixed	on
+thanh ghi 32 bit	thanh ghi 32 bit	ok	mixed	on
+ESP32 đời mới	i ét pi ba hai đời mới	ok	mixed	on
+vi điều khiển ESP32-S3	vi điều khiển i ét pi ba hai-S3	ok	mixed	on
+hàm callback	hàm callback	ok	mixed	on
+debug lỗi	debug lỗi	ok	mixed	on
+build lại	build lại	ok	mixed	on
+flash lại	flash lại	ok	mixed	on
+đẩy code lên GitHub	đẩy code lên GitHub	ok	mixed	on
+kết nối wifi	kết nối wifi	ok	mixed	on
+tràn stack	tràn stack	ok	mixed	on
+tốc độ baud	tốc độ baud	ok	mixed	on
+diode chỉnh lưu	diode chỉnh lưu	ok	mixed	on
+diode zener	diode zener	ok	mixed	on
+cầu diode	cầu diode	ok	mixed	on
+transistor công suất	transistor công suất	ok	mixed	on
+pin lithium	pin lithium	ok	mixed	on
+tụ 1000uF ở đây		units	mixed	pending
+5V		units	en	pending
+12V		units	en	pending
+24V		units	en	pending
+-5V		units	en	pending
++5V		units	en	pending
++3.3V		units	en	pending
+±12V		units	en	pending
+3.3V		units	en	pending
+3,3 V		units	en	pending
+3,3V		units	en	pending
+1.8V		units	en	pending
+2,64V		units	en	pending
+50 mV		units	en	pending
+1100mV		units	en	pending
+2.5 kV		units	en	pending
+20 mA		units	en	pending
+dòng 500mA		units	en	pending
+500 µA		units	en	pending
+500 μA		units	en	pending
+500 uA		units	en	pending
+10 nA		units	en	pending
+10A		units	en	pending
+5mW		units	en	pending
+1 kΩ		units	en	pending
+68 kΩ		units	en	pending
+45kΩ		units	en	pending
+4,7kΩ		units	en	pending
+10kΩ		units	en	pending
+1 MΩ		units	en	pending
+100 kΩ ±1%		units	en	pending
+100nF		units	en	pending
+0.1µF		units	en	pending
+0.1μF		units	en	pending
+0.1uF		units	en	pending
+10uF		units	en	pending
+10µF		units	en	pending
+10μF		units	en	pending
+4.7uF		units	en	pending
+4,7µF		units	en	pending
+22pF		units	en	pending
+100pF		units	en	pending
+4.7µH		units	en	pending
+4.7μH		units	en	pending
+4.7uH		units	en	pending
+100uH		units	en	pending
+10mH		units	en	pending
+10 µs		units	en	pending
+10 μs		units	en	pending
+10 us		units	en	pending
+8,7 µs		units	en	pending
+20 ns		units	en	pending
+2.4 GHz		units	en	pending
+2,4 GHz		units	en	pending
+1.2 GHz		units	en	pending
+-70 dBm		units	en	pending
+20 dBm		units	en	pending
+220VAC		units	en	pending
+12VDC		units	en	pending
+1-2m		units	en	pending
+1-2 m		units	en	pending
+0-5V		units	en	pending
+5-12V		units	en	pending
+1-2A		units	en	pending
+0-3.3V		units	en	pending
+0–3.3V		units	en	pending
+3.3-5V		units	en	pending
+0-3,3V		units	en	pending
+0 - 3.3V		units	en	pending
+0~3.3V		units	en	pending
+0~5V		units	en	pending
+-40~85°C		units	en	pending
+−40°C		units	en	pending
+−70 dBm		units	en	pending
+−5V		units	en	pending
+0 đến 3.3V		units	en	pending
+3.3V±5%		units	en	pending
+3.3V ± 0.1V		units	en	pending
+5V±10%		units	en	pending
+5V 2A		units	en	pending
+5V2A		units	en	pending
+12V5A		units	en	pending
+3.3V/500mA		units	en	pending
+5V/2A		units	en	pending
+12V/1A		units	en	pending
+1/4W		units	en	pending
+1/2W		units	en	pending
+1/4 W		units	en	pending
+100R		units	en	pending
+0R		units	en	pending
+1R		units	en	pending
+0x3C		units	en	pending
+0x76		units	en	pending
+0xFF		units	en	pending
+0x1A		units	en	pending
+0x5A		units	en	pending
+nguồn 3.3V		units	mixed	pending
+tụ 100nF		units	mixed	pending
+tụ 22pF		units	mixed	pending
+tụ 470uF		units	mixed	pending
+tụ 1000uF 16V		units	mixed	pending
+tụ 100uF/25V		units	mixed	pending
+cầu chì 10A		units	mixed	pending
+nguồn tổ ong 12V 5A		units	mixed	pending
+adapter 5V 2A		units	mixed	pending
+sạc 5V2A		units	mixed	pending
+sạc 5V/2A		units	mixed	pending
+pin 3,7V		units	mixed	pending
+pin 3.7V 2000mAh		units	mixed	pending
+pin 9V		units	mixed	pending
+cuộn cảm 10uH		units	mixed	pending
+điện trở 1M		units	mixed	pending
+trở 1M		units	mixed	pending
+địa chỉ 0x3C		units	mixed	pending
+tụ 104		units	mixed	pending
+tụ 103		units	mixed	pending
+tụ 102		units	mixed	pending
+tụ 105		units	mixed	pending
+tụ 221		units	mixed	pending
+tụ gốm 104		units	mixed	pending
+tụ 104 50V		units	mixed	pending
+tụ 22p		units	mixed	pending
+tụ 10p		units	mixed	pending
+tụ 100n		units	mixed	pending
+tụ 1u		units	mixed	pending
+tụ 0.1u		units	mixed	pending
+tụ 104 và tụ 22p		units	mixed	pending
+lớp 5A		units	mixed	pending
+2N2222A ở đây		units	mixed	pending
+AO3400A ở đây		units	mixed	pending
+UART		acronym	en	pending
+UART0		acronym	en	pending
+USART		acronym	en	pending
+RX		acronym	en	pending
+TX		acronym	en	pending
+RTS		acronym	en	pending
+CTS		acronym	en	pending
+SPI		acronym	en	pending
+SPI2		acronym	en	pending
+MOSI		acronym	en	pending
+MISO		acronym	en	pending
+SCK		acronym	en	pending
+CS		acronym	en	pending
+I2C		acronym	en	pending
+I2S		acronym	en	pending
+SDA		acronym	en	pending
+SCL		acronym	en	pending
+RS232		acronym	en	pending
+RS485		acronym	en	pending
+OTG		acronym	en	pending
+CDC		acronym	en	pending
+SWD		acronym	en	pending
+SWDIO		acronym	en	pending
+SWCLK		acronym	en	pending
+GPIO		acronym	en	pending
+GPIO0		acronym	en	pending
+GPIO12		acronym	en	pending
+IO0		acronym	en	pending
+IO43		acronym	en	pending
+ADC		acronym	en	pending
+ADC2		acronym	en	pending
+DAC		acronym	en	pending
+PWM		acronym	en	pending
+MCPWM		acronym	en	pending
+DMA		acronym	en	pending
+MMU		acronym	en	pending
+IRQ		acronym	en	pending
+ISR		acronym	en	pending
+IR		acronym	en	pending
+NVIC		acronym	en	pending
+EXTI		acronym	en	pending
+RTC		acronym	en	pending
+WDT		acronym	en	pending
+PLL		acronym	en	pending
+ULP		acronym	en	pending
+BLE		acronym	en	pending
+RFID		acronym	en	pending
+EN		acronym	en	pending
+ESP32-C3		acronym	en	pending
+ESP32-C6		acronym	en	pending
+ESP32-H2		acronym	en	pending
+ESP32S3		acronym	en	pending
+STM32		acronym	en	pending
+STM32F103		acronym	en	pending
+RP2040		acronym	en	pending
+AVR		acronym	en	pending
+Cortex-M4		acronym	en	pending
+LX7		acronym	en	pending
+TFT		acronym	en	pending
+ST7789		acronym	en	pending
+ILI9341		acronym	en	pending
+SSD1306		acronym	en	pending
+WS2812		acronym	en	pending
+SD card		acronym	en	pending
+SDIO		acronym	en	pending
+SDMMC		acronym	en	pending
+IMU		acronym	en	pending
+MPU6050		acronym	en	pending
+BME280		acronym	en	pending
+AHT20		acronym	en	pending
+DHT22		acronym	en	pending
+DS18B20		acronym	en	pending
+HC-SR04		acronym	en	pending
+MSB		acronym	en	pending
+LSB		acronym	en	pending
+ESP-IDF		acronym	en	pending
+IDF		acronym	en	pending
+Arduino IDE		acronym	en	pending
+MCU		acronym	en	pending
+CH340		acronym	en	pending
+CH340C		acronym	en	pending
+CP2102		acronym	en	pending
+FT232		acronym	en	pending
+FT232RL		acronym	en	pending
+USB		acronym	en	pending
+NFC		acronym	en	pending
+LCD		acronym	en	pending
+RGB		acronym	en	pending
+CPU		acronym	en	pending
+SS		acronym	en	pending
+RTOS		acronym	en	pending
+GCC		acronym	en	pending
+GDB		acronym	en	pending
+NVS		acronym	en	pending
+OTA		acronym	en	pending
+OTA update		acronym	en	pending
+LL		acronym	en	pending
+BSP		acronym	en	pending
+VS Code		acronym	en	pending
+WSL		acronym	en	pending
+CSV		acronym	en	pending
+HTTPS		acronym	en	pending
+HTTP		acronym	en	pending
+MQTT		acronym	en	pending
+TCP		acronym	en	pending
+UDP		acronym	en	pending
+DHCP		acronym	en	pending
+NTP		acronym	en	pending
+SNTP		acronym	en	pending
+TLS		acronym	en	pending
+SSID		acronym	en	pending
+STA		acronym	en	pending
+URL		acronym	en	pending
+CRC		acronym	en	pending
+CRC32		acronym	en	pending
+AES		acronym	en	pending
+UTF-8		acronym	en	pending
+SDK		acronym	en	pending
+API		acronym	en	pending
+CI		acronym	en	pending
+XML		acronym	en	pending
+DNS		acronym	en	pending
+SSL		acronym	en	pending
+IP		acronym	en	pending
+BLE server		acronym	en	pending
+ISR handler		acronym	en	pending
+IDE setup		acronym	en	pending
+INFO		acronym	en	pending
+DEBUG		acronym	en	pending
+ERROR		acronym	en	pending
+WARN		acronym	en	pending
+FAIL		acronym	en	pending
+HIGH		acronym	en	pending
+LOW		acronym	en	pending
+NULL		acronym	en	pending
+TRUE		acronym	en	pending
+FALSE		acronym	en	pending
+ON		acronym	en	pending
+OFF		acronym	en	pending
+MAX		acronym	en	pending
+MIN		acronym	en	pending
+IDLE		acronym	en	pending
+NOW		acronym	en	pending
+CONFIG		acronym	en	pending
+MAIN		acronym	en	pending
+TODO		acronym	en	pending
+README		acronym	en	pending
+LOG		acronym	en	pending
+DONE		acronym	en	pending
+READY		acronym	en	pending
+START		acronym	en	pending
+STOP		acronym	en	pending
+MODE		acronym	en	pending
+TASK		acronym	en	pending
+CORE		acronym	en	pending
+REST		acronym	en	pending
+COM		acronym	en	pending
+COM3		acronym	en	pending
+TIM2		acronym	en	pending
+LAN		acronym	en	pending
+WAN		acronym	en	pending
+BOOT		acronym	en	pending
+RESET		acronym	en	pending
+PIN		acronym	en	pending
+NAND		acronym	en	pending
+CMOS		acronym	en	pending
+BIOS		acronym	en	pending
+chân D4		acronym	mixed	pending
+chân A0		acronym	mixed	pending
+chân IO4		acronym	mixed	pending
+driver CH340		acronym	mixed	pending
+đọc ADC		acronym	mixed	pending
+xuất PWM		acronym	mixed	pending
+chân EN		acronym	mixed	pending
+nút EN		acronym	mixed	pending
+chân TX nối RX		acronym	mixed	pending
+chân TX nối RX, dùng UART, nối GND		acronym	mixed	pending
+chân GPIO số 4		acronym	mixed	pending
+chip ESP32-C3		acronym	mixed	pending
+xung PWM		acronym	mixed	pending
+ADC 12-bit		acronym	mixed	pending
+cảm biến DHT22		acronym	mixed	pending
+cảm biến BME280		acronym	mixed	pending
+SPI và I2C		acronym	mixed	pending
+chuẩn I2C		acronym	mixed	pending
+giao thức UART		acronym	mixed	pending
+giao tiếp SPI		acronym	mixed	pending
+cập nhật OTA		acronym	mixed	pending
+nút BOOT		acronym	mixed	pending
+nút RESET		acronym	mixed	pending
+CON CHIP NÀY DÙNG UART		acronym	mixed	pending
+IC nguồn		acronym	mixed	pending
+IC ổn áp		acronym	mixed	pending
+chạm GND		acronym	mixed	pending
+chân GND		acronym	mixed	pending
+chân VCC		acronym	mixed	pending
+kênh N		acronym	mixed	pending
+kênh P		acronym	mixed	pending
+GND		acronym	en-vi	pending
+AGND		acronym	en-vi	pending
+VCC		acronym	en-vi	pending
+VDD		acronym	en-vi	pending
+VSS		acronym	en-vi	pending
+VEE		acronym	en-vi	pending
+AC		acronym	en-vi	pending
+DC		acronym	en-vi	pending
+AC-DC		acronym	en-vi	pending
+DC-DC		acronym	en-vi	pending
+220V AC		acronym	en-vi	pending
+AC 220V		acronym	en-vi	pending
+12V DC		acronym	en-vi	pending
+V+		acronym	en-vi	pending
+V-		acronym	en-vi	pending
+R1		acronym	en-vi	pending
+R2		acronym	en-vi	pending
+R10		acronym	en-vi	pending
+C1		acronym	en-vi	pending
+C12		acronym	en-vi	pending
+U1		acronym	en-vi	pending
+U3		acronym	en-vi	pending
+Q1		acronym	en-vi	pending
+D1		acronym	en-vi	pending
+L1		acronym	en-vi	pending
+J1		acronym	en-vi	pending
+SW1		acronym	en-vi	pending
+TP1		acronym	en-vi	pending
+IC		acronym	en-vi	pending
+PCB		acronym	en-vi	pending
+SMD		acronym	en-vi	pending
+THT		acronym	en-vi	pending
+LDO		acronym	en-vi	pending
+SMPS		acronym	en-vi	pending
+ESR		acronym	en-vi	pending
+ESD		acronym	en-vi	pending
+TVS		acronym	en-vi	pending
+EMI		acronym	en-vi	pending
+EMC		acronym	en-vi	pending
+BJT		acronym	en-vi	pending
+NPN		acronym	en-vi	pending
+PNP		acronym	en-vi	pending
+IGBT		acronym	en-vi	pending
+NTC		acronym	en-vi	pending
+QFN		acronym	en-vi	pending
+QFN32		acronym	en-vi	pending
+BGA		acronym	en-vi	pending
+TQFP		acronym	en-vi	pending
+LQFP-48		acronym	en-vi	pending
+SOIC-8		acronym	en-vi	pending
+SMA		acronym	en-vi	pending
+SMB		acronym	en-vi	pending
+SMBJ		acronym	en-vi	pending
+TO-220		acronym	en-vi	pending
+TO-92		acronym	en-vi	pending
+DO-41		acronym	en-vi	pending
+CR2032		acronym	en-vi	pending
+AMS1117		acronym	en-vi	pending
+AMS1117-3.3		acronym	en-vi	pending
+LM7805		acronym	en-vi	pending
+LM358		acronym	en-vi	pending
+NE555		acronym	en-vi	pending
+TP4056		acronym	en-vi	pending
+MP1584		acronym	en-vi	pending
+XL4015		acronym	en-vi	pending
+BC547		acronym	en-vi	pending
+IRF540N		acronym	en-vi	pending
+2N2222		acronym	en-vi	pending
+1N4007		acronym	en-vi	pending
+1N5819		acronym	en-vi	pending
+N-MOSFET		acronym	en-vi	pending
+P-MOSFET		acronym	en-vi	pending
+ESP_LOGI		code	en	pending
+ESP_LOGE		code	en	pending
+ESP_LOGW		code	en	pending
+ESP_OK		code	en	pending
+ESP_FAIL		code	en	pending
+ESP_ERROR_CHECK		code	en	pending
+esp_err_t		code	en	pending
+pdMS_TO_TICKS		code	en	pending
+nvs_flash_init		code	en	pending
+gpio_set_level		code	en	pending
+esp_wifi_start		code	en	pending
+CONFIG_LOG_DEFAULT_LEVEL		code	en	pending
+CONFIG_FREERTOS_HZ		code	en	pending
+IRAM_ATTR		code	en	pending
+uint8_t		code	en	pending
+uint32_t		code	en	pending
+int32_t		code	en	pending
+size_t		code	en	pending
+SemaphoreHandle_t		code	en	pending
+TaskHandle_t		code	en	pending
+QueueHandle_t		code	en	pending
+vTaskDelay		code	en	pending
+.c		code	en	pending
+.h		code	en	pending
+main.c		code	en	pending
+main.h		code	en	pending
+app.cpp		code	en	pending
+build.sh		code	en	pending
+CMakeLists.txt		code	en	pending
+firmware.bin		code	en	pending
+sdkconfig.defaults		code	en	pending
+v5.3		code	en	pending
+v1.0.2		code	en	pending
+IDF v5.3.1		code	en	pending
+ESP-IDF v5.3		code	en	pending
+port 8080		code	en	pending
+https://github.com		code	en	pending
+http://192.168.4.1		code	en	pending
+/dev/ttyUSB0		code	en	pending
+components/		code	en	pending
+x != 0		code	en	pending
+stack size 2048		code	en	pending
+xTaskCreate(task, "name", 2048, NULL, 5, NULL)		code	en	pending
+ESP_LOGI(TAG, "x")		code	en	pending
+HTTP/1.1		code	en	pending
+802.11 b/g/n		code	en	pending
+softAP		code	en	pending
+esp32c3		code	en	pending
+phiên bản v5.3		code	mixed	pending
+cổng 1883		code	mixed	pending
+gọi hàm adc_cali_raw_to_voltage		code	mixed	pending
+mở file main.c		code	mixed	pending
+chạy idf.py build		code	mixed	pending
+bấm Ctrl+C		code	mixed	pending
+bấm Ctrl+]		code	mixed	pending
+OK		lexicon	en	pending
+FIFO		lexicon	en	pending
+fifo		lexicon	en	pending
+LIFO		lexicon	en	pending
+ASCII		lexicon	en	pending
+YAML		lexicon	en	pending
+SPIFFS		lexicon	en	pending
+FATFS		lexicon	en	pending
+ELF		lexicon	en	pending
+TAG		lexicon	en	pending
+MAC		lexicon	en	pending
+SHA		lexicon	en	pending
+SHA256		lexicon	en	pending
+JTAG		lexicon	en	pending
+ARM		lexicon	en	pending
+ARM Cortex-M4		lexicon	en	pending
+RISC-V		lexicon	en	pending
+PSRAM		lexicon	en	pending
+SRAM		lexicon	en	pending
+DRAM		lexicon	en	pending
+IRAM		lexicon	en	pending
+EEPROM		lexicon	en	pending
+ESP-NOW		lexicon	en	pending
+USB-C		lexicon	en	pending
+type-C		lexicon	en	pending
+LEDC		lexicon	en	pending
+SoC		lexicon	en	pending
+MicroSD		lexicon	en	pending
+DevKitC		lexicon	en	pending
+FreeRTOS		lexicon	en	pending
+freertos		lexicon	en	pending
+PlatformIO		lexicon	en	pending
+OpenOCD		lexicon	en	pending
+mDNS		lexicon	en	pending
+nRF52840		lexicon	en	pending
+ATmega328P		lexicon	en	pending
+Raspberry Pi		lexicon	en	pending
+tri-state		lexicon	en	pending
+8N1		lexicon	en	pending
+memcpy		lexicon	en	pending
+printf		lexicon	en	pending
+CMake		lexicon	en	pending
+idf.py		lexicon	en	pending
+base64		lexicon	en	pending
+ota		lexicon	en	pending
+VIN		lexicon	en	pending
+VOUT		lexicon	en	pending
+Vout		lexicon	en	pending
+VREF		lexicon	en	pending
+Vref		lexicon	en	pending
+VBUS		lexicon	en	pending
+VBAT		lexicon	en	pending
+hFE		lexicon	en	pending
+Gerber		lexicon	en	pending
+DIP		lexicon	en	pending
+SOT23		lexicon	en	pending
+SOT-23		lexicon	en	pending
+SOT-23-5		lexicon	en	pending
+LIPO		lexicon	en	pending
+LiPo		lexicon	en	pending
+module		lexicon	en	pending
+mass		lexicon	en	pending
+panic'ed		lexicon	en	pending
+module cảm biến		lexicon	mixed	pending
+cáp USB-C		lexicon	mixed	pending
+địa chỉ MAC		lexicon	mixed	pending
+ic nguồn		lexicon	mixed	pending
+pin LiPo		lexicon	mixed	pending
+pin 18650		lexicon	mixed	pending
+chạm mass		lexicon	mixed	pending
+dây mass		lexicon	mixed	pending
+VĐK		lexicon	vi	pending
+VXL		lexicon	vi	pending
+HĐH		lexicon	vi	pending
+CSDL		lexicon	vi	pending
+CTDL		lexicon	vi	pending
+ĐTDĐ		lexicon	vi	pending
+KTĐT		lexicon	vi	pending
+ĐKTĐ		lexicon	vi	pending
