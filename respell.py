@@ -52,10 +52,13 @@ _NUMBER_WORDS = set(DIGITS) | {"mười", "mươi", "mốt", "lăm", "tư", "tr�
 # out as a bare /z/, "kây" as English, "zét" split in two. H is the Vietnamese
 # "hát": measured 2026-10-09 (Whisper large-v3, 5 takes each), "ếch" was heard as X
 # (HAL 0/5 "XAL", DHT22 0/5 "DXT22", HTTP 3/5) and "ết" as S (HAL 0/5, DHT22 0/5),
-# "hát" gave HAL 5/5, DHT22 4/5, HTTP 4/5.
+# "hát" gave HAL 5/5, DHT22 4/5, HTTP 4/5. R is "ar", which sea_g2p reads as the
+# English letter /ɑːɹ/: "a" was heard as A (RTC 1/5 "ATC", RTOS 0/5 "ATOS", RP2040 0/5,
+# AVR 0/5) and "rờ" as "dờ" (RX 0/5 "giờ x"); "ar" gave RTC 5/5, RTOS 4/5, RP2040 4/5,
+# AVR 3/5, FreeRTOS 5/5 and kept UART and RGB at 5/5. RX stays weak: 4 of 10.
 EN_LETTERS = dict(zip("ABCDEFGHIJKLMNOPQRSTUVWXYZ", (
     "ây", "bi", "xi", "đi", "i", "ép", "di", "hát", "ai", "giây", "cây", "eo", "em", "en",
-    "ô", "pi", "kiu", "a", "ét", "ti", "iu", "vi", "đắp bờ liu", "ích", "oai", "dét")))
+    "ô", "pi", "kiu", "ar", "ét", "ti", "iu", "vi", "đắp bờ liu", "ích", "oai", "dét")))
 
 
 def guard_fives(words: list[str]) -> list[str]:
@@ -183,7 +186,7 @@ VI_LETTER_NAMES = dict(zip("ABCDEFGHIJKLMNOPQRSTUVWXYZ", (
 ELECTRICAL = {
     "GND", "AGND", "DGND", "PGND", "VCC", "VDD", "VSS", "VEE", "AC", "DC",
     "IC", "PCB", "PCBA", "SMD", "THT", "LDO", "SMPS", "ESR", "ESL", "ESD", "TVS", "EMI", "EMC",
-    "BJT", "NPN", "PNP", "IGBT", "JFET", "FET", "NTC", "PTC", "LDR", "UPS",
+    "BJT", "NPN", "PNP", "IGBT", "JFET", "FET", "NTC", "PTC", "LDR", "UPS", "VOM",
     "QFN", "BGA", "TQFP", "LQFP", "SOIC", "SOP", "SSOP", "TSSOP", "SMA", "SMB", "SMC", "SMBJ",
 }
 # Part numbers of analog, power and discrete parts: LM358, NE555, AMS1117, TP4056...
@@ -306,11 +309,12 @@ def _acronyms(text: str, keep: _Kept) -> str:
         if index:
             return f"{keep(' '.join(names[c] for c in index[1]))} {index[2]}"
         words = _spell(token, names)
-        # A last E or R right before an English word is read as English by sea_g2p
-        # ("BLE server" bi eo /aɪ/): the accented forms keep it Vietnamese.
+        # A last E or R right before an English word: sea_g2p reads a bare "i" there as
+        # English /aɪ/ ("BLE server" bi eo í: 4/5, "i" 0/5), and "ISR handler" was
+        # heard right with "à" 5/10, with "ar" 1/5.
         after = _NEXT_WORD.match(m.string, m.end())
-        if names is EN_LETTERS and after and _english(after[1]) and words[-1] in ("i", "a"):
-            words[-1] = {"i": "í", "a": "à"}[words[-1]]
+        if names is EN_LETTERS and after and _english(after[1]) and words[-1] in ("i", "ar"):
+            words[-1] = {"i": "í", "ar": "à"}[words[-1]]
         return keep(" ".join(words))
 
     return _ACRONYM.sub(acronym, text)

@@ -624,12 +624,12 @@ tụ 104 và tụ 22p	tụ một không bốn và tụ 22 pi cô	units	mixed	on
 lớp 5A	lớp 5A	units	mixed	on
 2N2222A ở đây	hai nờ hai hai hai hai a ở đây	units	mixed	on
 AO3400A ở đây	a ô ba bốn không không a ở đây	units	mixed	on
-UART	iu ây a ti	acronym	en	on
-UART0	iu ây a ti 0	acronym	en	on
-USART	iu ét ây a ti	acronym	en	on
-RX	a ích	acronym	en	on
+UART	iu ây ar ti	acronym	en	on
+UART0	iu ây ar ti 0	acronym	en	on
+USART	iu ét ây ar ti	acronym	en	on
+RX	ar ích	acronym	en	on
 TX	ti ích	acronym	en	on
-RTS	a ti ét	acronym	en	on
+RTS	ar ti ét	acronym	en	on
 CTS	xi ti ét	acronym	en	on
 SPI	ét pi ai	acronym	en	on
 SPI2	ét pi ai 2	acronym	en	on
@@ -641,8 +641,8 @@ I2C	ai hai xi	acronym	en	on
 I2S	ai hai ét	acronym	en	on
 SDA	ét đi ây	acronym	en	on
 SCL	ét xi eo	acronym	en	on
-RS232	a ét hai ba hai	acronym	en	on
-RS485	a ét bốn tám năm	acronym	en	on
+RS232	ar ét hai ba hai	acronym	en	on
+RS485	ar ét bốn tám năm	acronym	en	on
 OTG	ô ti di	acronym	en	on
 CDC	xi đi xi	acronym	en	on
 SWD	ét đắp bờ liu đi	acronym	en	on
@@ -660,17 +660,17 @@ PWM	pi đắp bờ liu em	acronym	en	on
 MCPWM	em xi pi đắp bờ liu em	acronym	en	on
 DMA	đi em ây	acronym	en	on
 MMU	em em iu	acronym	en	on
-IRQ	ai a kiu	acronym	en	on
-ISR	ai ét a	acronym	en	on
-IR	ai a	acronym	en	on
+IRQ	ai ar kiu	acronym	en	on
+ISR	ai ét ar	acronym	en	on
+IR	ai ar	acronym	en	on
 NVIC	en vi ai xi	acronym	en	on
 EXTI	i ích ti ai	acronym	en	on
-RTC	a ti xi	acronym	en	on
+RTC	ar ti xi	acronym	en	on
 WDT	đắp bờ liu đi ti	acronym	en	on
 PLL	pi eo eo	acronym	en	on
 ULP	iu eo pi	acronym	en	on
 BLE	bi eo i	acronym	en	on
-RFID	a ép ai đi	acronym	en	on
+RFID	ar ép ai đi	acronym	en	on
 EN	i en	acronym	en	on
 ESP32-C3	i ét pi ba hai-xi ba	acronym	en	on
 ESP32-C6	i ét pi ba hai-xi sáu	acronym	en	on
@@ -678,8 +678,8 @@ ESP32-H2	i ét pi ba hai-hát hai	acronym	en	on
 ESP32S3	i ét pi ba hai ét ba	acronym	en	on
 STM32	ét ti em ba hai	acronym	en	on
 STM32F103	ét ti em ba hai ép một không ba	acronym	en	on
-RP2040	a pi hai không bốn không	acronym	en	on
-AVR	ây vi a	acronym	en	on
+RP2040	ar pi hai không bốn không	acronym	en	on
+AVR	ây vi ar	acronym	en	on
 Cortex-M4	Cortex-em bốn	acronym	en	on
 LX7	eo ích bảy	acronym	en	on
 TFT	ti ép ti	acronym	en	on
@@ -696,7 +696,7 @@ BME280	bi em i hai tám không	acronym	en	on
 AHT20	ây hát ti hai không	acronym	en	on
 DHT22	đi hát ti hai hai	acronym	en	on
 DS18B20	đi ét một tám bi hai không	acronym	en	on
-HC-SR04	hát xi-ét a không bốn	acronym	en	on
+HC-SR04	hát xi-ét ar không bốn	acronym	en	on
 MSB	em ét bi	acronym	en	on
 LSB	eo ét bi	acronym	en	on
 ESP-IDF	i ét pi-ai đi ép	acronym	en	on
@@ -707,14 +707,14 @@ CH340	xi hát ba bốn không	acronym	en	on
 CH340C	xi hát ba bốn không xi	acronym	en	on
 CP2102	xi pi hai một không hai	acronym	en	on
 FT232	ép ti hai ba hai	acronym	en	on
-FT232RL	ép ti hai ba hai a eo	acronym	en	on
+FT232RL	ép ti hai ba hai ar eo	acronym	en	on
 USB	iu ét bi	acronym	en	on
 NFC	en ép xi	acronym	en	on
 LCD	eo xi đi	acronym	en	on
-RGB	a di bi	acronym	en	on
+RGB	ar di bi	acronym	en	on
 CPU	xi pi iu	acronym	en	on
 SS	ét ét	acronym	en	on
-RTOS	a ti ô ét	acronym	en	on
+RTOS	ar ti ô ét	acronym	en	on
 GCC	di xi xi	acronym	en	on
 GDB	di đi bi	acronym	en	on
 NVS	en vi ét	acronym	en	on
@@ -736,9 +736,9 @@ SNTP	ét en ti pi	acronym	en	on
 TLS	ti eo ét	acronym	en	on
 SSID	ét ét ai đi	acronym	en	on
 STA	ét ti ây	acronym	en	on
-URL	iu a eo	acronym	en	on
-CRC	xi a xi	acronym	en	on
-CRC32	xi a xi ba hai	acronym	en	on
+URL	iu ar eo	acronym	en	on
+CRC	xi ar xi	acronym	en	on
+CRC32	xi ar xi ba hai	acronym	en	on
 AES	ây i ét	acronym	en	on
 UTF-8	iu ti ép-8	acronym	en	on
 SDK	ét đi cây	acronym	en	on
@@ -799,8 +799,8 @@ driver CH340	driver xi hát ba bốn không	acronym	mixed	on
 xuất PWM	xuất pi đắp bờ liu em	acronym	mixed	on
 chân EN	chân i en	acronym	mixed	on
 nút EN	nút i en	acronym	mixed	on
-chân TX nối RX	chân ti ích nối a ích	acronym	mixed	on
-chân TX nối RX, dùng UART, nối GND	chân ti ích nối a ích, dùng iu ây a ti, nối gờ nờ đê	acronym	mixed	on
+chân TX nối RX	chân ti ích nối ar ích	acronym	mixed	on
+chân TX nối RX, dùng UART, nối GND	chân ti ích nối ar ích, dùng iu ây ar ti, nối gờ nờ đê	acronym	mixed	on
 chân GPIO số 4	chân di pi ai ô số 4	acronym	mixed	on
 chip ESP32-C3	chip i ét pi ba hai-xi ba	acronym	mixed	on
 xung PWM	xung pi đắp bờ liu em	acronym	mixed	on
@@ -809,12 +809,12 @@ cảm biến DHT22	cảm biến đi hát ti hai hai	acronym	mixed	on
 cảm biến BME280	cảm biến bi em i hai tám không	acronym	mixed	on
 SPI và I2C	ét pi ai và ai hai xi	acronym	mixed	on
 chuẩn I2C	chuẩn ai hai xi	acronym	mixed	on
-giao thức UART	giao thức iu ây a ti	acronym	mixed	on
+giao thức UART	giao thức iu ây ar ti	acronym	mixed	on
 giao tiếp SPI	giao tiếp ét pi ai	acronym	mixed	on
 cập nhật OTA	cập nhật ô ti ây	acronym	mixed	on
 nút BOOT	nút boot	acronym	mixed	on
 nút RESET	nút reset	acronym	mixed	on
-CON CHIP NÀY DÙNG UART	CON CHIP NÀY DÙNG iu ây a ti	acronym	mixed	on
+CON CHIP NÀY DÙNG UART	CON CHIP NÀY DÙNG iu ây ar ti	acronym	mixed	on
 IC nguồn	i xê nguồn	acronym	mixed	on
 IC ổn áp	i xê ổn áp	acronym	mixed	on
 chạm GND	chạm gờ nờ đê	acronym	mixed	on
@@ -906,7 +906,7 @@ nvs_flash_init	en vi ét flash init	code	en	on
 gpio_set_level	di pi ai ô set level	code	en	on
 esp_wifi_start	i ét pi wifi start	code	en	on
 CONFIG_LOG_DEFAULT_LEVEL	config log default level	code	en	on
-CONFIG_FREERTOS_HZ	config free a ti ô ét héc	code	en	on
+CONFIG_FREERTOS_HZ	config free ar ti ô ét héc	code	en	on
 IRAM_ATTR	ai ram attribute	code	en	on
 uint8_t	iu int tám ti	code	en	on
 uint32_t	iu int ba hai ti	code	en	on
@@ -978,8 +978,8 @@ LEDC	led xi	lexicon	en	on
 SoC	ét ô xi	lexicon	en	on
 MicroSD	micro ét đi	lexicon	en	on
 DevKitC	dev kit xi	lexicon	en	on
-FreeRTOS	free a ti ô ét	lexicon	en	on
-freertos	free a ti ô ét	lexicon	en	on
+FreeRTOS	free ar ti ô ét	lexicon	en	on
+freertos	free ar ti ô ét	lexicon	en	on
 PlatformIO	platform ai ô	lexicon	en	on
 OpenOCD	open ô xi đi	lexicon	en	on
 mDNS	em đi en ét	lexicon	en	on
@@ -1031,3 +1031,5 @@ KTĐT	kỹ thuật điện tử	lexicon	vi	on
 BOM	bi ô em	acronym	en	on
 bảng BOM linh kiện	bảng bi ô em linh kiện	acronym	mixed	on
 file ELF	file i eo ép	acronym	mixed	on
+VOM	vê ô mờ	acronym	en-vi	on
+đồng hồ VOM	đồng hồ vê ô mờ	acronym	mixed	on

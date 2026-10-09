@@ -87,7 +87,7 @@ ENTRIES = (
     ("SoC", "ét ô xi", True),
     ("MicroSD", "micro ét đi", False),
     ("DevKitC", "dev kit xi", False),
-    ("FreeRTOS", "free a ti ô ét", False),
+    ("FreeRTOS", "free ar ti ô ét", False),  # heard 5/5; "free a ti ô ét" 3/5
     ("PlatformIO", "platform ai ô", False),
     ("OpenOCD", "open ô xi đi", False),
     ("mDNS", "em đi en ét", True),
