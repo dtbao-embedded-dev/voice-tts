@@ -3,13 +3,13 @@
 # and the state: on (checked), pending (not handled yet), listen (two candidates,
 # settled by ear). Add a row for any term that reads wrong, then make it pass.
 input	expected	domain	lang	state
-CAN	CAN	ok	en	on
-CAN bus	CAN bus	ok	en	on
-LIN	LIN	ok	en	on
+CAN	can	ok	en	on
+CAN bus	can bus	ok	en	on
+LIN	lin	ok	en	on
 Modbus	Modbus	ok	en	on
 ESP32	i ét pi ba hai	ok	en	on
-ESP32-S3	i ét pi ba hai-S3	ok	en	on
-ESP32 S3	i ét pi ba hai S3	ok	en	on
+ESP32-S3	i ét pi ba hai-ét ba	ok	en	on
+ESP32 S3	i ét pi ba hai ét ba	ok	en	on
 LED	LED	ok	en	on
 ROM	ROM	ok	en	on
 RAM	RAM	ok	en	on
@@ -104,13 +104,13 @@ probe	probe	ok	en	on
 solder	solder	ok	en	on
 flux	flux	ok	en	on
 hot air	hot air	ok	en	on
-SS34	SS34	ok	en	on
+SS34	ét ét ba bốn	ok	en	on
 crystal 40MHz	crystal 40MHz	ok	en	on
 0402	0402	ok	en	on
 0603	0603	ok	en	on
 0805	0805	ok	en	on
-SOP-8	SOP-8	ok	en	on
-SOT-223	SOT-223	ok	en	on
+SOP-8	ét ô phê-8	ok	en	on
+SOT-223	ét ô ti-223	ok	en	on
 4k7	4k7	ok	en	on
 4K7	4K7	ok	en	on
 10k	10k	ok	en	on
@@ -472,7 +472,7 @@ màn hình OLED	màn hình OLED	ok	mixed	on
 LED đơn	LED đơn	ok	mixed	on
 LED ma trận	LED ma trận	ok	mixed	on
 ngắt timer	ngắt timer	ok	mixed	on
-cổng COM	cổng COM	ok	mixed	on
+cổng COM	cổng com	ok	mixed	on
 điện trở 10k	điện trở 10k	ok	mixed	on
 chân 3V3	chân 3V3	ok	mixed	on
 tốc độ baud 115200	tốc độ baud 115200	ok	mixed	on
@@ -480,7 +480,7 @@ tốc độ 240MHz	tốc độ 240MHz	ok	mixed	on
 độ phân giải 12 bit	độ phân giải 12 bit	ok	mixed	on
 thanh ghi 32 bit	thanh ghi 32 bit	ok	mixed	on
 ESP32 đời mới	i ét pi ba hai đời mới	ok	mixed	on
-vi điều khiển ESP32-S3	vi điều khiển i ét pi ba hai-S3	ok	mixed	on
+vi điều khiển ESP32-S3	vi điều khiển i ét pi ba hai-ét ba	ok	mixed	on
 hàm callback	hàm callback	ok	mixed	on
 debug lỗi	debug lỗi	ok	mixed	on
 build lại	build lại	ok	mixed	on
@@ -622,278 +622,278 @@ tụ 1u	tụ 1 mi cờ rô	units	mixed	on
 tụ 0.1u	tụ 0.1 mi cờ rô	units	mixed	on
 tụ 104 và tụ 22p	tụ một không bốn và tụ 22 pi cô	units	mixed	on
 lớp 5A	lớp 5A	units	mixed	on
-2N2222A ở đây	2N2222A ở đây	units	mixed	on
-AO3400A ở đây	AO3400A ở đây	units	mixed	on
-UART		acronym	en	pending
-UART0		acronym	en	pending
-USART		acronym	en	pending
-RX		acronym	en	pending
-TX		acronym	en	pending
-RTS		acronym	en	pending
-CTS		acronym	en	pending
-SPI		acronym	en	pending
-SPI2		acronym	en	pending
-MOSI		acronym	en	pending
-MISO		acronym	en	pending
-SCK		acronym	en	pending
-CS		acronym	en	pending
-I2C		acronym	en	pending
-I2S		acronym	en	pending
-SDA		acronym	en	pending
-SCL		acronym	en	pending
-RS232		acronym	en	pending
-RS485		acronym	en	pending
-OTG		acronym	en	pending
-CDC		acronym	en	pending
-SWD		acronym	en	pending
-SWDIO		acronym	en	pending
-SWCLK		acronym	en	pending
-GPIO		acronym	en	pending
-GPIO0		acronym	en	pending
-GPIO12		acronym	en	pending
-IO0		acronym	en	pending
-IO43		acronym	en	pending
-ADC		acronym	en	pending
-ADC2		acronym	en	pending
-DAC		acronym	en	pending
-PWM		acronym	en	pending
-MCPWM		acronym	en	pending
-DMA		acronym	en	pending
-MMU		acronym	en	pending
-IRQ		acronym	en	pending
-ISR		acronym	en	pending
-IR		acronym	en	pending
-NVIC		acronym	en	pending
-EXTI		acronym	en	pending
-RTC		acronym	en	pending
-WDT		acronym	en	pending
-PLL		acronym	en	pending
-ULP		acronym	en	pending
-BLE		acronym	en	pending
-RFID		acronym	en	pending
-EN		acronym	en	pending
-ESP32-C3		acronym	en	pending
-ESP32-C6		acronym	en	pending
-ESP32-H2		acronym	en	pending
-ESP32S3		acronym	en	pending
-STM32		acronym	en	pending
-STM32F103		acronym	en	pending
-RP2040		acronym	en	pending
-AVR		acronym	en	pending
-Cortex-M4		acronym	en	pending
-LX7		acronym	en	pending
-TFT		acronym	en	pending
-ST7789		acronym	en	pending
-ILI9341		acronym	en	pending
-SSD1306		acronym	en	pending
-WS2812		acronym	en	pending
-SD card		acronym	en	pending
-SDIO		acronym	en	pending
-SDMMC		acronym	en	pending
-IMU		acronym	en	pending
-MPU6050		acronym	en	pending
-BME280		acronym	en	pending
-AHT20		acronym	en	pending
-DHT22		acronym	en	pending
-DS18B20		acronym	en	pending
-HC-SR04		acronym	en	pending
-MSB		acronym	en	pending
-LSB		acronym	en	pending
-ESP-IDF		acronym	en	pending
-IDF		acronym	en	pending
-Arduino IDE		acronym	en	pending
-MCU		acronym	en	pending
-CH340		acronym	en	pending
-CH340C		acronym	en	pending
-CP2102		acronym	en	pending
-FT232		acronym	en	pending
-FT232RL		acronym	en	pending
-USB		acronym	en	pending
-NFC		acronym	en	pending
-LCD		acronym	en	pending
-RGB		acronym	en	pending
-CPU		acronym	en	pending
-SS		acronym	en	pending
-RTOS		acronym	en	pending
-GCC		acronym	en	pending
-GDB		acronym	en	pending
-NVS		acronym	en	pending
-OTA		acronym	en	pending
-OTA update		acronym	en	pending
-LL		acronym	en	pending
-BSP		acronym	en	pending
-VS Code		acronym	en	pending
-WSL		acronym	en	pending
-CSV		acronym	en	pending
-HTTPS		acronym	en	pending
-HTTP		acronym	en	pending
-MQTT		acronym	en	pending
-TCP		acronym	en	pending
-UDP		acronym	en	pending
-DHCP		acronym	en	pending
-NTP		acronym	en	pending
-SNTP		acronym	en	pending
-TLS		acronym	en	pending
-SSID		acronym	en	pending
-STA		acronym	en	pending
-URL		acronym	en	pending
-CRC		acronym	en	pending
-CRC32		acronym	en	pending
-AES		acronym	en	pending
-UTF-8		acronym	en	pending
-SDK		acronym	en	pending
-API		acronym	en	pending
-CI		acronym	en	pending
-XML		acronym	en	pending
-DNS		acronym	en	pending
-SSL		acronym	en	pending
-IP		acronym	en	pending
-BLE server		acronym	en	pending
-ISR handler		acronym	en	pending
-IDE setup		acronym	en	pending
-INFO		acronym	en	pending
-DEBUG		acronym	en	pending
-ERROR		acronym	en	pending
-WARN		acronym	en	pending
-FAIL		acronym	en	pending
-HIGH		acronym	en	pending
-LOW		acronym	en	pending
-NULL		acronym	en	pending
-TRUE		acronym	en	pending
-FALSE		acronym	en	pending
-ON		acronym	en	pending
-OFF		acronym	en	pending
-MAX		acronym	en	pending
-MIN		acronym	en	pending
-IDLE		acronym	en	pending
-NOW		acronym	en	pending
-CONFIG		acronym	en	pending
-MAIN		acronym	en	pending
-TODO		acronym	en	pending
-README		acronym	en	pending
-LOG		acronym	en	pending
-DONE		acronym	en	pending
-READY		acronym	en	pending
-START		acronym	en	pending
-STOP		acronym	en	pending
-MODE		acronym	en	pending
-TASK		acronym	en	pending
-CORE		acronym	en	pending
-REST		acronym	en	pending
-COM		acronym	en	pending
-COM3		acronym	en	pending
-TIM2		acronym	en	pending
-LAN		acronym	en	pending
-WAN		acronym	en	pending
-BOOT		acronym	en	pending
-RESET		acronym	en	pending
-PIN		acronym	en	pending
-NAND		acronym	en	pending
-CMOS		acronym	en	pending
-BIOS		acronym	en	pending
-chân D4		acronym	mixed	pending
-chân A0		acronym	mixed	pending
-chân IO4		acronym	mixed	pending
-driver CH340		acronym	mixed	pending
-đọc ADC		acronym	mixed	pending
-xuất PWM		acronym	mixed	pending
-chân EN		acronym	mixed	pending
-nút EN		acronym	mixed	pending
-chân TX nối RX		acronym	mixed	pending
-chân TX nối RX, dùng UART, nối GND		acronym	mixed	pending
-chân GPIO số 4		acronym	mixed	pending
-chip ESP32-C3		acronym	mixed	pending
-xung PWM		acronym	mixed	pending
-ADC 12-bit		acronym	mixed	pending
-cảm biến DHT22		acronym	mixed	pending
-cảm biến BME280		acronym	mixed	pending
-SPI và I2C		acronym	mixed	pending
-chuẩn I2C		acronym	mixed	pending
-giao thức UART		acronym	mixed	pending
-giao tiếp SPI		acronym	mixed	pending
-cập nhật OTA		acronym	mixed	pending
-nút BOOT		acronym	mixed	pending
-nút RESET		acronym	mixed	pending
-CON CHIP NÀY DÙNG UART		acronym	mixed	pending
-IC nguồn		acronym	mixed	pending
-IC ổn áp		acronym	mixed	pending
-chạm GND		acronym	mixed	pending
-chân GND		acronym	mixed	pending
-chân VCC		acronym	mixed	pending
-kênh N		acronym	mixed	pending
-kênh P		acronym	mixed	pending
-GND		acronym	en-vi	pending
-AGND		acronym	en-vi	pending
-VCC		acronym	en-vi	pending
-VDD		acronym	en-vi	pending
-VSS		acronym	en-vi	pending
-VEE		acronym	en-vi	pending
-AC		acronym	en-vi	pending
-DC		acronym	en-vi	pending
-AC-DC		acronym	en-vi	pending
-DC-DC		acronym	en-vi	pending
-220V AC		acronym	en-vi	pending
-AC 220V		acronym	en-vi	pending
-12V DC		acronym	en-vi	pending
-V+		acronym	en-vi	pending
-V-		acronym	en-vi	pending
-R1		acronym	en-vi	pending
-R2		acronym	en-vi	pending
-R10		acronym	en-vi	pending
-C1		acronym	en-vi	pending
-C12		acronym	en-vi	pending
-U1		acronym	en-vi	pending
-U3		acronym	en-vi	pending
-Q1		acronym	en-vi	pending
-D1		acronym	en-vi	pending
-L1		acronym	en-vi	pending
-J1		acronym	en-vi	pending
-SW1		acronym	en-vi	pending
-TP1		acronym	en-vi	pending
-IC		acronym	en-vi	pending
-PCB		acronym	en-vi	pending
-SMD		acronym	en-vi	pending
-THT		acronym	en-vi	pending
-LDO		acronym	en-vi	pending
-SMPS		acronym	en-vi	pending
-ESR		acronym	en-vi	pending
-ESD		acronym	en-vi	pending
-TVS		acronym	en-vi	pending
-EMI		acronym	en-vi	pending
-EMC		acronym	en-vi	pending
-BJT		acronym	en-vi	pending
-NPN		acronym	en-vi	pending
-PNP		acronym	en-vi	pending
-IGBT		acronym	en-vi	pending
-NTC		acronym	en-vi	pending
-QFN		acronym	en-vi	pending
-QFN32		acronym	en-vi	pending
-BGA		acronym	en-vi	pending
-TQFP		acronym	en-vi	pending
-LQFP-48		acronym	en-vi	pending
-SOIC-8		acronym	en-vi	pending
-SMA		acronym	en-vi	pending
-SMB		acronym	en-vi	pending
-SMBJ		acronym	en-vi	pending
-TO-220		acronym	en-vi	pending
-TO-92		acronym	en-vi	pending
-DO-41		acronym	en-vi	pending
-CR2032		acronym	en-vi	pending
-AMS1117		acronym	en-vi	pending
-AMS1117-3.3		acronym	en-vi	pending
-LM7805		acronym	en-vi	pending
-LM358		acronym	en-vi	pending
-NE555		acronym	en-vi	pending
-TP4056		acronym	en-vi	pending
-MP1584		acronym	en-vi	pending
-XL4015		acronym	en-vi	pending
-BC547		acronym	en-vi	pending
-IRF540N		acronym	en-vi	pending
-2N2222		acronym	en-vi	pending
-1N4007		acronym	en-vi	pending
-1N5819		acronym	en-vi	pending
-N-MOSFET		acronym	en-vi	pending
-P-MOSFET		acronym	en-vi	pending
+2N2222A ở đây	hai nờ hai hai hai hai a ở đây	units	mixed	on
+AO3400A ở đây	a ô ba bốn không không a ở đây	units	mixed	on
+UART	iu ây a ti	acronym	en	on
+UART0	iu ây a ti 0	acronym	en	on
+USART	iu ét ây a ti	acronym	en	on
+RX	a ích	acronym	en	on
+TX	ti ích	acronym	en	on
+RTS	a ti ét	acronym	en	on
+CTS	xi ti ét	acronym	en	on
+SPI	ét pi ai	acronym	en	on
+SPI2	ét pi ai 2	acronym	en	on
+MOSI	em ô ét ai	acronym	en	on
+MISO	em ai ét ô	acronym	en	on
+SCK	ét xi cây	acronym	en	on
+CS	xi ét	acronym	en	on
+I2C	ai hai xi	acronym	en	on
+I2S	ai hai ét	acronym	en	on
+SDA	ét đi ây	acronym	en	on
+SCL	ét xi eo	acronym	en	on
+RS232	a ét hai ba hai	acronym	en	on
+RS485	a ét bốn tám năm	acronym	en	on
+OTG	ô ti di	acronym	en	on
+CDC	xi đi xi	acronym	en	on
+SWD	ét đắp bờ liu đi	acronym	en	on
+SWDIO	ét đắp bờ liu đi ai ô	acronym	en	on
+SWCLK	ét đắp bờ liu xi eo cây	acronym	en	on
+GPIO	di pi ai ô	acronym	en	on
+GPIO0	di pi ai ô 0	acronym	en	on
+GPIO12	di pi ai ô 12	acronym	en	on
+IO0	ai ô 0	acronym	en	on
+IO43	ai ô 43	acronym	en	on
+ADC	ây đi xi	acronym	en	on
+ADC2	ây đi xi 2	acronym	en	on
+DAC	đi ây xi	acronym	en	on
+PWM	pi đắp bờ liu em	acronym	en	on
+MCPWM	em xi pi đắp bờ liu em	acronym	en	on
+DMA	đi em ây	acronym	en	on
+MMU	em em iu	acronym	en	on
+IRQ	ai a kiu	acronym	en	on
+ISR	ai ét a	acronym	en	on
+IR	ai a	acronym	en	on
+NVIC	en vi ai xi	acronym	en	on
+EXTI	i ích ti ai	acronym	en	on
+RTC	a ti xi	acronym	en	on
+WDT	đắp bờ liu đi ti	acronym	en	on
+PLL	pi eo eo	acronym	en	on
+ULP	iu eo pi	acronym	en	on
+BLE	bi eo i	acronym	en	on
+RFID	a ép ai đi	acronym	en	on
+EN	i en	acronym	en	on
+ESP32-C3	i ét pi ba hai-xi ba	acronym	en	on
+ESP32-C6	i ét pi ba hai-xi sáu	acronym	en	on
+ESP32-H2	i ét pi ba hai-ếch hai	acronym	en	on
+ESP32S3	i ét pi ba hai ét ba	acronym	en	on
+STM32	ét ti em ba hai	acronym	en	on
+STM32F103	ét ti em ba hai ép một không ba	acronym	en	on
+RP2040	a pi hai không bốn không	acronym	en	on
+AVR	ây vi a	acronym	en	on
+Cortex-M4	Cortex-em bốn	acronym	en	on
+LX7	eo ích bảy	acronym	en	on
+TFT	ti ép ti	acronym	en	on
+ST7789	ét ti bảy bảy tám chín	acronym	en	on
+ILI9341	ai eo ai chín ba bốn một	acronym	en	on
+SSD1306	ét ét đi một ba không sáu	acronym	en	on
+WS2812	đắp bờ liu ét hai tám một hai	acronym	en	on
+SD card	ét đi card	acronym	en	on
+SDIO	ét đi ai ô	acronym	en	on
+SDMMC	ét đi em em xi	acronym	en	on
+IMU	ai em iu	acronym	en	on
+MPU6050	em pi iu sáu không năm không	acronym	en	on
+BME280	bi em i hai tám không	acronym	en	on
+AHT20	ây ếch ti hai không	acronym	en	on
+DHT22	đi ếch ti hai hai	acronym	en	on
+DS18B20	đi ét một tám bi hai không	acronym	en	on
+HC-SR04	ếch xi-ét a không bốn	acronym	en	on
+MSB	em ét bi	acronym	en	on
+LSB	eo ét bi	acronym	en	on
+ESP-IDF	i ét pi-ai đi ép	acronym	en	on
+IDF	ai đi ép	acronym	en	on
+Arduino IDE	Arduino ai đi i	acronym	en	on
+MCU	em xi iu	acronym	en	on
+CH340	xi ếch ba bốn không	acronym	en	on
+CH340C	xi ếch ba bốn không xi	acronym	en	on
+CP2102	xi pi hai một không hai	acronym	en	on
+FT232	ép ti hai ba hai	acronym	en	on
+FT232RL	ép ti hai ba hai a eo	acronym	en	on
+USB	iu ét bi	acronym	en	on
+NFC	en ép xi	acronym	en	on
+LCD	eo xi đi	acronym	en	on
+RGB	a di bi	acronym	en	on
+CPU	xi pi iu	acronym	en	on
+SS	ét ét	acronym	en	on
+RTOS	a ti ô ét	acronym	en	on
+GCC	di xi xi	acronym	en	on
+GDB	di đi bi	acronym	en	on
+NVS	en vi ét	acronym	en	on
+OTA	ô ti ây	acronym	en	on
+OTA update	ô ti ây update	acronym	en	on
+LL	eo eo	acronym	en	on
+BSP	bi ét pi	acronym	en	on
+VS Code	vi ét Code	acronym	en	on
+WSL	đắp bờ liu ét eo	acronym	en	on
+CSV	xi ét vi	acronym	en	on
+HTTPS	ếch ti ti pi ét	acronym	en	on
+HTTP	ếch ti ti pi	acronym	en	on
+MQTT	em kiu ti ti	acronym	en	on
+TCP	ti xi pi	acronym	en	on
+UDP	iu đi pi	acronym	en	on
+DHCP	đi ếch xi pi	acronym	en	on
+NTP	en ti pi	acronym	en	on
+SNTP	ét en ti pi	acronym	en	on
+TLS	ti eo ét	acronym	en	on
+SSID	ét ét ai đi	acronym	en	on
+STA	ét ti ây	acronym	en	on
+URL	iu a eo	acronym	en	on
+CRC	xi a xi	acronym	en	on
+CRC32	xi a xi ba hai	acronym	en	on
+AES	ây i ét	acronym	en	on
+UTF-8	iu ti ép-8	acronym	en	on
+SDK	ét đi cây	acronym	en	on
+API	ây pi ai	acronym	en	on
+CI	xi ai	acronym	en	on
+XML	ích em eo	acronym	en	on
+DNS	đi en ét	acronym	en	on
+SSL	ét ét eo	acronym	en	on
+IP	ai pi	acronym	en	on
+BLE server	bi eo í server	acronym	en	on
+ISR handler	ai ét à handler	acronym	en	on
+IDE setup	ai đi í setup	acronym	en	on
+INFO	info	acronym	en	on
+DEBUG	debug	acronym	en	on
+ERROR	ERROR	acronym	en	on
+WARN	warn	acronym	en	on
+FAIL	fail	acronym	en	on
+HIGH	high	acronym	en	on
+LOW	low	acronym	en	on
+NULL	NULL	acronym	en	on
+TRUE	TRUE	acronym	en	on
+FALSE	FALSE	acronym	en	on
+ON	ON	acronym	en	on
+OFF	off	acronym	en	on
+MAX	max	acronym	en	on
+MIN	min	acronym	en	on
+IDLE	idle	acronym	en	on
+NOW	now	acronym	en	on
+CONFIG	config	acronym	en	on
+MAIN	main	acronym	en	on
+TODO	to do	acronym	en	on
+README	read me	acronym	en	on
+LOG	log	acronym	en	on
+DONE	done	acronym	en	on
+READY	ready	acronym	en	on
+START	start	acronym	en	on
+STOP	stop	acronym	en	on
+MODE	mode	acronym	en	on
+TASK	task	acronym	en	on
+CORE	core	acronym	en	on
+REST	REST	acronym	en	on
+COM	com	acronym	en	on
+COM3	com 3	acronym	en	on
+TIM2	tim 2	acronym	en	on
+LAN	lan	acronym	en	on
+WAN	wan	acronym	en	on
+BOOT	boot	acronym	en	on
+RESET	reset	acronym	en	on
+PIN	pin	acronym	en	on
+NAND	nand	acronym	en	on
+CMOS	cmos	acronym	en	on
+BIOS	bios	acronym	en	on
+chân D4	chân đi 4	acronym	mixed	on
+chân A0	chân ây 0	acronym	mixed	on
+chân IO4	chân ai ô 4	acronym	mixed	on
+driver CH340	driver xi ếch ba bốn không	acronym	mixed	on
+đọc ADC	đọc ây đi xi	acronym	mixed	on
+xuất PWM	xuất pi đắp bờ liu em	acronym	mixed	on
+chân EN	chân i en	acronym	mixed	on
+nút EN	nút i en	acronym	mixed	on
+chân TX nối RX	chân ti ích nối a ích	acronym	mixed	on
+chân TX nối RX, dùng UART, nối GND	chân ti ích nối a ích, dùng iu ây a ti, nối gờ nờ đê	acronym	mixed	on
+chân GPIO số 4	chân di pi ai ô số 4	acronym	mixed	on
+chip ESP32-C3	chip i ét pi ba hai-xi ba	acronym	mixed	on
+xung PWM	xung pi đắp bờ liu em	acronym	mixed	on
+ADC 12-bit	ây đi xi 12-bit	acronym	mixed	on
+cảm biến DHT22	cảm biến đi ếch ti hai hai	acronym	mixed	on
+cảm biến BME280	cảm biến bi em i hai tám không	acronym	mixed	on
+SPI và I2C	ét pi ai và ai hai xi	acronym	mixed	on
+chuẩn I2C	chuẩn ai hai xi	acronym	mixed	on
+giao thức UART	giao thức iu ây a ti	acronym	mixed	on
+giao tiếp SPI	giao tiếp ét pi ai	acronym	mixed	on
+cập nhật OTA	cập nhật ô ti ây	acronym	mixed	on
+nút BOOT	nút boot	acronym	mixed	on
+nút RESET	nút reset	acronym	mixed	on
+CON CHIP NÀY DÙNG UART	CON CHIP NÀY DÙNG iu ây a ti	acronym	mixed	on
+IC nguồn	i xê nguồn	acronym	mixed	on
+IC ổn áp	i xê ổn áp	acronym	mixed	on
+chạm GND	chạm gờ nờ đê	acronym	mixed	on
+chân GND	chân gờ nờ đê	acronym	mixed	on
+chân VCC	chân vê xê xê	acronym	mixed	on
+kênh N	kênh N	acronym	mixed	on
+kênh P	kênh P	acronym	mixed	on
+GND	gờ nờ đê	acronym	en-vi	on
+AGND	a gờ nờ đê	acronym	en-vi	on
+VCC	vê xê xê	acronym	en-vi	on
+VDD	vê đê đê	acronym	en-vi	on
+VSS	vê ét ét	acronym	en-vi	on
+VEE	vê e e	acronym	en-vi	on
+AC	a xê	acronym	en-vi	on
+DC	đê xê	acronym	en-vi	on
+AC-DC	a xê-đê xê	acronym	en-vi	on
+DC-DC	đê xê-đê xê	acronym	en-vi	on
+220V AC	220 vôn a xê	acronym	en-vi	on
+AC 220V	a xê 220 vôn	acronym	en-vi	on
+12V DC	12 vôn đê xê	acronym	en-vi	on
+V+	vê cộng	acronym	en-vi	on
+V-	vê trừ	acronym	en-vi	on
+R1	rờ 1	acronym	en-vi	on
+R2	rờ 2	acronym	en-vi	on
+R10	rờ 10	acronym	en-vi	on
+C1	xê 1	acronym	en-vi	on
+C12	xê 12	acronym	en-vi	on
+U1	u 1	acronym	en-vi	on
+U3	u 3	acronym	en-vi	on
+Q1	cu 1	acronym	en-vi	on
+D1	đê 1	acronym	en-vi	on
+L1	lờ 1	acronym	en-vi	on
+J1	giây 1	acronym	en-vi	on
+SW1	ét vê kép 1	acronym	en-vi	on
+TP1	tê phê 1	acronym	en-vi	on
+IC	i xê	acronym	en-vi	on
+PCB	phê xê bê	acronym	en-vi	on
+SMD	ét mờ đê	acronym	en-vi	on
+THT	tê hát tê	acronym	en-vi	on
+LDO	lờ đê ô	acronym	en-vi	on
+SMPS	ét mờ phê ét	acronym	en-vi	on
+ESR	e ét rờ	acronym	en-vi	on
+ESD	e ét đê	acronym	en-vi	on
+TVS	tê vê ét	acronym	en-vi	on
+EMI	e mờ i	acronym	en-vi	on
+EMC	e mờ xê	acronym	en-vi	on
+BJT	bê giây tê	acronym	en-vi	on
+NPN	nờ phê nờ	acronym	en-vi	on
+PNP	phê nờ phê	acronym	en-vi	on
+IGBT	i gờ bê tê	acronym	en-vi	on
+NTC	nờ tê xê	acronym	en-vi	on
+QFN	cu ép nờ	acronym	en-vi	on
+QFN32	cu ép nờ ba hai	acronym	en-vi	on
+BGA	bê gờ a	acronym	en-vi	on
+TQFP	tê cu ép phê	acronym	en-vi	on
+LQFP-48	lờ cu ép phê-48	acronym	en-vi	on
+SOIC-8	ét ô i xê-8	acronym	en-vi	on
+SMA	ét mờ a	acronym	en-vi	on
+SMB	ét mờ bê	acronym	en-vi	on
+SMBJ	ét mờ bê giây	acronym	en-vi	on
+TO-220	tê ô-220	acronym	en-vi	on
+TO-92	tê ô-92	acronym	en-vi	on
+DO-41	đê ô-41	acronym	en-vi	on
+CR2032	xê rờ hai không ba hai	acronym	en-vi	on
+AMS1117	a mờ ét một một một bảy	acronym	en-vi	on
+AMS1117-3.3	a mờ ét một một một bảy-3.3	acronym	en-vi	on
+LM7805	lờ mờ bảy tám không năm	acronym	en-vi	on
+LM358	lờ mờ ba năm tám	acronym	en-vi	on
+NE555	nờ e năm năm, năm	acronym	en-vi	on
+TP4056	tê phê bốn không năm sáu	acronym	en-vi	on
+MP1584	mờ phê một năm tám bốn	acronym	en-vi	on
+XL4015	ích lờ bốn không một năm	acronym	en-vi	on
+BC547	bê xê năm bốn bảy	acronym	en-vi	on
+IRF540N	i rờ ép năm bốn không nờ	acronym	en-vi	on
+2N2222	hai nờ hai hai hai hai	acronym	en-vi	on
+1N4007	một nờ bốn không không bảy	acronym	en-vi	on
+1N5819	một nờ năm tám một chín	acronym	en-vi	on
+N-MOSFET	N-MOSFET	acronym	en-vi	on
+P-MOSFET	P-MOSFET	acronym	en-vi	on
 ESP_LOGI		code	en	pending
 ESP_LOGE		code	en	pending
 ESP_LOGW		code	en	pending

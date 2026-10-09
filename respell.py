@@ -165,6 +165,152 @@ def _units(text: str, keep: _Kept) -> str:
     return _QUANTITY.sub(quantity, text)
 
 
+# ---------------------------------------------------------------- acronyms
+
+# Vietnamese letter names, as electronics people spell power rails, reference
+# designators and analog parts (GND gờ nờ đê, R1 rờ một). sea_g2p's own table, but Q
+# is "cu": its "qui" comes out /kwj/, with no vowel.
+VI_LETTER_NAMES = dict(zip("ABCDEFGHIJKLMNOPQRSTUVWXYZ", (
+    "a", "bê", "xê", "đê", "e", "ép", "gờ", "hát", "i", "giây", "ca", "lờ", "mờ", "nờ",
+    "ô", "phê", "cu", "rờ", "ét", "tê", "u", "vê", "vê kép", "ích", "y", "dét")))
+
+# Spelled with Vietnamese letter names: power and ground, the analog, power and
+# passive side, PCB and package words. Everything digital - MCU, bus, protocol,
+# software - takes the English letter names.
+ELECTRICAL = {
+    "GND", "AGND", "DGND", "PGND", "VCC", "VDD", "VSS", "VEE", "AC", "DC",
+    "IC", "PCB", "PCBA", "SMD", "THT", "LDO", "SMPS", "ESR", "ESL", "ESD", "TVS", "EMI", "EMC",
+    "BJT", "NPN", "PNP", "IGBT", "JFET", "FET", "NTC", "PTC", "LDR", "UPS",
+    "QFN", "BGA", "TQFP", "LQFP", "SOIC", "SOP", "SSOP", "TSSOP", "SMA", "SMB", "SMC", "SMBJ",
+}
+# Part numbers of analog, power and discrete parts: LM358, NE555, AMS1117, TP4056...
+ELECTRICAL_PARTS = re.compile(
+    r"(?:LM|NE|AMS|TP|MP|XL|IRF|IRLZ|BC|BD|TL|LT|AO|SS|MC|LD|ULN|TIP|HT|CR)\d")
+# Reference designators standing alone: R1, C12, U3, SW1 (not the C3 of ESP32-C3).
+DESIGNATOR = re.compile(r"([RCLUQDJFKT]|SW|TP|BT|VR|RV|FB)(\d{1,3})")
+# Through-hole packages, TO-220 and DO-41: Vietnamese letters before the "-number".
+_PACKAGES = {"TO", "DO", "SOD"}
+_PACKAGE_NUMBER = re.compile(r"-\d")
+
+# Acronyms sea_g2p 0.9.1 already reads as words (WORD_LIKE_ACRONYMS and the
+# upper-case TECHNICAL_TERMS in its src/lang/vi/resources.rs, Apache-2.0): left as
+# they are, or spelling them would undo it.
+SEA_WORDS = {
+    "UNESCO", "NASA", "NATO", "ASEAN", "OPEC", "SARS", "FIFA", "UNIC", "RAM", "VRAM", "COVID",
+    "IELTS", "STEM", "ROM", "ISO", "SEA", "UEFA", "EURO", "VAR", "ASIAD", "INTERPOL", "UNICEF",
+    "TOEFL", "TOEIC", "PISA", "STEAM", "SAT", "GMAT", "EBITDA", "AIDS", "MERS", "ECMO", "LASIK",
+    "FED", "NASDAQ", "UPCOM", "FOMO", "YOLO", "ASAP", "RADAR", "LASER", "LIDAR", "SONAR", "SCUBA",
+    "GIF", "JPEG", "UNIX", "WIFI", "SIM", "LED", "VIP", "SPA", "GYM", "POS", "SWAT", "SEAL",
+    "WASP", "COBOL", "BASIC", "OLED", "COVAX", "BRICS", "APEC", "VUCA", "PERMA", "DINK", "MENA",
+    "EPIC", "OASIS", "BASE", "DART", "IDEA", "CHAOS", "SMART", "FANG", "BLEU", "REST", "ERROR",
+    "SOTA", "BERT", "RAG", "ONNX", "ELO", "CAPTCHA", "ELISA", "SCADA", "MOSFET", "NEET", "REIT",
+    "EBIT", "GINI", "NSAID", "PET", "SELECT", "FROM", "WHERE", "ORDER", "BY", "LIMIT", "OFFSET",
+    "GROUP", "HAVING", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AS", "AND", "OR", "NOT",
+    "IN", "BETWEEN", "LIKE", "IS", "NULL", "TRUE", "FALSE", "CASE", "WHEN", "THEN", "ELSE", "END",
+    "UNION", "INTERSECT", "EXCEPT", "DESC", "JSON", "NVIDIA", "KI", "BOM",
+}
+# Upper-case English words in code and logs, read as the word: sea_g2p would spell
+# them with Vietnamese letters (INFO i nờ ép ô).
+CAPS_WORDS = {
+    "INFO": "info", "DEBUG": "debug", "WARN": "warn", "FAIL": "fail", "HIGH": "high",
+    "LOW": "low", "OFF": "off", "MAX": "max", "MIN": "min", "IDLE": "idle", "NOW": "now",
+    "CONFIG": "config", "MAIN": "main", "LOG": "log", "DONE": "done", "READY": "ready",
+    "START": "start", "STOP": "stop", "MODE": "mode", "TASK": "task", "CORE": "core",
+    "COM": "com", "TIM": "tim", "LAN": "lan", "WAN": "wan", "CAN": "can", "LIN": "lin",
+    "BOOT": "boot", "RESET": "reset", "PIN": "pin", "NAND": "nand", "CMOS": "cmos",
+    "BIOS": "bios", "TODO": "to do", "README": "read me",
+}
+# A peripheral's index is a number (GPIO12 mười hai); other digits in a name are
+# read one by one (ESP32 ba hai, LM358 ba năm tám).
+INDEXED = re.compile(
+    r"(GPIO|IO|ADC|DAC|TIM|CH|PWM|COM|GP|P[A-H]|UART|USART|SPI|I2S|CAN|LED|D|A)(\d{1,2})")
+_ROMAN = re.compile(r"M{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})")
+_ROMAN_LEADS = {"chương", "phần", "kỷ", "bài", "mục", "quý", "khóa", "khoá", "tập", "hồi",
+                "lần", "số", "đợt", "khu", "vòng"}
+_PIN_LEADS = {"chân", "pin", "Pin"}
+
+_ACRONYM = re.compile(r"(?<!\w)[A-Z][A-Z0-9]*[A-Z0-9](?!\w)")
+# A discrete semiconductor's JEDEC number: 2N2222, 1N4007 (sea_g2p reads 2222 as a
+# quantity).
+_JEDEC = re.compile(r"(?<!\w)([1-4])N(\d{3,4})([A-Z]?)(?!\w)")
+_RAIL_SIGN = re.compile(r"(?<!\w)V([+-])(?![\w+-])")
+_VI_SYLLABLE = re.compile(
+    r"(?:ngh|ng|nh|ch|gh|gi|kh|ph|qu|th|tr|[bcdghklmnpqrstvx])?[aeiouy]+(?:ng|nh|ch|[cmnpt])?")
+_NEXT_WORD = re.compile(r"\s+([^\W\d_]+)")
+_SENTENCE_END = re.compile(r"[.!?\n]")
+
+
+def _english(word: str) -> bool:
+    """Looks like an English word, not a Vietnamese syllable written without marks."""
+    return word.isascii() and len(word) > 1 and not _VI_SYLLABLE.fullmatch(word.lower())
+
+
+def _spell(token: str, names: dict[str, str]) -> list[str]:
+    words = []
+    for run in re.findall(r"[A-Z]+|\d+", token):
+        words.extend(digit_words(run) if run.isdigit() else [names[c] for c in run])
+    return guard_fives(words)
+
+
+def _caps_sentences(text: str) -> list[tuple[int, int]]:
+    """Spans of Vietnamese sentences written all in capitals ("CON CHIP NÀY DÙNG
+    UART"): sea_g2p lower-cases those, so their words without marks (CON, CHIP)
+    are left to it."""
+    spans, start = [], 0
+    for end in [m.start() for m in _SENTENCE_END.finditer(text)] + [len(text)]:
+        words = re.findall(r"[^\W\d_]+", text[start:end])
+        if (len(words) > 1 and all(w.isupper() for w in words)
+                and any(not w.isascii() for w in words)):
+            spans.append((start, end))
+        start = end + 1
+    return spans
+
+
+def _acronyms(text: str, keep: _Kept) -> str:
+    text = _JEDEC.sub(lambda m: keep(" ".join(
+        digit_words(m[1]) + ["nờ"] + digit_words(m[2]) + [VI_LETTER_NAMES[c] for c in m[3]])),
+        text)
+    text = _RAIL_SIGN.sub(lambda m: keep("vê cộng" if m[1] == "+" else "vê trừ"), text)
+    caps = _caps_sentences(text)
+
+    def acronym(m: re.Match) -> str:
+        token, at = m[0], m.start()
+        if token in SEA_WORDS:
+            return token
+        if token in CAPS_WORDS:
+            return keep(CAPS_WORDS[token])
+        word = re.fullmatch(r"([A-Z]+)(\d+)", token)
+        if word and (word[1] in CAPS_WORDS or word[1] in SEA_WORDS):  # COM3, LED1
+            return f"{keep(CAPS_WORDS.get(word[1], word[1].lower()))} {word[2]}"
+        before = _LAST_WORD.search(m.string, max(0, at - 24), at)
+        lead = before[1] if before and m.string[before.end():at].strip() == "" else ""
+        if lead.lower() in _ROMAN_LEADS and _ROMAN.fullmatch(token):
+            return token
+        if any(s <= at < e for s, e in caps) and _VI_SYLLABLE.fullmatch(token.lower()):
+            return token
+        standalone = at == 0 or m.string[at - 1].isspace()
+        # "chân D4" is a board pin, Arduino style; a lone D4 is a diode.
+        designator = standalone and lead not in _PIN_LEADS and DESIGNATOR.fullmatch(token)
+        if (re.match(r"[A-Z]+", token)[0] in ELECTRICAL or ELECTRICAL_PARTS.match(token)
+                or designator
+                or (token in _PACKAGES and _PACKAGE_NUMBER.match(m.string, m.end()))):
+            names = VI_LETTER_NAMES
+        else:
+            names = EN_LETTERS
+        index = designator if names is VI_LETTER_NAMES and designator else INDEXED.fullmatch(token)
+        if index:
+            return f"{keep(' '.join(names[c] for c in index[1]))} {index[2]}"
+        words = _spell(token, names)
+        # A last E or R right before an English word is read as English by sea_g2p
+        # ("BLE server" bi eo /aɪ/): the accented forms keep it Vietnamese.
+        after = _NEXT_WORD.match(m.string, m.end())
+        if names is EN_LETTERS and after and _english(after[1]) and words[-1] in ("i", "a"):
+            words[-1] = {"i": "í", "a": "à"}[words[-1]]
+        return keep(" ".join(words))
+
+    return _ACRONYM.sub(acronym, text)
+
+
 # ---------------------------------------------------------------- entry point
 
 def _unicode(text: str) -> str:
@@ -177,6 +323,7 @@ def _rewrite(text: str, user) -> str:
     text = _unicode(text)
     text = lexicon.sub(text, user, keep)
     text = _units(text, keep)
+    text = _acronyms(text, keep)
     return keep.restore(text)
 
 
