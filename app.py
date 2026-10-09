@@ -447,9 +447,16 @@ PRONUNCIATIONS = ("normal", "special")
 # this is still split at its commas, as before.
 CHUNK_CHARS = 120
 
+# The engine's babble guard - a chunk of three syllables or fewer that says more than
+# it was given ("Vâng." as "Vâng khi tại.") is generated again, twice at most - runs
+# in infer() only, never in infer_stream(). A reading the client takes whole loses
+# nothing by waiting for it, and a reading this short is one tiny chunk anyway.
+SHORT_WORDS = 3
+
 
 def synthesize(text: str, voice: str | None = None, speed: float = 1.0,
-               pronunciation: str = "normal", origin: str | None = None):
+               pronunciation: str = "normal", origin: str | None = None,
+               whole: bool = False):
     """Validate a request and return ``(voice, chunks)``.
 
     ``chunks`` yields float32 arrays at ``SAMPLE_RATE`` as the engine produces
@@ -458,7 +465,9 @@ def synthesize(text: str, voice: str | None = None, speed: float = 1.0,
     and the CLI can report it before opening any output.
 
     ``origin`` (``"client=<ip> format=<fmt>"``) logs the reading's queue, start
-    and end; the CLI passes none and logs nothing.
+    and end; the CLI passes none and logs nothing. ``whole``: the caller collects
+    the whole reading before using it (a WAV, MP3 or OGG file), so the engine reads
+    it in one call, with its babble guard, instead of streaming it.
     """
     text = text.strip()
     if not text:
@@ -478,8 +487,11 @@ def synthesize(text: str, voice: str | None = None, speed: float = 1.0,
     spoken = respell.special(text, lexicon.load_user()) if pronunciation == "special" else text
 
     def generate():
-        for chunk in stretch(tts.infer_stream(spoken, voice=resolved,
-                                              max_chars=CHUNK_CHARS), speed):
+        if whole or len(spoken.split()) <= SHORT_WORDS:
+            source = iter([tts.infer(spoken, voice=resolved, max_chars=CHUNK_CHARS)])
+        else:
+            source = tts.infer_stream(spoken, voice=resolved, max_chars=CHUNK_CHARS)
+        for chunk in stretch(source, speed):
             yield np.asarray(chunk, dtype=np.float32)
 
     def chunks():
@@ -572,7 +584,8 @@ def tts_stream(req: SpeakRequest, request: Request):
     try:
         client = request.client.host if request.client else "-"
         _, chunks = synthesize(req.text, req.voice, req.speed, req.pronunciation,
-                               origin=f"client={client} format={req.format}")
+                               origin=f"client={client} format={req.format}",
+                               whole=req.format != "f32")
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from None
 

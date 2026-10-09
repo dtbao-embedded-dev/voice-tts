@@ -58,12 +58,18 @@ class StubEngine:
     def infer_stream(self, text, voice=None, max_chars=256):
         self.last_text = text
         self.last_max_chars = max_chars
+        self.last_call = "infer_stream"
         # A 220 Hz tone, 0.1 s per word, in a few chunks - enough to be audible
         # and to be told apart from silence.
         n = int(app.SAMPLE_RATE * 0.1 * max(1, len(text.split())))
         t = np.arange(n) / app.SAMPLE_RATE
         tone = (0.3 * np.sin(2 * np.pi * 220 * t)).astype(np.float32)
         yield from np.array_split(tone, 4)
+
+    def infer(self, text, voice=None, max_chars=256):
+        audio = np.concatenate(list(self.infer_stream(text, voice, max_chars)))
+        self.last_call = "infer"
+        return audio
 
 
 class SlowEngine(StubEngine):
@@ -259,7 +265,19 @@ def check_wav_format(base: str) -> None:
 
     assert post(base, {"text": "xin chào", "format": "flac"})[0] == 422, "unknown format accepted"
     assert post(base, {"text": " ", "format": "wav"})[0] == 400, "empty text as wav accepted"
-    print("format: wav is a whole 16-bit file with its length, raw stays the default")
+
+    # The engine's babble guard runs only in infer(): a file and a short reading go
+    # through it, a long raw stream still streams.
+    long = "một câu đủ dài để đọc thành nhiều đoạn"
+    for body, want in (({"text": long, "format": "wav"}, "infer"),
+                       ({"text": long, "format": "mp3"}, "infer"),
+                       ({"text": long}, "infer_stream"),
+                       ({"text": "Vâng."}, "infer"),
+                       ({"text": "Tóm lại là vậy."}, "infer_stream")):
+        assert post(base, body)[0] == 200, body
+        assert app._engine.last_call == want, (body, app._engine.last_call)
+    print("format: wav is a whole 16-bit file with its length, raw stays the default; "
+          "files and short readings go through the engine's babble guard")
 
 
 MAGIC = {"mp3": (b"ID3", b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"), "ogg": (b"OggS",)}
@@ -375,10 +393,11 @@ def check_turns(base: str) -> None:
         assert engine.peak == 1, f"{engine.peak} readings ran at once"
         assert engine.started == list(names), f"served out of order: {engine.started}"
 
-        # A 10 s stream, abandoned after its first bytes.
+        # A 10 s stream, abandoned after its first bytes (over SHORT_WORDS words,
+        # or the engine reads it in one call and nothing streams).
         engine.chunks, engine.delay = 1000, 0.01
         conn = http.client.HTTPConnection("127.0.0.1", urlsplit(base).port, timeout=10)
-        conn.request("POST", "/api/tts/stream", json.dumps({"text": "bỏ dở"}),
+        conn.request("POST", "/api/tts/stream", json.dumps({"text": "đọc dở rồi bỏ đi"}),
                      {"Content-Type": "application/json"})
         conn.getresponse().read(WORD * 4)
         engine.chunks = 4  # the next reading is short again
@@ -408,10 +427,11 @@ def check_reading_log(base: str) -> None:
             assert post(base, {"text": "bí mật", "format": "wav", "speed": 1.25})[0] == 200
             first.join(10)
 
-            # Hung up after the first bytes of a long stream.
+            # Hung up after the first bytes of a long stream (over SHORT_WORDS
+            # words, or the engine reads it in one call and nothing streams).
             engine.chunks, engine.delay = 1000, 0.01
             conn = http.client.HTTPConnection("127.0.0.1", urlsplit(base).port, timeout=10)
-            conn.request("POST", "/api/tts/stream", json.dumps({"text": "bỏ dở"}),
+            conn.request("POST", "/api/tts/stream", json.dumps({"text": "đọc dở rồi bỏ đi"}),
                          {"Content-Type": "application/json"})
             conn.getresponse().read(WORD * 4)
             conn.close()
