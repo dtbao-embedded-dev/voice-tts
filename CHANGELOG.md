@@ -17,6 +17,10 @@ the release before it builds.
 
 ### Fixed
 
+- A short reading no longer comes out with words the engine made up ("Vâng." as
+  "Vâng khi tại."): `wav`, `mp3` and `ogg` readings, and any text of three words or
+  fewer, now go through the engine's own babble guard, which re-reads such a chunk.
+  The guard only ran outside streaming, and every reading streamed.
 - The `special` pronunciation reads units after a number the way engineers say
   them: `3,3V` *vôn* (was the letter *vê*), `5mW` *mi li oát* (was megawatts),
   `10µF` *mi cờ rô pha ra* (the µ was dropped), `500mA` *mi li am pe* (was *ma*),
