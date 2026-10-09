@@ -182,7 +182,8 @@ VI_LETTER_NAMES = dict(zip("ABCDEFGHIJKLMNOPQRSTUVWXYZ", (
 
 # Spelled with Vietnamese letter names: power and ground, the analog, power and
 # passive side, PCB and package words. Everything digital - MCU, bus, protocol,
-# software - takes the English letter names.
+# software - takes the English letter names. GND "gờ nờ đê" was heard as GND 11/15
+# over three carrier sentences, the English "di en đi" 7/15 ("di" heard as Z).
 ELECTRICAL = {
     "GND", "AGND", "DGND", "PGND", "VCC", "VDD", "VSS", "VEE", "AC", "DC",
     "IC", "PCB", "PCBA", "SMD", "THT", "LDO", "SMPS", "ESR", "ESL", "ESD", "TVS", "EMI", "EMC",

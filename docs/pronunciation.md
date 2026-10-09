@@ -244,6 +244,7 @@ has the term. 2026-10-09, on a desktop CPU, never on the LAN server.
 | ISR handler | *ai ét à handler* 4/5 | *ai ét a handler* 0/5 |
 | BLE server | *bi eo í server* 4/5 | *bi eo i server* 0/5 |
 | HAL, DHT22, HTTP | H *hát*: 5/5, 4/5, 4/5 | H *ếch* 0/5, 0/5, 3/5 (heard as X); *ết* 0/5, 0/5, 5/5 (heard as S) |
+| GND | *gờ nờ đê* 11/15 | *di en đi* 7/15 ("di" heard as Z), over three carrier sentences and 5 takes each |
 | MAC | *em ây xi* 5/5 | *mác*, `<en>mac</en>` 0/5 (heard "Mark") |
 | BOM | *bi ô em* 5/5 | *bom* 0/5 |
 | ELF | *i eo ép* 3/5 | *elf* 1/5 |
