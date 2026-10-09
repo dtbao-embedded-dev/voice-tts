@@ -125,17 +125,17 @@ term is about:
 
 | Letter | N | O | P | Q | R | S | T | U | V | W | X | Y | Z |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| English names | en | ô | pi | kiu | a | ét | ti | iu | vi | đắp bờ liu | ích | oai | dét |
+| English names | en | ô | pi | kiu | ar | ét | ti | iu | vi | đắp bờ liu | ích | oai | dét |
 | Vietnamese names | nờ | ô | phê | cu | rờ | ét | tê | u | vê | vê kép | ích | y | dét |
 
 - **English letter names** (the default): MCU, peripherals, buses, protocols,
-  software - `UART` *iu ây a ti*, `RX` *a ích*, `GPIO` *di pi ai ô*, `MQTT` *em kiu ti
+  software - `UART` *iu ây ar ti*, `RX` *ar ích*, `GPIO` *di pi ai ô*, `MQTT` *em kiu ti
   ti*, `HTTP` *hát ti ti pi*. Like `AP` *ây pi* and `ESP` *i ét pi* in the lexicon.
 - **Vietnamese letter names**, the way electronics people spell them:
   - power and ground: GND, AGND, DGND, PGND, VCC, VDD, VSS, VEE, AC, DC, and `V+` / `V-`
     (*vê cộng*, *vê trừ*);
   - analog, power and passive terms: IC, PCB, SMD, THT, LDO, SMPS, ESR, ESL, ESD, TVS,
-    EMI, EMC, BJT, NPN, PNP, IGBT, JFET, FET, NTC, PTC, LDR, UPS;
+    EMI, EMC, BJT, NPN, PNP, IGBT, JFET, FET, NTC, PTC, LDR, UPS, VOM;
   - packages: QFN, BGA, TQFP, LQFP, SOIC, SOP, SSOP, TSSOP, SMA, SMB, SMC, SMBJ, and
     TO / DO / SOD before a number (`TO-220`);
   - analog, power and discrete part numbers: LM, NE, AMS, TP, MP, XL, IRF, IRLZ, BC,
@@ -146,8 +146,9 @@ term is about:
     After *chân* or *pin* a letter and a number is a board pin instead, English style
     (`chân D4` *đi bốn*).
 
-Vietnamese Q is *cu*: sea-g2p's *qui* comes out with no vowel. English R is *a*,
-because *rờ* sounds like *dờ* in a northern voice (UART was heard as "UAZT").
+Vietnamese Q is *cu*: sea-g2p's *qui* comes out with no vowel. English R is *ar*,
+which sea-g2p reads as the English letter /ɑːɹ/: *rờ* sounds like *dờ* in a northern
+voice (UART was heard as "UAZT", RX as "giờ x") and a bare *a* is heard as A.
 
 Digits inside a name are read one by one (`ESP32` *ba hai*, `RP2040` *hai không bốn
 không*), except a peripheral's index, which is a number: GPIO, IO, ADC, DAC, TIM, CH,
@@ -169,8 +170,8 @@ Left as they are, or read as words:
   sentence itself.
 
 A last E or R right before an English word is written *í* / *à* (`BLE server` *bi eo
-í*, `ISR handler` *ai ét à*): next to an English word sea-g2p reads a bare *i* or *a*
-as English.
+í*, `ISR handler` *ai ét à*): next to an English word sea-g2p reads a bare *i* as
+English /aɪ/, and *à* was heard right more often than *ar* there (5/10 against 1/5).
 
 ## Code
 
@@ -236,7 +237,7 @@ has the term. 2026-10-09, on a desktop CPU, never on the LAN server.
 
 | Term | Kept | Others |
 | --- | --- | --- |
-| UART | *iu ây a ti* 4/5 | *u a rờ tê* (sea-g2p) 1/5, `<en>u a r t</en>` 3/5 |
+| UART | *iu ây ar ti* 4/5 | *u a rờ tê* (sea-g2p) 1/5, `<en>u a r t</en>` 3/5 |
 | GPIO | *di pi ai ô* 5/5 | `<en>g p i o</en>` 4/5, *gờ phê i ô* (sea-g2p) 1/5 |
 | MQTT | *em kiu ti ti* 5/5 | *mờ qui tê tê* 5/5 |
 | I2C | *ai hai xi* 5/5 | *ai tu xi* 5/5, *i hai xê* (sea-g2p) 3/5 |
@@ -254,9 +255,23 @@ has the term. 2026-10-09, on a desktop CPU, never on the LAN server.
 | 10µF | *mi cờ rô* 4/5 | *micro* 4/5 |
 | EN | *i en* 2/5 | *en* 0/5 |
 
-Still open - **the letter R**. English *a* is heard as A (`RX` as "AX" 0/5, `RTOS`
-as "ATOS" 0/5) and Vietnamese *rờ* as *dờ* (`RX` as "giờ x" 0/5). Bare *ar*, which
-sea-g2p reads as the English letter /ɑːɹ/, gave `RX` 3/5, better than every other
-spelling tried (`a rờ ích`, `<en>r x</en>`, `<en>ar</en> ích`, `a rơ ích` all 0/5), but
-the round checking it on RTC, RS485, RTS, RTOS, IRQ, RP2040, RGB and AVR was stopped
-before it ran. R stays *a* until that round is done.
+**The letter R** took two more rounds. English *a* is heard as A, Vietnamese *rờ* as
+*dờ*; bare *ar*, read by sea-g2p as the English letter /ɑːɹ/, won or tied every term:
+
+| Term | R *ar* | R *a* | Other spellings |
+| --- | --- | --- | --- |
+| RX | 4/10 | 0/10 | *rờ ích* 0/5 ("giờ x"), *a rờ ích* 0/10, `<en>r x</en>` 0/5 |
+| RTC | 5/5 | 3/10 | *rờ tê xê* 1/5 |
+| RS485 | 2/5 | 0/10 | *a rờ ét...* 2/5, *rờ ét...* 0/5 |
+| RTS | 1/5 | 0/10 | *a rờ ti ét* 0/5 |
+| RTOS | 4/5 | 0/10 | *a rờ ti ô ét* 3/5, *rờ tốt* 0/5 |
+| FreeRTOS | 5/5 | 5/10 | *free a rờ ti ô ét* 0/5 |
+| UART | 5/5 | 9/10 | |
+| IRQ | 3/5 | 2/5 | |
+| RP2040 | 4/5 | 0/5 | |
+| RGB | 5/5 | 5/5 | |
+| AVR | 3/5 | 0/5 | |
+| ISR handler | 1/5 | *à* 5/10 | (a last R before an English word) |
+
+RX and RTS stay weak whatever the spelling: a short acronym whose letters are all
+sounds Vietnamese lacks.

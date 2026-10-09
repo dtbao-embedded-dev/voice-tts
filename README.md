@@ -588,7 +588,7 @@ carries on without one: the window closes as before, `serve` keeps serving.
     `1-2m` as *một đến hai mét*, `3.3V/500mA` as two quantities, `100R` as *ôm*,
     `tụ 104` as *một không bốn*, `0x3C` as *không ích ba xi*.
   - Upper-case acronyms, letter by letter: English letter names for the digital side
-    (`UART` *iu ây a ti*, `RX` *a ích*, `GPIO12` *di pi ai ô mười hai*), Vietnamese
+    (`UART` *iu ây ar ti*, `RX` *ar ích*, `GPIO12` *di pi ai ô mười hai*), Vietnamese
     ones for power, analog parts and reference designators (`GND` *gờ nờ đê*, `LM358`
     *lờ mờ ba năm tám*, `R1` *rờ một*). The engine alone spells every acronym it does
     not know with Vietnamese names, and its *rờ* is heard as *dờ*. Upper-case English
