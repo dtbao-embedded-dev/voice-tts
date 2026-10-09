@@ -18,6 +18,12 @@ Desktop app that reads mixed Vietnamese/English text aloud, powered by
   than a lower one.
 - **Model** — v3 Turbo is bilingual, so Vietnamese and English mix freely inside one
   sentence; no language tagging or manual splitting is needed.
+- **Pronunciation** — `normal` reads the text as typed; `special` first respells the
+  words the engine gets wrong (POST, AP, Board, ESP32...), see
+  [Notes](#notes).
+- **Verify** — optional: Whisper large-v3-turbo hears the reading back, and it is
+  played, saved or sent only if it matches the text by 95% (configurable); otherwise
+  you get an error with what Whisper heard.
 
 ## Usage
 
@@ -38,14 +44,17 @@ it (plus a one-off download for a source install).
 1. Open **Voice TTS** (Start Menu, or the downloaded exe).
 2. Paste or type the text - up to 20 000 characters, Vietnamese and English mixed
    freely in one sentence.
-3. **Giọng đọc** picks the voice (★ = featured); **Tốc độ** picks 0.75×-1.5×;
-   **Phát âm** is *Thường* (as typed) or *Đặc biệt* (POST read "post", AP "ây pi",
-   Board "bo", ESP32 "i ét pi ba hai").
-   **Kiểm tra** has Whisper hear the reading back first and plays it only if it
-   matches the text by 95% or more; otherwise the status line says why, with what
-   Whisper heard. It starts playing later, since the whole text is read first.
-4. **Đọc** (`Ctrl+Enter`) reads it as it is generated; press again or `Esc` to stop.
-5. **Lưu WAV** saves what was read.
+3. **Giọng đọc** picks the voice (★ = featured); **Tốc độ** picks 0.75×-1.5×.
+4. **Phát âm** is *Thường* (the text as typed: `POST` is spelled *phê ô ét tê*) or
+   *Đặc biệt* (`POST` read "post", `AP` "ây pi", `Board` "bo", `ESP32` "i ét pi ba
+   hai").
+5. **Kiểm tra** (off by default) has Whisper hear the reading back first and plays
+   it only if it matches the text by 95% or more; the status line then shows the
+   match (*Khớp 96.3%*), or why it was rejected, with what Whisper heard. Playback
+   starts later, since the whole text is read and checked first.
+6. **Đọc** (`Ctrl+Enter`) reads it - as it is generated, or once checked; press again
+   or `Esc` to stop.
+7. **Lưu WAV** saves what was read.
 
 Minimizing or closing the window hides it in the system tray and the app keeps
 running; click the tray icon to bring it back, right-click → *Thoát* to quit.
@@ -84,6 +93,8 @@ cat notes.txt | voice-tts speak -o - > notes.wav                  # a pipe to a 
 voice-tts voices                                                  # the voices to pick from
 voice-tts status --wait 120                                       # is the server ready?
 voice-tts speak "..." --local                                     # ignore the server, run here
+voice-tts speak "Gửi POST tới ESP32" --pronunciation special      # POST "post", ESP32 "i ét pi ba hai"
+voice-tts speak -f doc.txt --verify -o doc.wav                    # save only if Whisper agrees (95%)
 ```
 
 `voice-tts <command> -h` lists every flag; [Command line](#command-line) has the
@@ -98,6 +109,9 @@ full table and the exit codes.
 | Page says *Đang tải model…* for long | first start after install is loading or downloading the model; wait |
 | `Không có giọng '...'` (exit 2) | voice name mistyped: `voice-tts voices` lists the exact names |
 | `voice-tts` not found on Windows | open a new terminal after the install, so it sees the new `PATH` |
+| `POST` read as *phê ô ét tê*, `AP` as *ap* | the default `normal` pronunciation reads the text as typed: use `--pronunciation special` / *Phát âm → Đặc biệt* |
+| `Kiểm tra không đạt: khớp 89.1%, cần 95.0%` (exit 1) | Whisper heard something else (shown after *Whisper heard*); read again (each reading differs), switch to `special`, or lower `--min-score` |
+| `cannot verify` / `Không kiểm tra được` (503) / *Kiểm tra* greyed out | this build has no Whisper (the Linux binary), or a source install offline without the model downloaded |
 | `no audio player found` on Linux | install `pulseaudio-utils` or `alsa-utils`, or write a file with `-o` |
 
 ## Quick start (development)
@@ -186,6 +200,7 @@ voice-tts speak "Xin chào, deploy lên production server."           # play it
 voice-tts speak -f bai-doc.txt -v "Mai Anh" -s 1.25 -o bai-doc.wav  # save it
 echo "Chào bạn" | voice-tts speak -o - > chao.wav                   # pipe it
 voice-tts speak "Xin chào" --server http://192.168.0.137:8760 --token <t>
+voice-tts speak "Bật AP trên Board" --pronunciation special --verify --min-score 0.9
 voice-tts voices                 # * default, + featured; --json for the raw list
 voice-tts status --wait 600      # exit 0 once the server's model is ready
 ```
@@ -483,8 +498,9 @@ carries on without one: the window closes as before, `serve` keeps serving.
 
 `.github/workflows/ci.yml` runs on every push to `main`, `developing`, `feat/**` and
 `fix/**` and on pull requests, on `ubuntu-latest` and `windows-latest` with Python
-3.12: `test_cli.py` (CLI, token guard, tray menu and the time-stretcher, against a
-stub engine - no model download) and `--help` for every subcommand and the
+3.12: `test_cli.py` (CLI, token guard, tray menu, time-stretcher, lexicon and
+pronunciation modes, verify mode and its score, against a stub engine and a stub
+Whisper - no model download) and `--help` for every subcommand and the
 installer. The real-model smoke test runs locally (`tool-build.py --check`).
 
 ## Release
@@ -533,8 +549,8 @@ lexicon.py                whole-word respellings applied before the engine reads
 verify.py                 verify mode: Whisper large-v3-turbo transcribes, 1 - CER scores
 icon.py                   the app icon, one geometry: tray/window/exe .ico and /favicon.svg
 cli.py                    command line: subcommands and flags, stdlib-only at import
-test_tts.py               assert-based smoke test over the real HTTP path
-test_cli.py               fast checks with a stub engine: CLI (local + remote), token guard
+test_tts.py               assert-based smoke test over the real HTTP path, real Whisper verify
+test_cli.py               fast checks with a stub engine and Whisper: CLI, token guard, lexicon, verify
 CHANGELOG.md              user-visible changes per version; a release publishes its section
 web/                      index.html, app.css, app.js, tray.html (tray menu) - no build step
 requirements.txt          server + CLI core (what Docker installs)
