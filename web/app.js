@@ -8,6 +8,7 @@ const els = {
   sheet: $('sheet'), scrim: $('scrim'), speed: $('speed'),
   playBtn: $('playBtn'), playIcon: $('playIcon'), playLabel: $('playLabel'),
   saveBtn: $('saveBtn'), timecode: $('timecode'), meter: $('meter'),
+  verify: $('verify'), verifyHint: $('verifyHint'),
 };
 
 const REGIONS = ['Bắc', 'Trung', 'Nam'];
@@ -19,6 +20,10 @@ let voice = null;
 let speaking = false;
 let abort = null;
 let speed = 1;
+// Mode 2: Whisper hears the reading back and the server sends it only when it
+// matches. Usable only where /api/status says verify can run.
+let verifyOn = false;
+let verifyUsable = false;
 // Every start and every stop bumps this. A read carries the value it started
 // with and checks it before touching the UI, so a read the user has already
 // stopped can no longer report into the one that replaced it.
@@ -197,6 +202,26 @@ els.speed.addEventListener('click', (e) => {
   for (const o of els.speed.children) o.setAttribute('aria-pressed', String(o === opt));
 });
 
+/* ---- Verify ---------------------------------------------------------- */
+
+els.verify.addEventListener('click', () => {
+  verifyOn = !verifyOn;
+  els.verify.setAttribute('aria-checked', String(verifyOn));
+});
+
+function applyVerify(state) {
+  verifyUsable = Boolean(state && state.available);
+  els.verify.disabled = !verifyUsable;
+  if (!verifyUsable) {
+    verifyOn = false;
+    els.verify.setAttribute('aria-checked', 'false');
+    els.verifyHint.textContent = 'Không khả dụng';
+    els.verifyHint.title = (state && state.detail) || '';
+  }
+}
+
+const percent = (score) => `${(Number(score) * 100).toFixed(1)}%`;
+
 /* ---- Meter ------------------------------------------------------------- */
 
 const bars = Array.from({ length: METER_BARS }, () => {
@@ -255,6 +280,7 @@ function setSpeaking(on) {
   els.text.readOnly = on;
   // The speed is baked into the request, so it is fixed for the whole read.
   for (const o of els.speed.children) o.disabled = on;
+  els.verify.disabled = on || !verifyUsable;
   els.meter.dataset.live = on ? '1' : '0';
   if (on) drawMeter(analyser);
 }
@@ -280,14 +306,16 @@ async function speak() {
   sources = [];
   els.saveBtn.disabled = true;
   setSpeaking(true);
-  setStatus('speaking', 'Đang đọc…');
+  // Verified, nothing plays until Whisper has heard the whole reading.
+  const checked = verifyOn;
+  setStatus('speaking', checked ? 'Đang đọc và kiểm tra…' : 'Đang đọc…');
 
   let res;
   try {
     res = await fetch('/api/tts/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, voice, speed }),
+      body: JSON.stringify(checked ? { text, voice, speed, verify: true } : { text, voice, speed }),
       signal: abort.signal,
     });
   } catch {
@@ -300,9 +328,12 @@ async function speak() {
     const detail = await res.json().catch(() => ({}));
     if (myRun !== run) return;
     setSpeaking(false);
-    setStatus('error', detail.detail || `Lỗi ${res.status}`);
+    const heard = detail.transcript !== undefined ? ` Nghe được: “${detail.transcript}”` : '';
+    setStatus('error', (detail.detail || `Lỗi ${res.status}`) + heard);
     return;
   }
+  const score = res.headers.get('X-Verify-Score');
+  if (score) setStatus('speaking', `Đang đọc · khớp ${percent(score)}`);
 
   recordedRate = Number(res.headers.get('X-Sample-Rate')) || 48000;
   const reader = res.body.getReader();
@@ -364,7 +395,7 @@ async function speak() {
   setTimeout(() => {
     if (myRun !== run) return;
     setSpeaking(false);
-    setStatus('ready', 'Sẵn sàng');
+    setStatus('ready', score ? `Khớp ${percent(score)} · Sẵn sàng` : 'Sẵn sàng');
   }, remaining);
 }
 
@@ -415,6 +446,7 @@ els.saveBtn.addEventListener('click', () => {
 function setStatus(state, text) {
   els.status.dataset.state = state;
   els.statusText.textContent = text;
+  els.status.title = text;
 }
 
 els.playBtn.addEventListener('click', () => (speaking ? stop() : speak()));
@@ -447,7 +479,7 @@ async function boot() {
       await new Promise((r) => setTimeout(r, 1000));
       continue;
     }
-    if (s.state === 'ready') break;
+    if (s.state === 'ready') { applyVerify(s.verify); break; }
     if (s.state === 'error') { setStatus('error', 'Không tải được model'); return; }
     await new Promise((r) => setTimeout(r, 1000));
   }

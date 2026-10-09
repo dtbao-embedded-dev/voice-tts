@@ -39,6 +39,9 @@ it (plus a one-off download for a source install).
 2. Paste or type the text - up to 20 000 characters, Vietnamese and English mixed
    freely in one sentence.
 3. **Giọng đọc** picks the voice (★ = featured); **Tốc độ** picks 0.75×-1.5×.
+   **Kiểm tra** has Whisper hear the reading back first and plays it only if it
+   matches the text by 95% or more; otherwise the status line says why, with what
+   Whisper heard. It starts playing later, since the whole text is read first.
 4. **Đọc** (`Ctrl+Enter`) reads it as it is generated; press again or `Esc` to stop.
 5. **Lưu WAV** saves what was read.
 

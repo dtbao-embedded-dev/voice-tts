@@ -19,6 +19,10 @@ the release before it builds.
   `X-Verify-Score`; below it the answer is `422` (exit 1 in the CLI) with what
   Whisper heard, and `503` when Whisper cannot run. `/api/status` reports whether
   verify is available. Without it nothing changes: the audio still streams.
+- A *Kiểm tra* switch in the window turns verify on for the next read: the status
+  shows *Đang đọc và kiểm tra…*, then the match (*Khớp 96.3%*) while it plays, or
+  why it was rejected with what Whisper heard. It is greyed out where verify cannot
+  run.
 
 ### Fixed
 
