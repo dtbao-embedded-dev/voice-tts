@@ -588,6 +588,11 @@ carries on without one: the window closes as before, `serve` keeps serving.
     *lờ mờ ba năm tám*, `R1` *rờ một*). The engine alone spells every acronym it does
     not know with Vietnamese names, and its *rờ* is heard as *dờ*. Upper-case English
     words of logs and code (`INFO`, `HIGH`, `BOOT`) are read as words.
+  - Code: `ESP_LOGI` as *i ét pi log ai* and `uint8_t` as *iu int tám ti* (never
+    *gạch dưới*), `main.c` as *main chấm xi*, `v5.3` as *vi năm chấm ba*, `/` in a path
+    as *gạch chéo*, `port 8080` digit by digit.
+  - About 80 more built-in words: `FreeRTOS`, `PSRAM`, `JTAG` *giây tag*, `OK` *ô kê*,
+    `VOUT` *vê ao*, `module` *mô đun*, `mass` *mát*, `VĐK` *vi điều khiển*...
 
   Anything inside `<en>...</en>` is left alone.
 - **Your own words.** *Từ điển* in the window, `voice-tts lexicon add` or

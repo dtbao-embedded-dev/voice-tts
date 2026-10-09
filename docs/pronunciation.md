@@ -29,8 +29,9 @@ Outside `<en>...</en>`, in this order:
 1. U+2212 MINUS SIGN becomes `-` (sea-g2p drops it: `−40°C` would lose its sign).
 2. The lexicon: the user's words and the built-in ones, longest first. What it says
    wins over every rule below.
-3. Numbers and units.
-4. Upper-case acronyms.
+3. Code: identifiers, file names, versions, URLs and paths, ports.
+4. Numbers and units.
+5. Upper-case acronyms.
 
 Each rewrite is parked behind a placeholder until the end, so a later rule never
 rewrites what an earlier one wrote.
@@ -170,3 +171,57 @@ Left as they are, or read as words:
 A last E or R right before an English word is written *í* / *à* (`BLE server` *bi eo
 í*, `ISR handler` *ai ét à*): next to an English word sea-g2p reads a bare *i* or *a*
 as English.
+
+## Code
+
+- **Identifiers** with an underscore (`ESP_LOGI`, `nvs_flash_init`, `uint8_t`,
+  `CONFIG_FREERTOS_HZ`) or a FreeRTOS type prefix (`vTaskDelay`, `xQueueSend`,
+  `pdMS_TO_TICKS`) are cut at the underscores and the case changes, and each part is
+  read on its own - never *gạch dưới*:
+  - a lexicon word: `ESP` *i ét pi*, `OK` *ô kê*, `IRAM` *ai ram*;
+  - a digital acronym, in any case: `gpio`, `adc`, `nvs`... spelled as above;
+  - a single letter or a run without a vowel: English letter names (`t` *ti*, `x`
+    *ích*, `pd` *pi đi*);
+  - digits one by one (`uint32_t` *iu int ba hai ti*);
+  - `ESP_LOGI` / `LOGE` / `LOGW`... is *log ai* / *log i*..., `HZ` *héc*, `ATTR`
+    *attribute*, `uint` *iu int*;
+  - anything else is the English word, in lower case (`TO`, `TICKS`, `Handle`).
+
+  Other camelCase words are left whole (`LoRa`, `GitHub` and `eFuse` read right).
+- **File names** `main.c`, `app.cpp`, `CMakeLists.txt`: *main chấm xi*, the name cut
+  like an identifier; the extension is a word (`bin`, `json`, `yaml`, `log`...) or
+  spelled (`c` *xi*, `cpp` *xi pi pi*, `py` *pai*, `txt` *ti ích ti*). sea-g2p reads
+  the dot as the end of a sentence.
+- **Versions** `v5.3`, `v1.0.2`: *vi năm chấm ba* (sea-g2p: *vê năm. ba*).
+- **URLs and paths**: the scheme spelled (`https` *ếch ti ti pi ét*), `/` *gạch chéo*
+  (sea-g2p: *trên*, divided by), a trailing `/` dropped.
+- **Ports** of four or five digits after *port* / *cổng*: digit by digit (`port 8080`
+  *tám không tám không*). Baud rates stay numbers.
+- `!=` is *khác*.
+- **A line of code or log with no Vietnamese in it** and at least two English-looking
+  words (`stack size 2048`, `xTaskCreate(task, "name", 2048, NULL, 5, NULL)`): its
+  whole numbers are read digit by digit in Vietnamese. On such a line sea-g2p
+  switches to English and reads 2048 as *two thousand forty eight*. Vietnamese typed
+  without marks (`thanh ghi 32 bit`) does not count as English.
+
+## Built-in words
+
+`ENTRIES` in `lexicon.py`, one per spelling in any case (the table is keyed by the
+casefolded word, so `VOUT` and `Vout` are one entry):
+
+| Kind | Words |
+| --- | --- |
+| Said as words | OK *ô kê*, FIFO *phai phô*, LIFO, ASCII, YAML, SPIFFS, FATFS, ELF, TAG, MAC *mác*, SHA, SHA256, JTAG *giây tag*, ARM, RISC-V *risk five*, PSRAM / SRAM / DRAM / IRAM *... ram*, EEPROM *i i pi rom* |
+| Names | ESP-NOW *i ét pi nao*, USB-C, type-C, LEDC *led xi*, SoC, MicroSD, DevKitC, FreeRTOS *free a ti ô ét*, PlatformIO, OpenOCD, mDNS, softAP, esp32s3 / c3 / c6 / h2, nRF52840, ATmega328P, Raspberry Pi *raspberry pai*, tri-state, 8N1 |
+| Code and tools | memcpy *mem copy*, printf *print ép*, CMake *xi make*, idf.py, base64 *base sáu tư*, ota, tty, Ctrl+C *control xi*, Ctrl+], HTTP/1.1, 802.11, b/g/n, panic'ed |
+| Power and transistors | VIN *vê in*, VOUT *vê ao*, VREF *vê rép*, VBUS *vê bớt*, VBAT *vê bát*, hFE, ic / Ic *i xê*, Ib |
+| Loanwords | board *bo*, module *mô đun*, mass *mát*, Gerber *gơ bơ*, DIP *đíp*, SOT *sót* (SOT23, SOT-23, SOT-23-5, SOT-23-6, SOT-223, SOT-89 digit by digit), LiPo *li pô*, 18650 *một tám sáu năm không* |
+| Vietnamese abbreviations | VĐK, VXL, HĐH, CSDL, CTDL, ĐTDĐ, KTĐT, ĐKTĐ, said in full |
+
+KTS, ĐK, CB and LT are left out: each stands for more than one thing. Add the one you
+mean to your own lexicon.
+
+## Limits
+
+- *pin* meaning a battery is read like the English *pin* (/pɪn/): sea-g2p's dictionary
+  has the word as English only, and no spelling reaches the Vietnamese /pin/.
