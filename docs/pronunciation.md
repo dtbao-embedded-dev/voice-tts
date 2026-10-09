@@ -30,6 +30,7 @@ Outside `<en>...</en>`, in this order:
 2. The lexicon: the user's words and the built-in ones, longest first. What it says
    wins over every rule below.
 3. Numbers and units.
+4. Upper-case acronyms.
 
 Each rewrite is parked behind a placeholder until the end, so a later rule never
 rewrites what an earlier one wrote.
@@ -109,3 +110,63 @@ Lines starting with `# ` are comments.
 
 For a quick fix on one machine, without a release, add the word to your own lexicon
 (`voice-tts lexicon add WORD SAY`, *Từ điển* in the window); it wins over every rule.
+
+## Acronyms
+
+An upper-case token of two characters or more (`UART`, `I2C`, `STM32F103`, `CH340C`)
+is spelled letter by letter, with one of two sets of letter names, chosen by what the
+term is about:
+
+| Letter | A | B | C | D | E | F | G | H | I | J | K | L | M |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| English names | ây | bi | xi | đi | i | ép | di | ếch | ai | giây | cây | eo | em |
+| Vietnamese names | a | bê | xê | đê | e | ép | gờ | hát | i | giây | ca | lờ | mờ |
+
+| Letter | N | O | P | Q | R | S | T | U | V | W | X | Y | Z |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| English names | en | ô | pi | kiu | a | ét | ti | iu | vi | đắp bờ liu | ích | oai | dét |
+| Vietnamese names | nờ | ô | phê | cu | rờ | ét | tê | u | vê | vê kép | ích | y | dét |
+
+- **English letter names** (the default): MCU, peripherals, buses, protocols,
+  software - `UART` *iu ây a ti*, `RX` *a ích*, `GPIO` *di pi ai ô*, `MQTT` *em kiu ti
+  ti*, `HTTP` *ếch ti ti pi*. Like `AP` *ây pi* and `ESP` *i ét pi* in the lexicon.
+- **Vietnamese letter names**, the way electronics people spell them:
+  - power and ground: GND, AGND, DGND, PGND, VCC, VDD, VSS, VEE, AC, DC, and `V+` / `V-`
+    (*vê cộng*, *vê trừ*);
+  - analog, power and passive terms: IC, PCB, SMD, THT, LDO, SMPS, ESR, ESL, ESD, TVS,
+    EMI, EMC, BJT, NPN, PNP, IGBT, JFET, FET, NTC, PTC, LDR, UPS;
+  - packages: QFN, BGA, TQFP, LQFP, SOIC, SOP, SSOP, TSSOP, SMA, SMB, SMC, SMBJ, and
+    TO / DO / SOD before a number (`TO-220`);
+  - analog, power and discrete part numbers: LM, NE, AMS, TP, MP, XL, IRF, IRLZ, BC,
+    BD, TL, LT, AO, SS, MC, LD, ULN, TIP, HT, CR followed by digits (`LM358` *lờ mờ ba
+    năm tám*), and JEDEC numbers (`2N2222` *hai nờ hai hai hai hai*, `1N4007`);
+  - reference designators standing alone: R, C, L, U, Q, D, J, F, K, T, SW, TP, BT,
+    VR, RV, FB followed by up to three digits (`R1` *rờ một*, `C12` *xê mười hai*).
+    After *chân* or *pin* a letter and a number is a board pin instead, English style
+    (`chân D4` *đi bốn*).
+
+Vietnamese Q is *cu*: sea-g2p's *qui* comes out with no vowel. English R is *a*,
+because *rờ* sounds like *dờ* in a northern voice (UART was heard as "UAZT").
+
+Digits inside a name are read one by one (`ESP32` *ba hai*, `RP2040` *hai không bốn
+không*), except a peripheral's index, which is a number: GPIO, IO, ADC, DAC, TIM, CH,
+PWM, COM, GP, PA-PH, UART, USART, SPI, I2S, CAN, LED, D, A followed by one or two
+digits (`GPIO12` *mười hai*, `IO43` *bốn mươi ba*).
+
+Left as they are, or read as words:
+
+- acronyms sea-g2p already reads as words (`LED`, `RAM`, `ROM`, `WIFI`, `MOSFET`,
+  `NULL`, `TRUE`, `ON`, `REST`, `JSON`...; its `WORD_LIKE_ACRONYMS`);
+- upper-case English words of code and logs, lower-cased so they are read as words:
+  INFO, DEBUG, WARN, FAIL, HIGH, LOW, OFF, MAX, MIN, IDLE, NOW, CONFIG, MAIN, LOG,
+  DONE, READY, START, STOP, MODE, TASK, CORE, COM, TIM, LAN, WAN, CAN, LIN, BOOT,
+  RESET, PIN, NAND, CMOS, BIOS, TODO (*to do*), README (*read me*), also with a number
+  (`COM3` *com ba*, `LED1`);
+- Roman numerals after *chương*, *phần*, *bài*, *mục*, *quý*, *tập*... (`Chương II`);
+- in a Vietnamese sentence written all in capitals (`CON CHIP NÀY DÙNG UART`), the
+  words that could be Vietnamese syllables (`CON`, `CHIP`): sea-g2p lower-cases that
+  sentence itself.
+
+A last E or R right before an English word is written *í* / *à* (`BLE server` *bi eo
+í*, `ISR handler` *ai ét à*): next to an English word sea-g2p reads a bare *i* or *a*
+as English.
