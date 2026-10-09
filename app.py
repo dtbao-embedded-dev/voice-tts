@@ -455,11 +455,13 @@ async def encode(request: Request, format: str):
     """Encode a tape the client already holds: 16-bit LE mono PCM at 48 kHz in,
     an MP3 or OGG file out. Saving a reading as MP3 then costs no second synthesis.
     """
-    if format not in ENCODINGS:
-        raise HTTPException(400, f"Định dạng phải là {' hoặc '.join(ENCODINGS)}.")
     if int(request.headers.get("content-length") or 0) > ENCODE_MAX_BYTES:
         raise HTTPException(413, "Âm thanh quá dài để mã hoá.")
+    # Read the body before any other refusal: answering while the client is
+    # still sending makes Windows abort the connection instead of showing a 400.
     body = await request.body()
+    if format not in ENCODINGS:
+        raise HTTPException(400, f"Định dạng phải là {' hoặc '.join(ENCODINGS)}.")
     if not body or len(body) % 2:
         raise HTTPException(400, "Cần âm thanh 16-bit mono 48 kHz.")
     audio = np.frombuffer(body, dtype="<i2").astype(np.float32) / 32767
