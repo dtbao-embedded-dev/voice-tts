@@ -144,14 +144,21 @@ def _matcher(user: tuple[tuple[str, str, bool], ...]):
     return re.compile(rf"(?<!\w)(?:{alternatives})(?!\w)"), [s for _, s, _ in words]
 
 
+def sub(text: str, user=(), wrap=lambda say: say) -> str:
+    """``text`` with every lexicon word replaced by ``wrap(its spelling)``.
+
+    ``<en>`` spans are the caller's business: this sees only the text it is given.
+    """
+    pattern, says = _matcher(tuple((e["word"], e["say"], e["matchCase"]) for e in user))
+    return pattern.sub(lambda m: wrap(says[int(m.lastgroup[1:])]), text)
+
+
 def apply(text: str, user=()) -> str:
     """``text`` with every lexicon word respelled, ``<en>`` spans untouched.
 
     ``user`` is a list of ``{"word", "say", "matchCase"}`` laid over the built-ins.
     """
-    pattern, says = _matcher(tuple((e["word"], e["say"], e["matchCase"]) for e in user))
-    spoken = lambda m: says[int(m.lastgroup[1:])]  # noqa: E731
     parts = _EN_SPAN.split(text)
     for i in range(0, len(parts), 2):  # odd indexes are the <en> spans
-        parts[i] = pattern.sub(spoken, parts[i])
+        parts[i] = sub(parts[i], user)
     return "".join(parts)
