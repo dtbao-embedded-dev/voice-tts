@@ -30,9 +30,16 @@ from array import array
 __version__ = "0.7.0"
 
 DEFAULT_PORT = 8760
+# The window's own backend. A fixed port keeps the page at one origin, and the
+# settings and history the page stores are keyed by it.
+GUI_PORT = 8761
 ENV_TOKEN = "VOICE_TTS_TOKEN"
 ENV_SERVER = "VOICE_TTS_SERVER"
 LOCAL_SERVER = f"http://127.0.0.1:{DEFAULT_PORT}"
+# What -o can write. wav is built here; mp3 and ogg are encoded by the backend,
+# in this process or on the server, from the 16-bit samples.
+FORMATS = ("wav", "mp3", "ogg")
+EXTENSIONS = {".mp3": "mp3", ".ogg": "ogg", ".oga": "ogg"}
 
 # POSIX players that take raw float32 mono on stdin, so playback starts with the
 # first chunk instead of after the whole text. First one on PATH wins.
@@ -67,8 +74,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
 
     gui = sub.add_parser("gui", help="open the desktop window (default)")
-    gui.add_argument("--port", type=int, default=0,
-                     help="loopback port for the backend (default: any free port)")
+    gui.add_argument("--port", type=int, default=GUI_PORT,
+                     help="loopback port for the backend; any free one if it is taken "
+                          "(default: %(default)s)")
     gui.add_argument("--tray", action=argparse.BooleanOptionalAction, default=True,
                      help="minimize and close hide the window into the system tray; "
                           "--no-tray makes close quit (default: on)")
@@ -103,6 +111,9 @@ def build_parser() -> argparse.ArgumentParser:
                        help="play through the speakers (default: on unless -o is given)")
     speak.add_argument("--raw", action="store_true",
                        help="with -o: raw float32 LE mono 48 kHz instead of a 16-bit WAV")
+    speak.add_argument("--format", choices=FORMATS,
+                       help="file format for -o (default: from the file name's extension, "
+                            "else wav)")
     speak.add_argument("--pronunciation", choices=("normal", "special"), default="normal",
                        help="normal reads the text as typed; special respells words the "
                             "engine gets wrong first - POST as 'post', AP as 'ây pi', "
@@ -113,6 +124,24 @@ def build_parser() -> argparse.ArgumentParser:
     voices = sub.add_parser("voices", help="list the preset voices")
     voices.add_argument("--json", action="store_true", help="print the /api/voices JSON")
     add_client_flags(voices, local=True)
+
+    lex = sub.add_parser(
+        "lexicon", help="list or edit the words the special pronunciation respells",
+        description="The user's own words, read in --pronunciation special on top of the "
+                    "built-in ones. Without --server this edits the file in the data dir "
+                    "($VOICE_TTS_DATA); with it, the server's list.")
+    lex_sub = lex.add_subparsers(dest="action", metavar="ACTION", required=True)
+    lex_list = lex_sub.add_parser("list", help="the built-in words and yours")
+    lex_list.add_argument("--json", action="store_true", help="print the /api/lexicon JSON")
+    lex_add = lex_sub.add_parser("add", help="add a word, or change how one is read")
+    lex_add.add_argument("word", help="the word as written, e.g. MQTT")
+    lex_add.add_argument("say", help="how to read it, e.g. 'em kiu ti ti'")
+    lex_add.add_argument("--case", action="store_true",
+                         help="match this exact case only (default: any case)")
+    lex_remove = lex_sub.add_parser("remove", help="remove one of your words")
+    lex_remove.add_argument("word")
+    for cmd in (lex_list, lex_add, lex_remove):
+        add_client_flags(cmd, local=True)
 
     status = sub.add_parser("status", help="ask a server whether its model is ready")
     status.add_argument("--json", action="store_true", help="print the /api/status JSON")
@@ -148,6 +177,8 @@ def parse(parser: argparse.ArgumentParser, argv: list[str]) -> argparse.Namespac
     args = parser.parse_args(argv)
     if args.command == "speak" and args.raw and not args.output:
         parser.error("--raw needs -o: it describes the file, not the playback")
+    if args.command == "speak" and args.raw and args.format:
+        parser.error("--raw and --format both describe the file; give one")
     return args
 
 
@@ -165,16 +196,26 @@ def server_url(args: argparse.Namespace) -> str | None:
     return url.rstrip("/") if url else None
 
 
-def call(args: argparse.Namespace, path: str, body: dict | None = None):
-    """Open ``path`` on the server; translate failures into ``CliError``."""
+def call(args: argparse.Namespace, path: str, body: dict | None = None,
+         raw: bytes | None = None, method: str | None = None):
+    """Open ``path`` on the server; translate failures into ``CliError``.
+
+    ``body`` goes as JSON, ``raw`` as octets; neither makes it a GET.
+    """
     url = server_url(args) + path
-    headers = {"Content-Type": "application/json"} if body is not None else {}
+    headers = {}
+    data = None
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+        data = json.dumps(body).encode()
+    elif raw is not None:
+        headers["Content-Type"] = "application/octet-stream"
+        data = raw
     if args.token:
         headers["Authorization"] = f"Bearer {args.token}"
-    data = json.dumps(body).encode() if body is not None else None
     try:
-        return urllib.request.urlopen(urllib.request.Request(url, data=data, headers=headers),
-                                      timeout=args.timeout)
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        return urllib.request.urlopen(req, timeout=args.timeout)
     except urllib.error.HTTPError as exc:
         try:
             detail = json.load(exc).get("detail", exc.reason)
@@ -273,6 +314,32 @@ class WavSink:
             self.fileobj.close()
 
 
+class EncodedSink:
+    """An MP3 or OGG file: the samples are held, then encoded once complete.
+
+    ``encode`` turns the float32 bytes into the file - in this process through
+    the backend, or on the server through ``/api/encode`` - so the remote client
+    needs no encoder of its own.
+    """
+
+    def __init__(self, fileobj, owned: bool, encode) -> None:
+        self.fileobj, self.owned, self.encode = fileobj, owned, encode
+        self.held = bytearray()
+
+    def write(self, data: bytes) -> None:
+        self.held += data
+
+    def close(self) -> None:
+        self.fileobj.write(self.encode(bytes(self.held)))
+        self.fileobj.flush()
+        if self.owned:
+            self.fileobj.close()
+
+    def abort(self) -> None:
+        if self.owned:
+            self.fileobj.close()
+
+
 class RawSink:
     def __init__(self, fileobj, owned: bool) -> None:
         self.fileobj, self.owned = fileobj, owned
@@ -345,14 +412,27 @@ class Player:
         os.remove(self.path)
 
 
-def open_output(path: str, rate: int, raw: bool, stdout):
-    if path == "-":
-        return RawSink(stdout, owned=False) if raw else WavSink(stdout, rate, owned=False)
-    try:
-        handle = open(path, "wb")
-    except OSError as exc:
-        raise CliError(1, f"cannot write {path}: {exc.strerror}") from None
-    return RawSink(handle, owned=True) if raw else WavSink(handle, rate, owned=True)
+def output_format(args: argparse.Namespace) -> str:
+    """``--format``, else the extension of ``-o``, else wav."""
+    if args.format:
+        return args.format
+    return EXTENSIONS.get(os.path.splitext(args.output or "")[1].lower(), "wav")
+
+
+def open_output(path: str, rate: int, raw: bool, stdout, fmt: str = "wav", encode=None):
+    owned = path != "-"
+    if owned:
+        try:
+            handle = open(path, "wb")
+        except OSError as exc:
+            raise CliError(1, f"cannot write {path}: {exc.strerror}") from None
+    else:
+        handle = stdout
+    if raw:
+        return RawSink(handle, owned)
+    if fmt != "wav":
+        return EncodedSink(handle, owned, encode)
+    return WavSink(handle, rate, owned)
 
 
 # --------------------------------------------------------------------- commands
@@ -398,6 +478,7 @@ def cmd_speak(args: argparse.Namespace) -> int:
     if args.output == "-" and stdout.isatty():
         raise CliError(2, "refusing to write audio to a terminal; redirect it or use -o FILE")
     server = server_url(args)
+    fmt = output_format(args)
 
     # Whatever a library prints must not land in a WAV going to stdout.
     with contextlib.redirect_stdout(sys.stderr):
@@ -410,6 +491,10 @@ def cmd_speak(args: argparse.Namespace) -> int:
             rate = int(resp.headers.get("X-Sample-Rate", 48000))
             voice = args.voice or "default voice"
             chunks = remote_samples(resp)
+
+            def encode(data: bytes) -> bytes:
+                with call(args, f"/api/encode?format={fmt}", raw=f32_to_i16(data)) as answer:
+                    return answer.read()
         else:
             app = local_engine(args.quiet)
             try:
@@ -420,10 +505,15 @@ def cmd_speak(args: argparse.Namespace) -> int:
             rate = app.SAMPLE_RATE
             chunks = (chunk.tobytes() for chunk in samples)
 
+            def encode(data: bytes) -> bytes:
+                import numpy as np
+
+                return app.encode_audio(np.frombuffer(data, dtype=np.float32), fmt)
+
         sinks = []
         try:
             if args.output:
-                sinks.append(open_output(args.output, rate, args.raw, stdout))
+                sinks.append(open_output(args.output, rate, args.raw, stdout, fmt, encode))
             if play:
                 sinks.append(Player(rate))
             samples_out = 0
@@ -490,6 +580,57 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0 if state["state"] == "ready" else 1
 
 
+def cmd_lexicon(args: argparse.Namespace) -> int:
+    import lexicon
+
+    if server_url(args):
+        def load() -> list[dict]:
+            return get_json(args, "/api/lexicon")["user"]
+
+        def store(user: list[dict]) -> None:
+            call(args, "/api/lexicon", {"user": user}, method="PUT").close()
+
+        def builtin() -> list[dict]:
+            return get_json(args, "/api/lexicon")["builtin"]
+    else:
+        def load() -> list[dict]:
+            try:
+                return lexicon.load_user()
+            except ValueError as exc:
+                raise CliError(1, str(exc)) from None
+
+        def store(user: list[dict]) -> None:
+            try:
+                lexicon.save_user(user)
+            except ValueError as exc:
+                raise CliError(2, str(exc)) from None
+
+        builtin = lexicon.builtin
+
+    user = load()
+    if args.action == "list":
+        if args.json:
+            print(json.dumps({"builtin": builtin(), "user": user}, ensure_ascii=False, indent=2))
+            return 0
+        rows = [(e, "") for e in user] + [(e, "built-in") for e in builtin()]
+        width = max(len(e["word"]) for e, _ in rows)
+        say = max(len(e["say"]) for e, _ in rows)
+        for e, note in rows:
+            case = "case" if e["matchCase"] else "    "
+            print(f"{e['word']:<{width}}  {e['say']:<{say}}  {case}  {note}".rstrip())
+        return 0
+
+    key = args.word.strip().casefold()
+    kept = [e for e in user if e["word"].casefold() != key]
+    if args.action == "add":
+        store(kept + [{"word": args.word, "say": args.say, "matchCase": args.case}])
+    else:
+        if len(kept) == len(user):
+            raise CliError(2, f"'{args.word}' is not one of your words")
+        store(kept)
+    return 0
+
+
 def cmd_gui(args: argparse.Namespace) -> int:
     import app
 
@@ -508,7 +649,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
 
 HANDLERS = {"gui": cmd_gui, "serve": cmd_serve, "speak": cmd_speak,
-            "voices": cmd_voices, "status": cmd_status}
+            "voices": cmd_voices, "status": cmd_status, "lexicon": cmd_lexicon}
 
 
 def main(argv: list[str] | None = None) -> int:

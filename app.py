@@ -26,6 +26,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 from numpy.lib.stride_tricks import sliding_window_view
 from pydantic import BaseModel
 
@@ -80,6 +81,26 @@ def _token_ok(candidate: str | None) -> bool:
     return candidate is not None and hmac.compare_digest(candidate.encode(), _token.encode())
 
 
+# The desktop window's backend sits on a fixed loopback port. A web page that
+# rebinds its own hostname to 127.0.0.1 would be same-origin with it; such a
+# request still carries that hostname, so the window's backend accepts only its
+# own. None (serve mode) accepts any Host - the token guards a LAN server.
+_gui_hosts: frozenset[str] | None = None
+
+
+def set_gui_hosts(port: int | None) -> None:
+    global _gui_hosts
+    _gui_hosts = None if port is None else frozenset(
+        {f"127.0.0.1:{port}", f"localhost:{port}"})
+
+
+@app.middleware("http")
+async def require_host(request: Request, call_next):
+    if _gui_hosts is not None and request.headers.get("host", "").lower() not in _gui_hosts:
+        return JSONResponse({"detail": "Sai địa chỉ."}, status_code=421)
+    return await call_next(request)
+
+
 @app.middleware("http")
 async def require_token(request: Request, call_next):
     """Guard the API, not the page: the page is static and carries nothing.
@@ -94,7 +115,21 @@ async def require_token(request: Request, call_next):
     bearer = auth[7:] if auth.lower().startswith("bearer ") else None
     if _token_ok(bearer) or _token_ok(request.cookies.get(TOKEN_COOKIE)):
         return await call_next(request)
+    # Take in what the client sent before refusing it: closing on an unread body
+    # makes Windows reset the connection, and the client sees an abort, not a 401.
+    # A megabyte is plenty for any honest mistake; past it, the reset is fine.
+    seen = 0
+    async for chunk in request.stream():
+        seen += len(chunk)
+        if seen > 1 << 20:
+            break
     return JSONResponse({"detail": "Thiếu hoặc sai token."}, status_code=401)
+
+# The CPU engine's ONNX graphs: "fp32" (onnx_update, 475 MB, the reference
+# quality) or "int8" (onnx_int8, 165 MB; faster only where the CPU has the int8
+# path onnxruntime wants, distorted where it has not - on an i5-14600K fp32 ran
+# at RTF 0.29, int8 at 0.55). tool-build.py fetches and ships the matching subfolder.
+MODEL_PRECISION = "fp32"
 
 _engine = None
 _engine_error: str | None = None
@@ -113,7 +148,7 @@ def engine():
             from vieneu import Vieneu
 
             try:
-                _engine = Vieneu(precision="int8")
+                _engine = Vieneu(precision=MODEL_PRECISION)
             except Exception as exc:  # surfaced to the UI via /api/status
                 _engine_error = f"{type(exc).__name__}: {exc}"
                 raise
@@ -261,9 +296,9 @@ class SpeakRequest(BaseModel):
     text: str
     voice: str | None = None
     speed: float = 1.0
-    # "f32": raw float32 streamed as it is generated. "wav": the whole reading
-    # as one 16-bit file, sent once it is complete.
-    format: Literal["f32", "wav"] = "f32"
+    # "f32": raw float32 streamed as it is generated. "wav", "mp3", "ogg": the
+    # whole reading as one file, sent once it is complete.
+    format: Literal["f32", "wav", "mp3", "ogg"] = "f32"
     # "normal": the engine reads the text as typed (POST spelled "phê ô ét tê").
     # "special": lexicon.py respells words first (POST as "post", AP as "ây pi").
     pronunciation: Literal["normal", "special"] = "normal"
@@ -279,6 +314,28 @@ def wav_bytes(chunks) -> bytes:
         out.setsampwidth(2)
         out.setframerate(SAMPLE_RATE)
         out.writeframes(pcm.tobytes())
+    return buf.getvalue()
+
+
+# format -> (libsndfile container, codec, media type). The libsndfile that the
+# soundfile wheels bundle carries LAME and Vorbis, so no encoder is installed.
+ENCODINGS = {
+    "mp3": ("MP3", "MPEG_LAYER_III", "audio/mpeg"),
+    "ogg": ("OGG", "VORBIS", "audio/ogg"),
+}
+# A tape the window sends to /api/encode: 20 000 characters read at 0.5x is
+# under an hour of 16-bit audio at 48 kHz, about 330 MB; past that it is a mistake.
+ENCODE_MAX_BYTES = 400 * 1024 * 1024
+
+
+def encode_audio(audio: np.ndarray, fmt: str) -> bytes:
+    """``audio`` (float32 mono at ``SAMPLE_RATE``) as a complete MP3 or OGG file."""
+    import soundfile
+
+    container, codec, _ = ENCODINGS[fmt]
+    buf = io.BytesIO()
+    soundfile.write(buf, np.clip(audio, -1.0, 1.0), SAMPLE_RATE, format=container,
+                    subtype=codec)
     return buf.getvalue()
 
 
@@ -343,7 +400,7 @@ def synthesize(text: str, voice: str | None = None, speed: float = 1.0,
     if resolved is None:
         raise ValueError(f"Không có giọng '{voice}'.")
 
-    spoken = lexicon.apply(text) if pronunciation == "special" else text
+    spoken = lexicon.apply(text, lexicon.load_user()) if pronunciation == "special" else text
 
     def chunks():
         for chunk in stretch(tts.infer_stream(spoken, voice=resolved), speed):
@@ -359,21 +416,26 @@ def tts_stream(req: SpeakRequest):
     ``speed`` scales the duration and leaves the pitch where it is, so the
     stream is always 48 kHz and the client plays it back untouched.
 
-    ``format: "wav"`` trades the streaming for a file any player opens: the
-    whole reading is synthesized first, then sent as one 16-bit WAV with its
-    real length in the header and in ``Content-Length``.
+    ``format: "wav"`` (or ``"mp3"``, ``"ogg"``) trades the streaming for a file
+    any player opens: the whole reading is synthesized first, then sent as one
+    file with its real length in ``Content-Length``.
     """
     try:
         _, chunks = synthesize(req.text, req.voice, req.speed, req.pronunciation)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from None
 
-    if req.format == "wav":
+    if req.format != "f32":
+        if req.format == "wav":
+            body, media = wav_bytes(chunks), "audio/wav"
+        else:
+            audio = np.concatenate([np.zeros(0, dtype=np.float32), *chunks])
+            body, media = encode_audio(audio, req.format), ENCODINGS[req.format][2]
         return Response(
-            wav_bytes(chunks),
-            media_type="audio/wav",
+            body,
+            media_type=media,
             headers={"X-Sample-Rate": str(SAMPLE_RATE), "Cache-Control": "no-store",
-                     "Content-Disposition": 'inline; filename="speech.wav"'},
+                     "Content-Disposition": f'inline; filename="speech.{req.format}"'},
         )
 
     def samples():
@@ -387,6 +449,72 @@ def tts_stream(req: SpeakRequest):
         media_type="application/octet-stream",
         headers={"X-Sample-Rate": str(SAMPLE_RATE), "Cache-Control": "no-store"},
     )
+
+
+class LexiconEntry(BaseModel):
+    word: str
+    say: str
+    matchCase: bool = False
+
+
+class LexiconBody(BaseModel):
+    user: list[LexiconEntry]
+
+
+def _lexicon_state(user: list[dict]) -> dict:
+    return {"builtin": lexicon.builtin(), "user": user}
+
+
+@app.get("/api/lexicon")
+def lexicon_get() -> dict:
+    """The built-in words and the user's own, which ``special`` reads with."""
+    try:
+        return _lexicon_state(lexicon.load_user())
+    except ValueError as exc:
+        raise HTTPException(500, str(exc)) from None
+
+
+@app.put("/api/lexicon")
+def lexicon_put(body: LexiconBody) -> dict:
+    """Replace the user's words. One list for the whole server: on a LAN server
+    everyone who holds the token reads, and edits, the same one."""
+    try:
+        return _lexicon_state(lexicon.save_user([e.model_dump() for e in body.user]))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+
+@app.post("/api/encode")
+async def encode(request: Request, format: str):
+    """Encode a tape the client already holds: 16-bit LE mono PCM at 48 kHz in,
+    an MP3 or OGG file out. Saving a reading as MP3 then costs no second synthesis.
+    """
+    # Octets only: a text/plain POST is one another site may send with no
+    # preflight, and nothing of ours sends that.
+    if request.headers.get("content-type", "").split(";")[0].strip() != "application/octet-stream":
+        raise HTTPException(415, "Cần Content-Type application/octet-stream.")
+    # Read the body before any other refusal: answering while the client is
+    # still sending makes Windows abort the connection instead of showing a 400.
+    # Counted as it arrives, since a chunked body has no Content-Length to trust.
+    if int(request.headers.get("content-length") or 0) > ENCODE_MAX_BYTES:
+        raise HTTPException(413, "Âm thanh quá dài để mã hoá.")
+    parts, size = [], 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > ENCODE_MAX_BYTES:
+            raise HTTPException(413, "Âm thanh quá dài để mã hoá.")
+        parts.append(chunk)
+    body = b"".join(parts)
+    if format not in ENCODINGS:
+        raise HTTPException(400, f"Định dạng phải là {' hoặc '.join(ENCODINGS)}.")
+    if not body or len(body) % 2:
+        raise HTTPException(400, "Cần âm thanh 16-bit mono 48 kHz.")
+    audio = np.frombuffer(body, dtype="<i2").astype(np.float32) / 32767
+    # Encoding blocks for seconds on a long tape; keep the event loop free.
+    data = await run_in_threadpool(encode_audio, audio, format)
+    return Response(data, media_type=ENCODINGS[format][2],
+                    headers={"Cache-Control": "no-store",
+                             "Content-Disposition": f'inline; filename="speech.{format}"'})
 
 
 @app.get("/")
@@ -422,8 +550,17 @@ def start_server(port: int = 0, host: str = "127.0.0.1",
     only hides it by retrying the connect for a second or two.
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind((host, port))
+    if sys.platform == "win32":
+        # Windows' SO_REUSEADDR lets a second socket bind a port that is in use,
+        # and the two then split the connections; claim the port outright.
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+    else:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        sock.bind((host, port))
+    except OSError:
+        sock.close()
+        raise
     sock.listen(2048)  # uvicorn's default backlog; its own listen() is then a no-op
     bound_port = sock.getsockname()[1]
 
@@ -431,6 +568,23 @@ def start_server(port: int = 0, host: str = "127.0.0.1",
     thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]}, daemon=True)
     thread.start()
     return server, bound_port, thread
+
+
+def start_gui_server(port: int) -> tuple[uvicorn.Server, int, threading.Thread]:
+    """``start_server`` on ``port``, or on any free port if that one is taken.
+
+    The window asks for a fixed port so its page keeps one origin - the settings
+    and history it stores belong to that origin. A second window, or another
+    program on the port, still gets a working app, just without those.
+    """
+    try:
+        return start_server(port)
+    except OSError:
+        if not port:
+            raise
+        print(f"voice-tts: port {port} is taken; this window will not see saved "
+              "settings or history", file=sys.stderr)
+        return start_server(0)
 
 
 def lan_address() -> str:
@@ -523,7 +677,8 @@ def run_gui(port: int = 0, tray: bool = True) -> None:
 
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("VoiceTTS.Desktop")
 
-    _, port, _ = start_server(port)
+    _, port, _ = start_gui_server(port)
+    set_gui_hosts(port)
     url = f"http://127.0.0.1:{port}/"
     # pywebview asks WinForms for FormStartPosition.CenterScreen, but it does so
     # after the form handle exists, so the window lands at 78,78 instead. Passing
@@ -574,8 +729,11 @@ def run_gui(port: int = 0, tray: bool = True) -> None:
         else:
             icon = None  # no tray here: closing the window quits, as before
 
-    # Returns when the window is destroyed; daemon threads go with it.
-    webview.start(icon=window_icon())
+    # Returns when the window is destroyed; daemon threads go with it. pywebview
+    # defaults to a private profile, wiped on exit; a profile kept in the data dir
+    # is what lets the page remember settings, the draft and the history.
+    webview.start(icon=window_icon(), private_mode=False,
+                  storage_path=str(lexicon.data_dir() / "webview"))
     if icon is not None:
         icon.stop()
 

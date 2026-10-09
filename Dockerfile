@@ -3,7 +3,8 @@
 #   docker compose up -d --build      # see compose.yaml; token from .env
 #
 # The model is not baked in: the first start downloads it into the /data/hf
-# volume (needs internet once), later starts load it from there.
+# volume (needs internet once), later starts load it from there. The user's
+# lexicon lives in the /data/app volume, so a rebuild keeps it.
 
 FROM python:3.12-slim
 
@@ -11,7 +12,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    HF_HOME=/data/hf
+    HF_HOME=/data/hf \
+    VOICE_TTS_DATA=/data/app
 
 WORKDIR /app
 
@@ -25,10 +27,10 @@ COPY web ./web
 # Run unprivileged; the volume mount point must already belong to that user,
 # or a fresh named volume comes up root-owned and the download fails.
 RUN useradd --create-home --uid 1000 voicetts \
-    && mkdir -p /data/hf \
+    && mkdir -p /data/hf /data/app \
     && chown -R voicetts:voicetts /data
 USER voicetts
-VOLUME ["/data/hf"]
+VOLUME ["/data/hf", "/data/app"]
 
 EXPOSE 8760
 

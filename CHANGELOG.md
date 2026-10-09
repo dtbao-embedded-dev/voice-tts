@@ -13,6 +13,56 @@ the release before it builds.
 - The project is licensed under the Apache License 2.0 (`LICENSE`).
 - `GET /api/version` answers `{"version": "<version>"}`, the version the server
   runs - `voice-tts --version` only ever told the CLI's own.
+- MP3 and OGG (Vorbis) output: `"format": "mp3"` / `"ogg"` on `POST /api/tts/stream`,
+  `POST /api/encode?format=` to encode 16-bit PCM a client already holds, and
+  `voice-tts speak -o out.mp3` (format from the extension, or `--format`).
+- Your own pronunciation words, read in `special` on top of the built-ins:
+  `GET`/`PUT /api/lexicon` and `voice-tts lexicon list|add|remove`, stored in
+  `lexicon.json` in the data dir (`$VOICE_TTS_DATA`, `%APPDATA%\VoiceTTS`,
+  `~/.local/share/voice-tts`; the `voice-tts-data` volume in Docker). A user word
+  replaces a built-in one with the same spelling, and the longest word wins.
+- *Từ điển* in the window lists the built-in words and yours, adds, changes and
+  removes yours, and plays how a spelling sounds (*Nghe*, *Nghe thử*). A changed
+  list makes the next special-pronunciation reading read anew.
+- *Lịch sử* in the window keeps the last 20 readings with their audio in the
+  browser (IndexedDB); one click plays a reading again, to seek or save, without
+  synthesis. Readings stopped after at least a second are kept, marked *một phần*.
+- Open a `.txt` or `.md` file in the window: *Mở file…*, `Ctrl+O`, or drop it on the
+  window. Markdown is read for its words (marks, URLs and code blocks left out);
+  past 20 000 characters the rest is cut, and the status line says so.
+- *Lưu dạng* in the window saves a reading as WAV, MP3 or OGG; MP3 and OGG are
+  encoded by `/api/encode` from the audio already read.
+- The window remembers the voice, speed, pronunciation, file format and the draft
+  across a reload and a restart; a browser on the LAN server remembers them per
+  browser.
+- Pause, seek and replay in the window, from what was already read: the main
+  button reads, pauses (*Tạm dừng*), carries on (*Tiếp tục*) and plays again (*Phát
+  lại*), a bar seeks, and **■** stops. The backend is asked again only once the
+  text, voice, speed or pronunciation changes.
+
+### Changed
+
+- The CPU engine loads the fp32 ONNX graphs of v3 Turbo (`onnx_update`) instead of
+  the int8 ones: the reference quality, and no int8 distortion. On an i5-14600K it
+  is faster too (real-time factor 0.29 against 0.55). The first start downloads
+  475 MB of graphs, and the packaged build carries them instead of the 165 MB int8
+  set.
+- The window reads one sentence per request and shows the text while it reads:
+  the sentence being heard is lit, and clicking one jumps to it, or reads from it
+  if it is not made yet.
+- The window's backend listens on the fixed port 8761 (`gui --port`, any free port
+  if it is taken) and keeps a WebView2 profile in `<data dir>/webview`, so what the
+  page stores survives a restart. It answers only requests addressed to
+  `127.0.0.1` or `localhost` on that port.
+- The lexicon respells in one pass, longest word first, so a spelling one entry
+  produces is never respelled by another.
+
+### Fixed
+
+- On Windows a second server could bind a port already in use and split its
+  connections; the port is now claimed exclusively.
+- A request refused for its token, or an `/api/encode` call refused for its format,
+  could reach a Windows client as a reset connection instead of the error.
 
 ## [0.7.0] - 2026-10-09
 

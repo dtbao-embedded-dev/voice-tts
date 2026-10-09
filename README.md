@@ -41,13 +41,34 @@ it (plus a one-off download for a source install).
 
 1. Open **Voice TTS** (Start Menu, or the downloaded exe).
 2. Paste or type the text - up to 20 000 characters, Vietnamese and English mixed
-   freely in one sentence.
+   freely in one sentence - or open a `.txt`/`.md` file: **Mở file…**, `Ctrl+O`, or
+   drop it on the window. A Markdown file is read for its words: headings, emphasis
+   and list marks go, links keep their text, code blocks are left out.
 3. **Giọng đọc** picks the voice (★ = featured); **Tốc độ** picks 0.75×-1.5×.
 4. **Phát âm** is *Thường* (the text as typed: `POST` is spelled *phê ô ét tê*) or
    *Đặc biệt* (`POST` read "post", `AP` "ây pi", `Board` "bo", `ESP32` "i ét pi ba
-   hai").
-5. **Đọc** (`Ctrl+Enter`) reads it as it is generated; press again or `Esc` to stop.
-6. **Lưu WAV** saves what was read.
+   hai"). **Từ điển** at the top adds your own words for *Đặc biệt* - a word, how to
+   read it, and *Nghe thử* to hear that spelling first.
+5. **Đọc** (`Ctrl+Enter`) reads it as it is generated. The same button then pauses
+   (*Tạm dừng*), carries on (*Tiếp tục*) and, at the end, plays it again (*Phát
+   lại*); the bar beside it seeks. All of that plays what was already read - the
+   backend is not asked again until the text, voice, speed or pronunciation
+   changes. **■** or `Esc` stops.
+
+   While it reads, the text shows sentence by sentence: the one being heard is
+   lit, the ones still being made are dimmed. Click a sentence to jump to it -
+   at once if it is already made, otherwise the reading starts over from it.
+6. **Lưu dạng** picks WAV, MP3 or OGG, and **Lưu WAV/MP3/OGG** saves what was
+   read. MP3 and OGG are about a tenth of the WAV; the backend encodes the audio the
+   window already holds, so nothing is read twice.
+
+**Lịch sử** at the top keeps the last 20 readings - text, settings and audio - in
+this machine's browser storage. Click one to hear it again, seek or save it, with
+no synthesis; a reading stopped half-way is kept too, marked *một phần*.
+
+The window remembers the voice, speed, pronunciation and file format you picked and the text you
+were typing, across a restart. A browser on the LAN server remembers them per
+browser.
 
 Minimizing or closing the window hides it in the system tray and the app keeps
 running; click the tray icon to bring it back, right-click → *Thoát* to quit.
@@ -189,9 +210,13 @@ voice-tts speak "Xin chào" --server http://192.168.0.137:8760 --token <token>
 voice-tts speak "Xin chào, deploy lên production server."           # play it
 voice-tts speak -f bai-doc.txt -v "Mai Anh" -s 1.25 -o bai-doc.wav  # save it
 echo "Chào bạn" | voice-tts speak -o - > chao.wav                   # pipe it
+voice-tts speak -f bai-doc.txt -o bai-doc.mp3                       # MP3 (or .ogg) by extension
 voice-tts speak "Xin chào" --server http://192.168.0.137:8760 --token <t>
 voice-tts speak "Bật AP trên Board" --pronunciation special     # AP "ây pi", Board "bo"
 voice-tts voices                 # * default, + featured; --json for the raw list
+voice-tts lexicon add MQTT "em kiu ti ti"   # read MQTT that way in --pronunciation special
+voice-tts lexicon list           # your words, then the built-in ones; --json for the raw list
+voice-tts lexicon remove MQTT
 voice-tts status --wait 600      # exit 0 once the server's model is ready
 ```
 
@@ -203,6 +228,7 @@ voice-tts status --wait 600      # exit 0 once the server's model is ready
 | `-o`, `--output` | write to a file, or `-` for stdout; without it the text is played |
 | `--play` / `--no-play` | force playback on or off (default: on unless `-o`) |
 | `--raw` | with `-o`: raw float32 LE mono 48 kHz instead of a 16-bit WAV |
+| `--format F` | `wav`, `mp3` or `ogg` for `-o` (default: from the extension - `.mp3`, `.ogg`, `.oga` - else `wav`); needed for `-o -` |
 | `--pronunciation P` | `normal` reads the text as typed (default); `special` respells POST, AP, Board, ESP32... first |
 | `--server URL`, `--token T` | use a running server instead of loading the model here |
 | `--local` | ignore `$VOICE_TTS_SERVER` |
@@ -210,6 +236,9 @@ voice-tts status --wait 600      # exit 0 once the server's model is ready
 | `-q`, `--quiet` | nothing on stderr except errors |
 
 `voices` and `status` take `--server`, `--token`, `--timeout` and `--json` too.
+`lexicon add WORD SAY [--case]` adds a word or changes how one is read (`--case`:
+that exact case only), `lexicon remove WORD` drops one; without `--server` they edit
+`lexicon.json` in the data dir, with it the server's list.
 `$VOICE_TTS_SERVER` and `$VOICE_TTS_TOKEN` are the defaults for `--server` and
 `--token`. Exit codes: `0` done, `1` runtime failure (unreachable server, wrong
 token, model failed), `2` bad input (usage, empty or over-long text, unknown voice,
@@ -251,7 +280,10 @@ plain HTTP: fine on a home LAN, not for the internet.
 | `GET /api/status` | `{"state": "loading" \| "ready" \| "error"}` while the model warms up |
 | `GET /api/version` | `{"version": "0.7.0"}` - the version the server runs (`voice-tts --version` is the CLI's own) |
 | `GET /api/voices` | the 25 preset voices with region, gender and description, the default voice, `sampleRate` and `maxChars` |
-| `POST /api/tts/stream` | raw float32 LE mono at 48 kHz, streamed as it is generated; or one 16-bit WAV file with `"format": "wav"` |
+| `GET /api/lexicon` | `{"builtin": [...], "user": [...]}`, each entry `{"word", "say", "matchCase"}` |
+| `PUT /api/lexicon` | replaces the user's words with `{"user": [...]}`; answers the new state, `400` for an empty, duplicate or over-long entry |
+| `POST /api/tts/stream` | raw float32 LE mono at 48 kHz, streamed as it is generated; or one WAV, MP3 or OGG file with `"format"` |
+| `POST /api/encode?format=mp3\|ogg` | the request body - 16-bit LE mono PCM at 48 kHz - encoded as one MP3 or OGG (Vorbis) file; how the window saves what it already read |
 
 `GET /api/voices` is the list of voices a request may name - featured voices first,
 then the rest in the engine's order (shortened here):
@@ -280,14 +312,19 @@ upgrade: since 3.8.3 `Minh Quân Pro` is `Hải Đăng`, `Anh Khôi` is `Thiện
 
 `POST /api/tts/stream` takes `{"text", "voice", "speed", "format", "pronunciation"}`:
 `text` up to 20 000 characters, `voice` a name from `/api/voices` (omit it for the
-default), `speed` between `0.5` and `2.0` (default `1.0`), `format` either `"f32"`
-(default) or `"wav"`, `pronunciation` either `"normal"` (default, the text as typed)
+default), `speed` between `0.5` and `2.0` (default `1.0`), `format` one of `"f32"`
+(default), `"wav"`, `"mp3"` or `"ogg"`, `pronunciation` either `"normal"` (default, the text as typed)
 or `"special"` (respelled by `lexicon.py`, see Notes).
 
 | `format` | Body | `Content-Type` | Starts arriving |
 | --- | --- | --- | --- |
 | `"f32"` | raw float32 LE mono, 48 kHz, no header | `application/octet-stream` | with the first generated chunk - for live playback |
 | `"wav"` | a complete 16-bit mono WAV, 48 kHz, real length in the header and `Content-Length` | `audio/wav` | once the whole text is synthesized - for saving a file |
+| `"mp3"` | a complete MP3 (LAME through libsndfile), 48 kHz mono | `audio/mpeg` | once the whole text is synthesized |
+| `"ogg"` | a complete Ogg Vorbis file, 48 kHz mono | `audio/ogg` | once the whole text is synthesized |
+
+`POST /api/encode` answers `400` for an unknown `format` or a body that is empty or
+not whole 16-bit samples, and `413` above 400 MB.
 
 The answer is `400` for empty or over-long text, an unknown voice or a speed out
 of range, `422` for an unknown `format` or `pronunciation`, and `401` when the server
@@ -403,7 +440,8 @@ carries on without one: the window closes as before, `serve` keeps serving.
 
 | Key | Action |
 | --- | --- |
-| `Ctrl` + `Enter` | read / stop |
+| `Ctrl` + `Enter` | read / pause / carry on / play again |
+| `Ctrl` + `O` | open a `.txt` or `.md` file |
 | `Esc` | stop, or close the voice sheet |
 
 ## Notes
@@ -411,13 +449,19 @@ carries on without one: the window closes as before, `serve` keeps serving.
 - **No GPU is required.** The default install is the torch-free ONNX build, and
   streaming runs on the CPU engine either way. The model is
   [`pnnbao-ump/VieNeu-TTS-v3-Turbo`](https://huggingface.co/pnnbao-ump/VieNeu-TTS-v3-Turbo)
-  through the `vieneu` SDK (`requirements.txt`), with its `int8` ONNX graphs for
-  speed (about 2x the fp32 ones; a CPU without VNNI may sound distorted).
+  through the `vieneu` SDK (`requirements.txt`), with its fp32 ONNX graphs
+  (`onnx_update`, 475 MB) - the reference quality. The int8 set (`onnx_int8`,
+  165 MB) is smaller, but it is only faster where the CPU has the int8 path
+  onnxruntime wants, and it can sound distorted where it has not. Measured on an
+  i5-14600K, one 9 s paragraph: fp32 RTF 0.29 (first audio after 0.20 s), int8 RTF
+  0.55 (0.36 s). `MODEL_PRECISION` in `app.py` picks the set, and `tool-build.py`
+  fetches and ships only that one.
 - **The first launch downloads the model** (HuggingFace cache, `~/.cache/huggingface`).
   The window shows *Đang tải model…* until it is ready. This applies to a source
   checkout only.
-- **The packaged desktop build is a folder** (`dist/VoiceTTS/`, ~760 MB; the NSIS
-  installer around it is ~330 MB): the runtime, the web view, the tray icon and both
+- **The packaged desktop build is a folder** (`dist/VoiceTTS/`, ~760 MB with the
+  int8 graphs, about 310 MB more with the fp32 ones; the NSIS installer around it
+  was ~330 MB with int8): the runtime, the web view, the tray icon and both
   model repos (backbone + audio codec) are inside, and `VoiceTTS.exe` takes the same
   subcommands as `app.py` (`VoiceTTS.exe serve --tray`, say) - but, being windowed,
   it prints nothing; the CLI is the installed `voice-tts`. It points `HF_HOME` at its
@@ -439,8 +483,37 @@ carries on without one: the window closes as before, `serve` keeps serving.
   has `lexicon.py` rewrite whole words first: `POST`/`GET`/`PUT`/`PATCH`/`DELETE` as
   the English words, `AP` as *ây pi*, `board` (any case) as *bo*, `ESP32` (any case,
   also `ESP 32`) as *i ét pi ba hai*. `POSTMAN`, `APP` and `onboard` are left alone,
-  and so is anything inside `<en>...</en>`. Another word is one more line in
-  `ENTRIES`.
+  and so is anything inside `<en>...</en>`. Another built-in word is one more line
+  in `ENTRIES`.
+- **Your own words.** *Từ điển* in the window, `voice-tts lexicon add` or
+  `PUT /api/lexicon` add words on top of the built-ins, read in `special` only (`normal` stays the text as typed). They live in `lexicon.json` in the data dir: `$VOICE_TTS_DATA`,
+  else `%APPDATA%\VoiceTTS` on Windows and `~/.local/share/voice-tts` on Linux;
+  the Docker image keeps it in the `voice-tts-data` volume (`/data/app`). A word you
+  add replaces a built-in one with the same spelling, and where two words start at
+  the same place the longer one wins (`ESP32 S3` before `ESP32`). On a LAN server the
+  list is the server's: everyone who holds the token reads and edits the same one.
+  Up to 500 words, 64 characters a word and 128 for how it is read. The window
+  reads a changed list anew only when the change came through its own *Từ điển*;
+  after `voice-tts lexicon` or another LAN client edits it, *Phát lại* still plays
+  the old audio until the text or a setting changes.
+- **The window reads one sentence per request.** `web/text.js` splits the text at
+  `. ! ? …` before a space and at line breaks (not after `3.14`, `v.v.`, `TP.` and
+  the like, nor inside `<en>...</en>`), and each sentence is its own
+  `POST /api/tts/stream`. That is what tells the page where every sentence sits in
+  the audio, for the highlight and click-to-jump. The price: the engine no longer
+  sees across a sentence end, and every sentence pays the request's start-up. The
+  CLI and the HTTP API still send the whole text at once.
+- **What the window remembers lives in its own browser profile.** Settings and the
+  draft (`localStorage`) and the history (IndexedDB, audio included - a long
+  reading is a few tens of MB, so 20 of them can reach hundreds) are kept by the
+  page, so they belong to its origin. The
+  window therefore serves its backend on a fixed port, `8761` (`voice-tts gui
+  --port`), and keeps a WebView2 profile in `<data dir>/webview` instead of
+  pywebview's private one. If 8761 is taken - a second window, another program -
+  that window runs on any free port and starts without them. Having no token, the
+  window's backend answers only requests addressed to `127.0.0.1` or `localhost`
+  on its port (`421` otherwise), so a web page cannot reach it by pointing a
+  hostname of its own at the loopback address.
 - **Verify mode is deferred.** Checking a reading by ear - Whisper large-v3-turbo
   transcribes it, and it is sent only if it matches the text by 95% - was built,
   measured and taken out before release (it needs a 0.8 GB int8 model in the
@@ -466,7 +539,8 @@ carries on without one: the window closes as before, `serve` keeps serving.
 `.github/workflows/ci.yml` runs on every push to `main`, `developing`, `feat/**` and
 `fix/**` and on pull requests, on `ubuntu-latest` and `windows-latest` with Python
 3.12: `test_cli.py` (CLI, token guard, tray menu, the time-stretcher and the
-pronunciation lexicon, against a stub engine - no model download) and `--help` for every subcommand and the
+pronunciation lexicon, against a stub engine - no model download), `test_web.js`
+(the page's text helpers, under node) and `--help` for every subcommand and the
 installer. The real-model smoke test runs locally (`tool-build.py --check`).
 
 ## Release
@@ -524,9 +598,11 @@ icon.py                   the app icon, one geometry: tray/window/exe .ico and /
 cli.py                    command line: subcommands and flags, stdlib-only at import
 test_tts.py               assert-based smoke test over the real HTTP path
 test_cli.py               fast checks with a stub engine: CLI (local + remote), token guard
+test_web.js               node checks of web/text.js: Markdown stripping, file decoding
 CHANGELOG.md              user-visible changes per version; a release publishes its section
 LICENSE                   Apache License 2.0
-web/                      index.html, app.css, app.js, tray.html (tray menu) - no build step
+web/                      index.html, app.css, app.js, text.js (pure text helpers),
+                          tray.html (tray menu) - no build step
 requirements.txt          server + CLI core (what Docker installs)
 requirements-desktop.txt  core + window + tray (what tool-build.py installs)
 Dockerfile, compose.yaml  Linux server image, token from .env

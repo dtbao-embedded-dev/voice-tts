@@ -87,6 +87,9 @@ h1 {
   letter-spacing: -0.0255em;    /* SF tracking at 17pt */
 }
 
+.tools { display: flex; gap: 18px; margin-left: 12px; font-size: 0.9375rem; }
+.tools .link { margin-left: 0; }
+
 .status {
   margin-left: auto;
   display: flex; align-items: center; gap: 7px;
@@ -161,12 +164,58 @@ textarea:focus, textarea:focus-visible { outline: none; }
 textarea::placeholder { color: var(--label-3); }
 textarea::selection { background: rgba(10, 132, 255, 0.45); }
 
+/* The text while it is read: same type and box as the editor, so swapping one
+   for the other does not move a word. Sentences not yet made are dimmed; the
+   one being heard is lit; any made one can be clicked to jump to it. */
+.reader {
+  flex: 1 1 0;
+  min-height: 0;
+  margin: 8px 0 8px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 1.0625rem;
+  line-height: 1.5;
+  letter-spacing: -0.0255em;
+  color: var(--label-3);
+}
+.reader::-webkit-scrollbar { width: 0; height: 0; }
+.sent {
+  border-radius: 4px;
+  transition: background-color 160ms ease-out, color 160ms ease-out;
+}
+.sent:hover { text-decoration: underline; text-decoration-color: var(--label-3); }
+.sent--ready { color: var(--label-2); }
+.sent--now {
+  color: var(--label);
+  background: rgba(10, 132, 255, 0.28);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 .field-foot {
   display: flex; align-items: baseline; gap: 12px;
   font-size: 0.75rem;
   color: var(--label-3);
 }
-.count { margin-left: auto; font-variant-numeric: tabular-nums; }
+.count { font-variant-numeric: tabular-nums; }
+
+/* A text button: the tint is the affordance, as in an iOS toolbar. */
+.link {
+  margin-left: auto;
+  padding: 0; border: 0; background: none;
+  color: var(--accent);
+  font: inherit; font-weight: 600;
+  cursor: default;
+}
+.link:active:not(:disabled) { opacity: 0.6; }
+.link:disabled { opacity: 0.35; }
+.link--danger { color: var(--red); }
+
+/* A file held over the window: the card is where it lands. */
+.reader[hidden], textarea[hidden] { display: none; }
+
+.card[data-drop="1"] { outline: 2px dashed var(--accent); outline-offset: -2px; }
 
 /* ---- Inset grouped list: voice + speed ---------------------------------- */
 
@@ -273,6 +322,8 @@ button.row:active { background: var(--surface-2); transition: none; }
   transform: translateY(100%);
   touch-action: none;
 }
+/* `display: flex` above would otherwise win over the hidden attribute. */
+.sheet[hidden], .scrim[hidden] { display: none; }
 .sheet__grip {
   width: 36px; height: 5px; margin: 4px auto 12px;
   border-radius: 3px;
@@ -296,6 +347,104 @@ button.row:active { background: var(--surface-2); transition: none; }
               #000 calc(100% - 12px), transparent 100%);
 }
 .sheet__list::-webkit-scrollbar { width: 0; height: 0; }
+.sheet__head { display: flex; align-items: baseline; justify-content: space-between; }
+.sheet__hint { margin: 0 0 12px; font-size: 0.8125rem; color: var(--label-2); }
+.sheet__hint b { font-weight: 600; color: var(--label); }
+.sheet__error { margin: 8px 0 0; font-size: 0.8125rem; color: var(--red); }
+
+/* ---- Lexicon sheet ------------------------------------------------------ */
+
+.btn--small { min-height: 36px; padding: 6px 14px; font-size: 0.9375rem; }
+.btn--small.btn--primary { min-width: 0; }
+
+.field {
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: var(--surface-2);
+  color: var(--label);
+  font: inherit; font-size: 0.9375rem;
+  user-select: text; -webkit-user-select: text;
+}
+.field::placeholder { color: var(--label-3); }
+.field:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+
+.lex-form {
+  display: grid;
+  grid-template-columns: 1fr 1.6fr auto auto auto;
+  align-items: center;
+  gap: 8px;
+}
+.lex-form__case {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 0.875rem; color: var(--label-2);
+}
+.lex-form__case input { accent-color: var(--accent); }
+
+.lex-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  background: var(--surface-2);
+  font-size: 0.9375rem;
+}
+.lex-item:not(:has(.link--danger)) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto; }
+.voice-group + .lex-item, .lex-empty + .lex-item { border-radius: var(--r-group) var(--r-group) 0 0; }
+.lex-item:has(+ .voice-group), .lex-item:last-child { border-radius: 0 0 var(--r-group) var(--r-group); }
+.voice-group + .lex-item:has(+ .voice-group),
+.voice-group + .lex-item:last-child { border-radius: var(--r-group); }
+.lex-item + .lex-item::before {
+  content: "";
+  position: absolute; top: 0; left: 16px; right: 0;
+  height: 0.5px;
+  background: var(--separator);
+}
+.lex-item__word { font-weight: 600; overflow-wrap: anywhere; }
+.lex-item__case {
+  margin-left: 6px; padding: 0 5px;
+  border-radius: 4px;
+  background: var(--fill);
+  font-size: 0.6875rem; font-weight: 600;
+  color: var(--label-2);
+}
+.lex-item__say { color: var(--label-2); overflow-wrap: anywhere; }
+.lex-item--overridden .lex-item__word,
+.lex-item--overridden .lex-item__say { text-decoration: line-through; opacity: 0.6; }
+/* ---- History sheet ------------------------------------------------------ */
+
+.hist-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 14px;
+  padding: 10px 16px;
+  background: var(--surface-2);
+  cursor: default;
+}
+.hist-item:first-child { border-radius: var(--r-group) var(--r-group) 0 0; }
+.hist-item:last-child { border-radius: 0 0 var(--r-group) var(--r-group); }
+.hist-item:only-child { border-radius: var(--r-group); }
+.hist-item + .hist-item::before {
+  content: "";
+  position: absolute; top: 0; left: 16px; right: 0;
+  height: 0.5px;
+  background: var(--separator);
+}
+.hist-item:active { background: #3a3a3c; }
+.hist-item__text {
+  grid-column: 1;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: 0.9375rem;
+}
+.hist-item__meta { grid-column: 1; font-size: 0.8125rem; color: var(--label-2); }
+.hist-item .link--danger { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+
+.lex-empty { margin: 0 0 0 16px; font-size: 0.875rem; color: var(--label-3); }
 
 .voice-group {
   margin: 18px 0 6px 16px;
@@ -375,8 +524,37 @@ button.row:active { background: var(--surface-2); transition: none; }
 .btn--primary:active:not(:disabled) { background: var(--accent-press); }
 .btn__icon { width: 15px; height: 15px; }
 
+.btn--icon { padding: 10px 14px; }
+
+/* The scrubber: a thin track that thickens under the finger, iOS-style. */
+.scrub {
+  flex: 1;
+  display: flex; align-items: center; gap: 12px;
+  min-width: 0;
+}
+.scrub__bar {
+  flex: 1; min-width: 0;
+  height: 28px; margin: 0;
+  background: transparent;
+  -webkit-appearance: none; appearance: none;
+  --fill-to: 0%;
+}
+.scrub__bar::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(to right, var(--label) var(--fill-to), var(--fill) var(--fill-to));
+  transition: height 120ms ease-out;
+}
+.scrub__bar:active::-webkit-slider-runnable-track { height: 8px; }
+.scrub__bar::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; margin-top: -5px;
+  border-radius: 50%; background: var(--label);
+  box-shadow: 0 0.5px 4px rgba(0, 0, 0, 0.4);
+}
+.scrub__bar:active::-webkit-slider-thumb { margin-top: -3px; }
+.scrub__bar:disabled { opacity: 0.35; }
+
 .timecode {
-  margin-left: auto;
   font-size: 0.9375rem;
   font-variant-numeric: tabular-nums;
   color: var(--label-2);
