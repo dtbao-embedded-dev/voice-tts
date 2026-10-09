@@ -54,6 +54,35 @@ function checkDecode() {
   console.log('decode: UTF-8 with or without BOM, CRLF, Markdown by extension only');
 }
 
+function checkSplit() {
+  const { splitSentences } = text;
+  const texts = (src) => splitSentences(src).map((s) => s.text);
+  const cases = [
+    ['Xin chào. Tôi là Nas! Bạn khỏe không?', ['Xin chào.', 'Tôi là Nas!', 'Bạn khỏe không?']],
+    // Decimals, abbreviations and domains are not sentence ends.
+    ['Giá 3.14 đô, v.v. và nhiều thứ. Xem docs.espressif.com nhé.',
+      ['Giá 3.14 đô, v.v. và nhiều thứ.', 'Xem docs.espressif.com nhé.']],
+    ['TP. Hồ Chí Minh và PGS. TS. An đến. Hết', ['TP. Hồ Chí Minh và PGS. TS. An đến.', 'Hết']],
+    ['Dòng một\nDòng hai\n\n  Dòng ba  ', ['Dòng một', 'Dòng hai', 'Dòng ba']],
+    ['Chờ đã... Rồi sao?! Thôi…', ['Chờ đã...', 'Rồi sao?!', 'Thôi…']],
+    ['"Xin chào." Anh ấy nói. (Thật vậy.) Xong', ['"Xin chào."', 'Anh ấy nói.', '(Thật vậy.)', 'Xong']],
+    // Nothing to say on its own: it rides with the sentence before.
+    ['Một.\n---\nHai. 123.', ['Một.\n---', 'Hai.', '123.']],
+    ['...\nMở đầu.', ['Mở đầu.']],
+    // What the user marked as English is read as one piece.
+    ['Nói <en>Hello. How are you?</en> rồi đi. Hết.', ['Nói <en>Hello. How are you?</en> rồi đi.', 'Hết.']],
+    ['  \n \t ', []],
+  ];
+  for (const [src, want] of cases) {
+    assert.deepEqual(texts(src), want, JSON.stringify(src));
+    for (const s of splitSentences(src)) {
+      assert.equal(src.slice(s.start, s.end), s.text, `offsets of ${JSON.stringify(s.text)}`);
+    }
+  }
+  console.log('sentences: ends, abbreviations, decimals, line breaks, <en> spans, offsets');
+}
+
 checkStripMarkdown();
 checkDecode();
+checkSplit();
 console.log('OK');

@@ -36,6 +36,9 @@ the release before it builds.
 
 ### Changed
 
+- The window reads one sentence per request and shows the text while it reads:
+  the sentence being heard is lit, and clicking one jumps to it, or reads from it
+  if it is not made yet.
 - The window's backend listens on the fixed port 8761 (`gui --port`, any free port
   if it is taken) and keeps a WebView2 profile in `<data dir>/webview`, so what the
   page stores survives a restart.

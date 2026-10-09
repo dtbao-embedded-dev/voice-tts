@@ -9,7 +9,7 @@ const els = {
   playBtn: $('playBtn'), playIcon: $('playIcon'), playLabel: $('playLabel'),
   saveBtn: $('saveBtn'), timecode: $('timecode'), meter: $('meter'),
   pron: $('pron'), stopBtn: $('stopBtn'), seek: $('seek'), format: $('format'),
-  card: $('card'), openBtn: $('openBtn'), fileInput: $('fileInput'),
+  card: $('card'), openBtn: $('openBtn'), fileInput: $('fileInput'), reader: $('reader'),
 };
 
 const REGIONS = ['Bắc', 'Trung', 'Nam'];
@@ -326,7 +326,10 @@ function audio() {
 // The tape is kept as Int16. At the 20 000-character limit this is 20+ minutes
 // of audio; float32 would hold twice as much of it in memory and the WAV is
 // 16-bit either way. `starts[i]` is where `chunks[i]` begins, in samples.
-const tape = { key: '', rate: 48000, chunks: [], starts: [], length: 0, complete: false };
+// `sentences` are the text's, `segments` [{i, start, end}] where each one read
+// so far sits on the tape - from the sentence the reading started at.
+const tape = { key: '', rate: 48000, chunks: [], starts: [], length: 0, complete: false,
+  sentences: [], segments: [], first: 0 };
 // True while the backend is still sending this tape.
 let synthesizing = false;
 
@@ -343,7 +346,8 @@ function tapeValid() {
 }
 
 function resetTape(key, rate = 48000) {
-  Object.assign(tape, { key, rate, chunks: [], starts: [], length: 0, complete: false });
+  Object.assign(tape, { key, rate, chunks: [], starts: [], length: 0, complete: false,
+    sentences: [], segments: [], first: 0 });
 }
 
 function appendTape(pcm) {
@@ -479,57 +483,33 @@ function stop() {
   render();
 }
 
-async function read() {
-  const text = els.text.value.trim();
-  if (!text) { els.text.focus(); return; }
-
-  stop();
-  const myRun = run;
-  const ac = audio();
-  await ac.resume();
-  abort = new AbortController();
-  resetTape(readingKey());
-  synthesizing = true;
-  play(0);
-
-  // A failure before any audio leaves nothing to keep.
-  const fail = (message) => {
-    synthesizing = false;
-    tape.key = '';
-    stopSources();
-    Object.assign(player, { playing: false, pos: 0 });
-    clearInterval(player.timer);
-    setStatus('error', message);
-    render();
-  };
-
+// One sentence through the backend onto the tape. Answers null when it all
+// arrived, or why it did not: an error message, or "aborted" once stopped.
+async function streamSentence(sentence, seg, myRun) {
   let res;
   try {
     res = await fetch('/api/tts/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, voice, speed, pronunciation }),
+      body: JSON.stringify({ text: sentence, voice, speed, pronunciation }),
       signal: abort.signal,
     });
   } catch {
-    if (myRun === run) fail('Không gọi được backend');   // else: aborted by Dừng
-    return;
+    return myRun === run ? 'Không gọi được backend' : 'aborted';
   }
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
-    if (myRun === run) fail(detail.detail || `Lỗi ${res.status}`);
-    return;
+    return myRun === run ? (detail.detail || `Lỗi ${res.status}`) : 'aborted';
   }
 
   tape.rate = Number(res.headers.get('X-Sample-Rate')) || 48000;
   const reader = res.body.getReader();
   let tail = new Uint8Array(0);
-  let broken = false;
   try {
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      if (myRun !== run) return;
+      if (myRun !== run) return 'aborted';
 
       const joined = new Uint8Array(tail.length + value.length);
       joined.set(tail); joined.set(value, tail.length);
@@ -544,26 +524,138 @@ async function read() {
         pcm[i] = Math.max(-1, Math.min(1, samples[i])) * 32767;
       }
       appendTape(pcm);
+      seg.end = tape.length;
       pump();
       render();
     }
   } catch (err) {
-    broken = err.name !== 'AbortError';
+    if (myRun !== run || err.name === 'AbortError') return 'aborted';
+    return 'Luồng âm thanh bị ngắt';
+  }
+  return myRun === run ? null : 'aborted';
+}
+
+// Read the text from sentence `from` on, one request per sentence: each
+// sentence's place on the tape is then known exactly, which is what the
+// highlight and click-to-seek go by. Playback starts with the first sentence
+// while the rest are still being made.
+async function read(from = 0) {
+  const sentences = VoiceText.splitSentences(els.text.value);
+  if (!sentences.length) { els.text.focus(); return; }
+
+  stop();
+  const myRun = run;
+  await audio().resume();
+  abort = new AbortController();
+  resetTape(readingKey());
+  tape.sentences = sentences;
+  tape.first = Math.min(from, sentences.length - 1);
+  synthesizing = true;
+  buildReader();
+  play(0);
+
+  let failure = null;
+  for (let i = tape.first; i < sentences.length; i++) {
+    const seg = { i, start: tape.length, end: tape.length };
+    tape.segments.push(seg);
+    failure = await streamSentence(sentences[i].text, seg, myRun);
+    if (failure === 'aborted') return;   // stopped or superseded: owns nothing now
+    if (seg.end === seg.start) tape.segments.pop();   // nothing came back for it
+    if (failure) break;
+    render();
   }
 
-  if (myRun !== run) return;   // stopped or superseded: this read owns nothing now
   synthesizing = false;
-  if (!tape.length) { fail('Không nhận được âm thanh'); return; }
-  if (broken) {
+  if (!tape.length) {
+    // A failure before any audio leaves nothing to keep.
+    tape.key = '';
+    stopSources();
+    Object.assign(player, { playing: false, pos: 0 });
+    clearInterval(player.timer);
+    setStatus('error', failure || 'Không nhận được âm thanh');
+    render();
+    return;
+  }
+  if (failure) {
     // Keep what arrived for saving; it is not the whole text, so no replay.
     tape.key = '';
-    setStatus('error', 'Luồng âm thanh bị ngắt');
+    setStatus('error', failure);
   } else {
     tape.complete = true;
   }
   pump();   // the end of the tape may be what finishes playback
   render();
 }
+
+/* ---- Reader: the text while it is read, the current sentence lit -------- */
+
+// The sentence playing now: the segment holding `pos`, or -1.
+function sentenceAt(pos) {
+  for (const s of tape.segments) if (pos >= s.start && pos < s.end) return s.i;
+  return -1;
+}
+
+function buildReader() {
+  const src = els.text.value;
+  els.reader.replaceChildren();
+  let at = 0;
+  tape.sentences.forEach((s, i) => {
+    if (s.start > at) els.reader.append(src.slice(at, s.start));
+    const span = document.createElement('span');
+    span.className = 'sent';
+    span.dataset.i = String(i);
+    span.textContent = s.text;
+    els.reader.append(span);
+    at = s.end;
+  });
+  if (at < src.length) els.reader.append(src.slice(at));
+  els.reader.scrollTop = els.text.scrollTop;
+  litSentence = -2;
+}
+
+let litSentence = -2;   // what the reader shows lit; -2: nothing drawn yet
+
+// Shown while a reading is under way or paused; sentences already on the tape
+// look ready, the rest are still being made.
+function renderReader() {
+  const show = tapeValid() && (synthesizing || player.playing || player.pos > 0);
+  els.reader.hidden = !show;
+  els.text.hidden = show;
+  if (!show) return;
+  const ready = new Set(tape.segments.map((s) => s.i));
+  for (const span of els.reader.children) {
+    span.classList.toggle('sent--ready', ready.has(Number(span.dataset.i)));
+  }
+}
+
+// Every frame while playing: light the sentence being heard.
+function renderLit() {
+  if (els.reader.hidden) return;
+  const now = sentenceAt(position());
+  if (now === litSentence) return;
+  litSentence = now;
+  for (const span of els.reader.querySelectorAll('.sent--now')) span.classList.remove('sent--now');
+  const span = els.reader.querySelector(`.sent[data-i="${now}"]`);
+  if (span) {
+    span.classList.add('sent--now');
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    span.scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
+  }
+}
+
+// A sentence clicked: play from it if it is on the tape, else read from it.
+els.reader.addEventListener('click', (e) => {
+  const span = e.target.closest('.sent');
+  if (!span) return;
+  const i = Number(span.dataset.i);
+  const seg = tape.segments.find((s) => s.i === i);
+  if (seg) {
+    if (player.playing) seek(seg.start);
+    else play(seg.start);
+  } else {
+    read(i);
+  }
+});
 
 function fmt(seconds) {
   const s = Math.floor(seconds);
@@ -584,6 +676,7 @@ function renderTime() {
   els.timecode.textContent = tape.length ? `${fmt(at)} / ${fmt(total)}` : '0:00';
   if (!seeking) els.seek.value = tape.length ? String(position() / tape.length) : '0';
   els.seek.style.setProperty('--fill-to', `${Number(els.seek.value) * 100}%`);
+  renderLit();
 }
 
 function render() {
@@ -591,7 +684,8 @@ function render() {
   const busy = synthesizing || player.playing;
   let label = 'Đọc';
   if (player.playing) label = 'Tạm dừng';
-  else if (valid) label = player.pos > 0 ? 'Tiếp tục' : 'Phát lại';
+  else if (valid && player.pos > 0) label = 'Tiếp tục';
+  else if (valid && tape.first === 0) label = 'Phát lại';
   els.playLabel.textContent = label;
   els.playIcon.innerHTML = player.playing ? PAUSE_ICON : PLAY_ICON;
   els.stopBtn.disabled = !(busy || player.pos > 0);
@@ -608,6 +702,7 @@ function render() {
     els.meter.dataset.live = live;
     if (player.playing) drawMeter(analyser);
   }
+  renderReader();
   renderTime();
 }
 
@@ -618,11 +713,14 @@ function tick() {
   requestAnimationFrame(tick);
 }
 
-// The one button: read, pause, carry on, or play again.
+// The one button: read, pause, carry on, or play again. A tape that starts
+// part-way (a sentence was clicked) is played again only from where it stands;
+// from its start, the whole text is read.
 function primary() {
   if (player.playing) pause();
-  else if (tapeValid()) play(player.pos >= tape.length ? 0 : player.pos);
-  else read();
+  else if (tapeValid() && (player.pos > 0 || tape.first === 0)) {
+    play(player.pos >= tape.length ? 0 : player.pos);
+  } else read();
 }
 
 els.seek.addEventListener('input', () => { seeking = true; renderTime(); });

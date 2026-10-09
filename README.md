@@ -53,6 +53,10 @@ it (plus a one-off download for a source install).
    lại*); the bar beside it seeks. All of that plays what was already read - the
    backend is not asked again until the text, voice, speed or pronunciation
    changes. **■** or `Esc` stops.
+
+   While it reads, the text shows sentence by sentence: the one being heard is
+   lit, the ones still being made are dimmed. Click a sentence to jump to it -
+   at once if it is already made, otherwise the reading starts over from it.
 6. **Lưu dạng** picks WAV, MP3 or OGG, and **Lưu WAV/MP3/OGG** saves what was
    read. MP3 and OGG are about a tenth of the WAV; the backend encodes the audio the
    window already holds, so nothing is read twice.
@@ -478,6 +482,13 @@ carries on without one: the window closes as before, `serve` keeps serving.
   the same place the longer one wins (`ESP32 S3` before `ESP32`). On a LAN server the
   list is the server's: everyone who holds the token reads and edits the same one.
   Up to 500 words, 64 characters a word and 128 for how it is read.
+- **The window reads one sentence per request.** `web/text.js` splits the text at
+  `. ! ? …` before a space and at line breaks (not after `3.14`, `v.v.`, `TP.` and
+  the like, nor inside `<en>...</en>`), and each sentence is its own
+  `POST /api/tts/stream`. That is what tells the page where every sentence sits in
+  the audio, for the highlight and click-to-jump. The price: the engine no longer
+  sees across a sentence end, and every sentence pays the request's start-up. The
+  CLI and the HTTP API still send the whole text at once.
 - **What the window remembers lives in its own browser profile.** Settings and the
   draft are kept by the page (`localStorage`), so they belong to its origin. The
   window therefore serves its backend on a fixed port, `8761` (`voice-tts gui

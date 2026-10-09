@@ -70,7 +70,64 @@
     return /\.(md|markdown)$/i.test(name) ? stripMarkdown(text) : text;
   }
 
-  const api = { stripMarkdown, decodeFile };
+  const ENDS = '.!?…';
+  const CLOSERS = '"\'”’)]}»';
+  // Words that end in a dot without ending the sentence (lower case, dots kept).
+  const ABBREVIATIONS = new Set(['v.v', 'tp', 'ts', 'ths', 'pgs', 'gs', 'bs', 'ks', 'tr',
+    'mr', 'mrs', 'ms', 'dr', 'st', 'e.g', 'i.e', 'vs', 'no', 'fig']);
+
+  // The sentences of `src`, each `{start, end, text}` with `text` exactly
+  // `src.slice(start, end)`, so the page can highlight the one being read.
+  // A sentence ends at . ! ? … (plus closing quotes or brackets) before a space,
+  // or at a line break. Nothing inside <en>...</en> splits: the backend reads
+  // that span as one English piece. A piece with no letter or digit (a rule,
+  // a lone "...") rides with the sentence before it; at the start it is dropped.
+  function splitSentences(src) {
+    const out = [];
+    const push = (from, to) => {
+      while (from < to && /\s/.test(src[from])) from++;
+      while (to > from && /\s/.test(src[to - 1])) to--;
+      if (from >= to) return;
+      if (!/[\p{L}\p{N}]/u.test(src.slice(from, to))) {
+        const last = out[out.length - 1];
+        if (last) { last.end = to; last.text = src.slice(last.start, to); }
+        return;
+      }
+      out.push({ start: from, end: to, text: src.slice(from, to) });
+    };
+
+    let start = 0, inEn = false;
+    for (let i = 0; i < src.length; i++) {
+      const c = src[i];
+      if (c === '<') {
+        const tag = src.slice(i, i + 5).toLowerCase();
+        if (tag.startsWith('<en>')) inEn = true;
+        else if (tag === '</en>') inEn = false;
+        continue;
+      }
+      if (inEn) continue;
+      if (c === '\n') { push(start, i); start = i + 1; continue; }
+      if (!ENDS.includes(c)) continue;
+
+      let j = i;
+      while (j < src.length && ENDS.includes(src[j])) j++;
+      const lone = j - i === 1 && c === '.';
+      while (j < src.length && CLOSERS.includes(src[j])) j++;
+      // 3.14, example.com, ESP32.bin: no space after it, no sentence end.
+      if (j < src.length && !/\s/.test(src[j])) { i = j - 1; continue; }
+      if (lone) {
+        const word = (src.slice(start, i).match(/[\p{L}.]+$/u) || [''])[0].toLowerCase();
+        if (ABBREVIATIONS.has(word)) { i = j - 1; continue; }
+      }
+      push(start, j);
+      start = j;
+      i = j - 1;
+    }
+    push(start, src.length);
+    return out;
+  }
+
+  const api = { stripMarkdown, decodeFile, splitSentences };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.VoiceText = api;
 })(this);
