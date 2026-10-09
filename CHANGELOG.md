@@ -8,6 +8,17 @@ the release before it builds.
 
 ## [Unreleased]
 
+### Changed
+
+- The server reads one text at a time and queues the rest in arrival order, so the
+  reading being heard stays faster than real time; before, every request ran at
+  once and all of them stuttered. `VOICE_TTS_MAX_STREAMS` raises the limit.
+
+### Fixed
+
+- A listener who hangs up mid-stream frees the engine at once; the abandoned
+  reading used to keep generating until the garbage collector reached it.
+
 ## [0.8.1] - 2026-10-09
 
 ### Fixed

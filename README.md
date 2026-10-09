@@ -327,6 +327,14 @@ static. Without a token the API is open, which is what the loopback-only desktop
 wants - binding anything else without one prints a warning. The token travels over
 plain HTTP: fine on a home LAN, not for the internet.
 
+The engine reads one text at a time. A reading sent while another runs waits its
+turn, in arrival order: a stream answers `200` at once and its audio starts when
+the turn comes; a `wav`/`mp3`/`ogg` request answers once its file is ready. A
+listener who hangs up gives the turn back straight away. On CPU a second reading
+in parallel adds no throughput and only slows both (i5-8500T: RTF 0.79 alone, 1.65
+each for two, 2.5 each for three), so the default is 1. `VOICE_TTS_MAX_STREAMS=<n>`
+in the environment (the systemd `.env`, or `compose.yaml`) lets `n` run at once.
+
 ## HTTP API
 
 | Endpoint | Response |
