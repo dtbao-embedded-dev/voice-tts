@@ -120,7 +120,7 @@ term is about:
 
 | Letter | A | B | C | D | E | F | G | H | I | J | K | L | M |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| English names | ây | bi | xi | đi | i | ép | di | ếch | ai | giây | cây | eo | em |
+| English names | ây | bi | xi | đi | i | ép | di | hát | ai | giây | cây | eo | em |
 | Vietnamese names | a | bê | xê | đê | e | ép | gờ | hát | i | giây | ca | lờ | mờ |
 
 | Letter | N | O | P | Q | R | S | T | U | V | W | X | Y | Z |
@@ -130,7 +130,7 @@ term is about:
 
 - **English letter names** (the default): MCU, peripherals, buses, protocols,
   software - `UART` *iu ây a ti*, `RX` *a ích*, `GPIO` *di pi ai ô*, `MQTT` *em kiu ti
-  ti*, `HTTP` *ếch ti ti pi*. Like `AP` *ây pi* and `ESP` *i ét pi* in the lexicon.
+  ti*, `HTTP` *hát ti ti pi*. Like `AP` *ây pi* and `ESP` *i ét pi* in the lexicon.
 - **Vietnamese letter names**, the way electronics people spell them:
   - power and ground: GND, AGND, DGND, PGND, VCC, VDD, VSS, VEE, AC, DC, and `V+` / `V-`
     (*vê cộng*, *vê trừ*);
@@ -193,7 +193,7 @@ as English.
   spelled (`c` *xi*, `cpp` *xi pi pi*, `py` *pai*, `txt` *ti ích ti*). sea-g2p reads
   the dot as the end of a sentence.
 - **Versions** `v5.3`, `v1.0.2`: *vi năm chấm ba* (sea-g2p: *vê năm. ba*).
-- **URLs and paths**: the scheme spelled (`https` *ếch ti ti pi ét*), `/` *gạch chéo*
+- **URLs and paths**: the scheme spelled (`https` *hát ti ti pi ét*), `/` *gạch chéo*
   (sea-g2p: *trên*, divided by), a trailing `/` dropped.
 - **Ports** of four or five digits after *port* / *cổng*: digit by digit (`port 8080`
   *tám không tám không*). Baud rates stay numbers.
@@ -211,11 +211,11 @@ casefolded word, so `VOUT` and `Vout` are one entry):
 
 | Kind | Words |
 | --- | --- |
-| Said as words | OK *ô kê*, FIFO *phai phô*, LIFO, ASCII, YAML, SPIFFS, FATFS, ELF, TAG, MAC *mác*, SHA, SHA256, JTAG *giây tag*, ARM, RISC-V *risk five*, PSRAM / SRAM / DRAM / IRAM *... ram*, EEPROM *i i pi rom* |
+| Said as words | OK *ô kê*, FIFO *phai phô*, LIFO, ASCII, YAML, SPIFFS, FATFS, TAG, SHA, SHA256, JTAG *giây tag*, ARM, RISC-V *risk five*, PSRAM / SRAM / DRAM / IRAM *... ram*, EEPROM *i i pi rom* |
 | Names | ESP-NOW *i ét pi nao*, USB-C, type-C, LEDC *led xi*, SoC, MicroSD, DevKitC, FreeRTOS *free a ti ô ét*, PlatformIO, OpenOCD, mDNS, softAP, esp32s3 / c3 / c6 / h2, nRF52840, ATmega328P, Raspberry Pi *raspberry pai*, tri-state, 8N1 |
 | Code and tools | memcpy *mem copy*, printf *print ép*, CMake *xi make*, idf.py, base64 *base sáu tư*, ota, tty, Ctrl+C *control xi*, Ctrl+], HTTP/1.1, 802.11, b/g/n, panic'ed |
 | Power and transistors | VIN *vê in*, VOUT *vê ao*, VREF *vê rép*, VBUS *vê bớt*, VBAT *vê bát*, hFE, ic / Ic *i xê*, Ib |
-| Loanwords | board *bo*, module *mô đun*, mass *mát*, Gerber *gơ bơ*, DIP *đíp*, SOT *sót* (SOT23, SOT-23, SOT-23-5, SOT-23-6, SOT-223, SOT-89 digit by digit), LiPo *li pô*, 18650 *một tám sáu năm không* |
+| Loanwords | board *bo*, module *mô đun*, mass *mát*, Gerber *gơ bơ*, DIP *đíp*, SOT *sót* (SOT23, SOT-23, SOT-23-5, SOT-23-6, SOT-223, SOT-89 digit by digit), LiPo *li pô*, 18650 *mười tám sáu năm mươi* |
 | Vietnamese abbreviations | VĐK, VXL, HĐH, CSDL, CTDL, ĐTDĐ, KTĐT, ĐKTĐ, said in full |
 
 KTS, ĐK, CB and LT are left out: each stands for more than one thing. Add the one you
@@ -225,3 +225,38 @@ mean to your own lexicon.
 
 - *pin* meaning a battery is read like the English *pin* (/pɪn/): sea-g2p's dictionary
   has the word as English only, and no spelling reaches the Vietnamese /pin/.
+
+## Measured
+
+Where two spellings both came out of sea-g2p clean, the choice was made by ear, the
+way `AP` *ây pi* was: each candidate read 5 times in "ở bước này, ta dùng ... cho
+mạch." by the local engine (v3 Turbo, fp32, voice Hải Đăng), transcribed by
+faster-whisper large-v3 (`vi`, beam 5, no prompt), counted right when the transcript
+has the term. 2026-10-09, on a desktop CPU, never on the LAN server.
+
+| Term | Kept | Others |
+| --- | --- | --- |
+| UART | *iu ây a ti* 4/5 | *u a rờ tê* (sea-g2p) 1/5, `<en>u a r t</en>` 3/5 |
+| GPIO | *di pi ai ô* 5/5 | `<en>g p i o</en>` 4/5, *gờ phê i ô* (sea-g2p) 1/5 |
+| MQTT | *em kiu ti ti* 5/5 | *mờ qui tê tê* 5/5 |
+| I2C | *ai hai xi* 5/5 | *ai tu xi* 5/5, *i hai xê* (sea-g2p) 3/5 |
+| ISR handler | *ai ét à handler* 4/5 | *ai ét a handler* 0/5 |
+| BLE server | *bi eo í server* 4/5 | *bi eo i server* 0/5 |
+| HAL, DHT22, HTTP | H *hát*: 5/5, 4/5, 4/5 | H *ếch* 0/5, 0/5, 3/5 (heard as X); *ết* 0/5, 0/5, 5/5 (heard as S) |
+| MAC | *em ây xi* 5/5 | *mác*, `<en>mac</en>` 0/5 (heard "Mark") |
+| BOM | *bi ô em* 5/5 | *bom* 0/5 |
+| ELF | *i eo ép* 3/5 | *elf* 1/5 |
+| JSON | as typed, sea-g2p's own 4/5 | *giây sơn* 0/5 |
+| printf | *print ép* 4/5 | as typed 0/5 |
+| 2R2 | *2,2 ôm* 5/5 | *hai rờ hai* 0/5 |
+| 18650 | *mười tám sáu năm mươi* 5/5 | *một tám sáu năm không* 4/5 |
+| base64 | *base sáu tư* 3/5 | *base sáu mươi bốn* 3/5 |
+| 10µF | *mi cờ rô* 4/5 | *micro* 4/5 |
+| EN | *i en* 2/5 | *en* 0/5 |
+
+Still open - **the letter R**. English *a* is heard as A (`RX` as "AX" 0/5, `RTOS`
+as "ATOS" 0/5) and Vietnamese *rờ* as *dờ* (`RX` as "giờ x" 0/5). Bare *ar*, which
+sea-g2p reads as the English letter /ɑːɹ/, gave `RX` 3/5, better than every other
+spelling tried (`a rờ ích`, `<en>r x</en>`, `<en>ar</en> ích`, `a rơ ích` all 0/5), but
+the round checking it on RTC, RS485, RTS, RTOS, IRQ, RP2040, RGB and AVR was stopped
+before it ran. R stays *a* until that round is done.
