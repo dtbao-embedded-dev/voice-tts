@@ -595,6 +595,24 @@ def check_install_files() -> None:
     print("install: tool-install.py and the Docker image carry every module the app imports")
 
 
+def check_model_precision() -> None:
+    """The build fetches and ships the ONNX graphs the app loads, and only those.
+
+    tool-build.py runs before the venv exists, so it cannot import app and names
+    the subfolder itself; this keeps the two from drifting apart.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("tool_build", ROOT / "docs/scripts/tool-build.py")
+    tool_build = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool_build)
+    assert app.MODEL_PRECISION == "fp32", f"model precision is {app.MODEL_PRECISION}"
+    want = {"fp32": "onnx_update", "int8": "onnx_int8"}[app.MODEL_PRECISION]
+    assert tool_build.ONNX_SUBFOLDER == want, \
+        f"tool-build.py ships {tool_build.ONNX_SUBFOLDER}, app loads {want}"
+    print(f"model: {app.MODEL_PRECISION} ONNX graphs ({want}) in the app and the build")
+
+
 def check_release_notes() -> None:
     """The release publishes the CHANGELOG section of ``cli.__version__``."""
     def notes(version: str) -> subprocess.CompletedProcess:
@@ -625,6 +643,7 @@ def main() -> int:
     app._engine = StubEngine()
     check_parser()
     check_install_files()
+    check_model_precision()
     check_release_notes()
     check_tray()
     check_gui_port()

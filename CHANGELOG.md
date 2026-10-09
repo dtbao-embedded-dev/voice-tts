@@ -42,6 +42,11 @@ the release before it builds.
 
 ### Changed
 
+- The CPU engine loads the fp32 ONNX graphs of v3 Turbo (`onnx_update`) instead of
+  the int8 ones: the reference quality, and no int8 distortion. On an i5-14600K it
+  is faster too (real-time factor 0.29 against 0.55). The first start downloads
+  475 MB of graphs, and the packaged build carries them instead of the 165 MB int8
+  set.
 - The window reads one sentence per request and shows the text while it reads:
   the sentence being heard is lit, and clicking one jumps to it, or reads from it
   if it is not made yet.

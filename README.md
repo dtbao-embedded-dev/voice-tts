@@ -449,13 +449,19 @@ carries on without one: the window closes as before, `serve` keeps serving.
 - **No GPU is required.** The default install is the torch-free ONNX build, and
   streaming runs on the CPU engine either way. The model is
   [`pnnbao-ump/VieNeu-TTS-v3-Turbo`](https://huggingface.co/pnnbao-ump/VieNeu-TTS-v3-Turbo)
-  through the `vieneu` SDK (`requirements.txt`), with its `int8` ONNX graphs for
-  speed (about 2x the fp32 ones; a CPU without VNNI may sound distorted).
+  through the `vieneu` SDK (`requirements.txt`), with its fp32 ONNX graphs
+  (`onnx_update`, 475 MB) - the reference quality. The int8 set (`onnx_int8`,
+  165 MB) is smaller, but it is only faster where the CPU has the int8 path
+  onnxruntime wants, and it can sound distorted where it has not. Measured on an
+  i5-14600K, one 9 s paragraph: fp32 RTF 0.29 (first audio after 0.20 s), int8 RTF
+  0.55 (0.36 s). `MODEL_PRECISION` in `app.py` picks the set, and `tool-build.py`
+  fetches and ships only that one.
 - **The first launch downloads the model** (HuggingFace cache, `~/.cache/huggingface`).
   The window shows *Đang tải model…* until it is ready. This applies to a source
   checkout only.
-- **The packaged desktop build is a folder** (`dist/VoiceTTS/`, ~760 MB; the NSIS
-  installer around it is ~330 MB): the runtime, the web view, the tray icon and both
+- **The packaged desktop build is a folder** (`dist/VoiceTTS/`, ~760 MB with the
+  int8 graphs, about 310 MB more with the fp32 ones; the NSIS installer around it
+  was ~330 MB with int8): the runtime, the web view, the tray icon and both
   model repos (backbone + audio codec) are inside, and `VoiceTTS.exe` takes the same
   subcommands as `app.py` (`VoiceTTS.exe serve --tray`, say) - but, being windowed,
   it prints nothing; the CLI is the installed `voice-tts`. It points `HF_HOME` at its

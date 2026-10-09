@@ -105,6 +105,12 @@ async def require_token(request: Request, call_next):
             break
     return JSONResponse({"detail": "Thiếu hoặc sai token."}, status_code=401)
 
+# The CPU engine's ONNX graphs: "fp32" (onnx_update, 475 MB, the reference
+# quality) or "int8" (onnx_int8, 165 MB; faster only where the CPU has the int8
+# path onnxruntime wants, distorted where it has not - on an i5-14600K fp32 ran
+# at RTF 0.29, int8 at 0.55). tool-build.py fetches and ships the matching subfolder.
+MODEL_PRECISION = "fp32"
+
 _engine = None
 _engine_error: str | None = None
 _engine_lock = threading.Lock()
@@ -122,7 +128,7 @@ def engine():
             from vieneu import Vieneu
 
             try:
-                _engine = Vieneu(precision="int8")
+                _engine = Vieneu(precision=MODEL_PRECISION)
             except Exception as exc:  # surfaced to the UI via /api/status
                 _engine_error = f"{type(exc).__name__}: {exc}"
                 raise
