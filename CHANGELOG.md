@@ -24,6 +24,9 @@ the release before it builds.
 - *Từ điển* in the window lists the built-in words and yours, adds, changes and
   removes yours, and plays how a spelling sounds (*Nghe*, *Nghe thử*). A changed
   list makes the next special-pronunciation reading read anew.
+- *Lịch sử* in the window keeps the last 20 readings with their audio in the
+  browser (IndexedDB); one click plays a reading again, to seek or save, without
+  synthesis. Readings stopped after at least a second are kept, marked *một phần*.
 - Open a `.txt` or `.md` file in the window: *Mở file…*, `Ctrl+O`, or drop it on the
   window. Markdown is read for its words (marks, URLs and code blocks left out);
   past 20 000 characters the rest is cut, and the status line says so.

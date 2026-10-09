@@ -62,6 +62,10 @@ it (plus a one-off download for a source install).
    read. MP3 and OGG are about a tenth of the WAV; the backend encodes the audio the
    window already holds, so nothing is read twice.
 
+**Lịch sử** at the top keeps the last 20 readings - text, settings and audio - in
+this machine's browser storage. Click one to hear it again, seek or save it, with
+no synthesis; a reading stopped half-way is kept too, marked *một phần*.
+
 The window remembers the voice, speed, pronunciation and file format you picked and the text you
 were typing, across a restart. A browser on the LAN server remembers them per
 browser.
@@ -491,7 +495,9 @@ carries on without one: the window closes as before, `serve` keeps serving.
   sees across a sentence end, and every sentence pays the request's start-up. The
   CLI and the HTTP API still send the whole text at once.
 - **What the window remembers lives in its own browser profile.** Settings and the
-  draft are kept by the page (`localStorage`), so they belong to its origin. The
+  draft (`localStorage`) and the history (IndexedDB, audio included - a long
+  reading is a few tens of MB, so 20 of them can reach hundreds) are kept by the
+  page, so they belong to its origin. The
   window therefore serves its backend on a fixed port, `8761` (`voice-tts gui
   --port`), and keeps a WebView2 profile in `<data dir>/webview` instead of
   pywebview's private one. If 8761 is taken - a second window, another program -

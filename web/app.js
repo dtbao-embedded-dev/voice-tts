@@ -12,7 +12,8 @@ const els = {
   card: $('card'), openBtn: $('openBtn'), fileInput: $('fileInput'), reader: $('reader'),
   lexBtn: $('lexBtn'), lexSheet: $('lexSheet'), lexForm: $('lexForm'), lexWord: $('lexWord'),
   lexSay: $('lexSay'), lexCase: $('lexCase'), lexTry: $('lexTry'), lexError: $('lexError'),
-  lexList: $('lexList'),
+  lexList: $('lexList'), histBtn: $('histBtn'), histSheet: $('histSheet'),
+  histList: $('histList'), histClear: $('histClear'),
 };
 
 const REGIONS = ['Bắc', 'Trung', 'Nam'];
@@ -201,8 +202,10 @@ function draggable(st) {
 
 const voiceSheet = sheetOf(els.sheet);
 const lexSheet = sheetOf(els.lexSheet);
+const histSheet = sheetOf(els.histSheet);
 draggable(voiceSheet);
 draggable(lexSheet);
+draggable(histSheet);
 
 els.scrim.addEventListener('pointerdown', () => closeSheet());
 els.voiceBtn.addEventListener('click', () => openSheet(voiceSheet));
@@ -349,9 +352,11 @@ function audio() {
 // of audio; float32 would hold twice as much of it in memory and the WAV is
 // 16-bit either way. `starts[i]` is where `chunks[i]` begins, in samples.
 // `sentences` are the text's, `segments` [{i, start, end}] where each one read
-// so far sits on the tape - from the sentence the reading started at.
+// so far sits on the tape - from the sentence the reading started at. `source`,
+// `voice`, `speed` and `pronunciation` are what it was read with, for the
+// history; `saved` once it is there.
 const tape = { key: '', rate: 48000, chunks: [], starts: [], length: 0, complete: false,
-  sentences: [], segments: [], first: 0 };
+  sentences: [], segments: [], first: 0, saved: false };
 // True while the backend is still sending this tape.
 let synthesizing = false;
 
@@ -370,7 +375,7 @@ function tapeValid() {
 
 function resetTape(key, rate = 48000) {
   Object.assign(tape, { key, rate, chunks: [], starts: [], length: 0, complete: false,
-    sentences: [], segments: [], first: 0 });
+    sentences: [], segments: [], first: 0, saved: false });
 }
 
 function appendTape(pcm) {
@@ -495,6 +500,7 @@ function seek(to) {
 // Stop everything: the request, and the playback. What was read stays on the
 // tape for saving; a tape cut short is not offered for replay.
 function stop() {
+  if (synthesizing) remember();   // cut short, but what was heard is kept
   run++;
   if (abort) abort.abort();
   synthesizing = false;
@@ -571,8 +577,8 @@ async function read(from = 0) {
   await audio().resume();
   abort = new AbortController();
   resetTape(readingKey());
-  tape.sentences = sentences;
-  tape.first = Math.min(from, sentences.length - 1);
+  Object.assign(tape, { sentences, first: Math.min(from, sentences.length - 1),
+    source: els.text.value, voice, speed, pronunciation });
   synthesizing = true;
   buildReader();
   play(0);
@@ -606,6 +612,7 @@ async function read(from = 0) {
   } else {
     tape.complete = true;
   }
+  remember();
   pump();   // the end of the tape may be what finishes playback
   render();
 }
@@ -969,6 +976,180 @@ els.lexForm.addEventListener('submit', async (e) => {
 });
 els.lexTry.addEventListener('click', () => tryWord(els.lexSay.value));
 els.lexBtn.addEventListener('click', () => { openSheet(lexSheet); loadLexicon(); });
+
+/* ---- History: the last readings, kept in this browser ------------------- */
+
+// IndexedDB, per viewer like the preferences: the desktop window's profile, or
+// each LAN browser's own. A reading is stored with its audio, so playing it
+// back never asks the backend. Without storage (a private window, blocked site
+// data) history is simply off.
+const HISTORY_MAX = 20;
+const HISTORY_MIN_SECONDS = 1;   // a reading stopped sooner is not worth a row
+let dbOpening = null;
+
+function historyDb() {
+  if (!dbOpening) {
+    dbOpening = new Promise((resolve, reject) => {
+      const req = indexedDB.open('voice-tts', 1);
+      req.onupgradeneeded = () => {
+        req.result.createObjectStore('readings', { keyPath: 'id', autoIncrement: true });
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    }).catch(() => null);
+  }
+  return dbOpening;
+}
+
+// Run `fn(store)` in one transaction; resolves with what `fn` returned once
+// the transaction commits, or `fallback` if there is no storage or it fails.
+async function historyTx(mode, fn, fallback) {
+  const db = await historyDb();
+  if (!db) return fallback;
+  return new Promise((resolve) => {
+    let result = fallback;
+    try {
+      const t = db.transaction('readings', mode);
+      const req = fn(t.objectStore('readings'));
+      if (req) req.onsuccess = () => { result = req.result; };
+      t.oncomplete = () => resolve(result);
+      t.onerror = t.onabort = () => resolve(fallback);
+    } catch {
+      resolve(fallback);
+    }
+  });
+}
+
+// Newest first, without the audio: the list needs only what it shows.
+function historyList() {
+  return historyDb().then((db) => new Promise((resolve) => {
+    if (!db) { resolve([]); return; }
+    const out = [];
+    try {
+      const req = db.transaction('readings').objectStore('readings').openCursor(null, 'prev');
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor) { resolve(out); return; }
+        const { audio: _, ...meta } = cursor.value;
+        out.push(meta);
+        cursor.continue();
+      };
+      req.onerror = () => resolve(out);
+    } catch {
+      resolve(out);
+    }
+  }));
+}
+
+async function historyAdd(record) {
+  await historyTx('readwrite', (s) => s.add(record));
+  // Keys grow with time, so the oldest are the smallest.
+  const keys = await historyTx('readonly', (s) => s.getAllKeys(), []);
+  const extra = keys.slice(0, Math.max(0, keys.length - HISTORY_MAX));
+  if (extra.length) await historyTx('readwrite', (s) => { for (const k of extra) s.delete(k); });
+}
+
+const historyGet = (id) => historyTx('readonly', (s) => s.get(id), null);
+const historyDelete = (id) => historyTx('readwrite', (s) => s.delete(id));
+const historyClear = () => historyTx('readwrite', (s) => s.clear());
+
+// Keep the tape that just ended - once, and never one that came from here.
+function remember() {
+  if (tape.saved || !tape.length || tape.length < tape.rate * HISTORY_MIN_SECONDS) return;
+  tape.saved = true;
+  historyAdd({
+    at: Date.now(),
+    text: tape.source,
+    voice: tape.voice,
+    speed: tape.speed,
+    pronunciation: tape.pronunciation,
+    rate: tape.rate,
+    length: tape.length,
+    complete: tape.complete,
+    first: tape.first,
+    sentences: tape.sentences,
+    segments: tape.segments.map(({ i, start, end }) => ({ i, start, end })),
+    audio: new Blob(tape.chunks),
+  }).then(() => { if (histSheet.open) renderHistory(); });
+}
+
+// Put a stored reading back: its text and settings on screen, its audio on the
+// tape, playing from the start - the backend is not asked.
+async function loadHistory(id) {
+  const rec = await historyGet(id);
+  if (!rec) { renderHistory(); return; }
+  stop();
+  els.text.value = rec.text;
+  setSpeed(rec.speed);
+  setPronunciation(rec.pronunciation);
+  pickVoice(rec.voice);
+  savePrefs();
+  renderCount();
+  saveDraft();
+  const pcm = new Int16Array(await rec.audio.arrayBuffer());
+  resetTape(readingKey(), rec.rate);
+  appendTape(pcm);
+  // What it holds is all there is to it: playable as it is, kept as it was.
+  Object.assign(tape, { complete: true, saved: true, first: rec.first, source: rec.text,
+    sentences: rec.sentences, segments: rec.segments });
+  buildReader();
+  await audio().resume();
+  play(0);
+}
+
+function fmtWhen(ms) {
+  const d = new Date(ms);
+  const two = (n) => String(n).padStart(2, '0');
+  return `${two(d.getDate())}/${two(d.getMonth() + 1)} ${two(d.getHours())}:${two(d.getMinutes())}`;
+}
+
+async function renderHistory() {
+  const items = await historyList();
+  const list = els.histList;
+  list.replaceChildren();
+  els.histClear.disabled = !items.length;
+  if (!items.length) {
+    const empty = document.createElement('p');
+    empty.className = 'lex-empty';
+    empty.textContent = 'Chưa có lần đọc nào. Mỗi lần đọc xong được giữ ở đây, tối đa '
+      + `${HISTORY_MAX} lần gần nhất.`;
+    list.append(empty);
+    return;
+  }
+  for (const rec of items) {
+    const row = document.createElement('div');
+    row.className = 'hist-item';
+    row.tabIndex = 0;
+    row.setAttribute('role', 'button');
+    const snippet = document.createElement('span');
+    snippet.className = 'hist-item__text';
+    snippet.textContent = rec.text.trim().replace(/\s+/g, ' ');
+    const meta = document.createElement('span');
+    meta.className = 'hist-item__meta';
+    const parts = [fmtWhen(rec.at), rec.voice, `${rec.speed}×`];
+    if (rec.pronunciation === 'special') parts.push('Đặc biệt');
+    parts.push(fmt(rec.length / rec.rate));
+    if (!rec.complete || rec.first > 0) parts.push('một phần');
+    meta.textContent = parts.join(' · ');
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'link link--danger';
+    del.textContent = 'Xoá';
+    del.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await historyDelete(rec.id);
+      renderHistory();
+    });
+    const open = () => { closeSheet(histSheet); loadHistory(rec.id); };
+    row.addEventListener('click', open);
+    row.addEventListener('keydown', (e) => { if (e.key === 'Enter') open(); });
+    row.append(snippet, meta, del);
+    list.append(row);
+  }
+}
+
+els.histBtn.addEventListener('click', () => { openSheet(histSheet); renderHistory(); });
+els.histClear.addEventListener('click', async () => { await historyClear(); renderHistory(); });
 
 /* ---- Opening a file: picked, Ctrl+O, or dropped on the window ---------- */
 

@@ -13,6 +13,7 @@
   <h1>Voice TTS</h1>
   <nav class="tools" aria-label="Công cụ">
     <button class="link" id="lexBtn" type="button" title="Cách đọc các từ khi Phát âm là Đặc biệt">Từ điển</button>
+    <button class="link" id="histBtn" type="button" title="Các lần đọc gần đây, nghe lại không cần tạo lại">Lịch sử</button>
   </nav>
   <div class="status" id="status" role="status" aria-live="polite">
     <span class="dot"></span><span id="statusText">Đang khởi động…</span>
@@ -109,6 +110,16 @@
   </form>
   <p class="sheet__error" id="lexError" role="alert" hidden></p>
   <div class="sheet__list" id="lexList"></div>
+</section>
+
+<section class="sheet" id="histSheet" hidden aria-label="Lịch sử đọc">
+  <div class="sheet__grip"></div>
+  <div class="sheet__head">
+    <h2 class="sheet__title">Lịch sử</h2>
+    <button class="link link--danger" id="histClear" type="button">Xoá hết</button>
+  </div>
+  <p class="sheet__hint">20 lần đọc gần nhất, giữ trong máy này. Bấm một dòng để nghe lại, tua hoặc lưu - không tạo lại âm thanh.</p>
+  <div class="sheet__list" id="histList"></div>
 </section>
 
 <script src="/web/text.js"></script>

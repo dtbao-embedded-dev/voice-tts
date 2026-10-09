@@ -347,6 +347,7 @@ button.row:active { background: var(--surface-2); transition: none; }
               #000 calc(100% - 12px), transparent 100%);
 }
 .sheet__list::-webkit-scrollbar { width: 0; height: 0; }
+.sheet__head { display: flex; align-items: baseline; justify-content: space-between; }
 .sheet__hint { margin: 0 0 12px; font-size: 0.8125rem; color: var(--label-2); }
 .sheet__hint b { font-weight: 600; color: var(--label); }
 .sheet__error { margin: 8px 0 0; font-size: 0.8125rem; color: var(--red); }
@@ -414,6 +415,35 @@ button.row:active { background: var(--surface-2); transition: none; }
 .lex-item__say { color: var(--label-2); overflow-wrap: anywhere; }
 .lex-item--overridden .lex-item__word,
 .lex-item--overridden .lex-item__say { text-decoration: line-through; opacity: 0.6; }
+/* ---- History sheet ------------------------------------------------------ */
+
+.hist-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 14px;
+  padding: 10px 16px;
+  background: var(--surface-2);
+  cursor: default;
+}
+.hist-item:first-child { border-radius: var(--r-group) var(--r-group) 0 0; }
+.hist-item:last-child { border-radius: 0 0 var(--r-group) var(--r-group); }
+.hist-item:only-child { border-radius: var(--r-group); }
+.hist-item + .hist-item::before {
+  content: "";
+  position: absolute; top: 0; left: 16px; right: 0;
+  height: 0.5px;
+  background: var(--separator);
+}
+.hist-item:active { background: #3a3a3c; }
+.hist-item__text {
+  grid-column: 1;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: 0.9375rem;
+}
+.hist-item__meta { grid-column: 1; font-size: 0.8125rem; color: var(--label-2); }
+.hist-item .link--danger { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+
 .lex-empty { margin: 0 0 0 16px; font-size: 0.875rem; color: var(--label-3); }
 
 .voice-group {
