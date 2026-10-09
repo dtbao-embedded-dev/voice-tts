@@ -8,6 +8,8 @@ the release before it builds.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-09
+
 ### Added
 
 - The server logs every reading: when it queues (and how many are ahead), when its
