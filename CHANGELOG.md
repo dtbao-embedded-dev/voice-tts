@@ -8,6 +8,8 @@ the release before it builds.
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-10-09
+
 ### Changed
 
 - The server reads one text at a time and queues the rest in arrival order, so the
