@@ -6,6 +6,14 @@ Every user-visible change, newest first. The format follows
 (`tool-build.py --release-notes <version>`), and a tag without a section here fails
 the release before it builds.
 
+## [Unreleased]
+
+### Added
+
+- `verify.py`: Whisper large-v3-turbo transcribes a reading and scores it against
+  its text as `1 - CER` (case, spacing and punctuation ignored). The model loads on
+  the first check, not at startup.
+
 ## [0.6.1] - 2026-10-08
 
 ### Changed

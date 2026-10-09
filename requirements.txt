@@ -4,6 +4,11 @@
 # Vietnamese/English TTS engine (v3 Turbo, torch-free ONNX CPU build).
 vieneu>=3.8.3
 
+# Optional verify mode: Whisper large-v3-turbo (CTranslate2) hears the reading back,
+# and rapidfuzz scores it against the text.
+faster-whisper>=1.2
+rapidfuzz>=3.9
+
 # HTTP backend.
 fastapi>=0.115
 uvicorn>=0.30

@@ -321,6 +321,25 @@ def check_icon(base: str, tmp: Path) -> None:
     print("icon: disc + ring + 5 bars, ICO with small sizes, /favicon.svg on the page")
 
 
+def check_score() -> None:
+    """The verify score: 1 - CER over text reduced to letters and digits."""
+    import verify
+
+    ref = "Gửi request lên server, bật ESP32 rồi đọc log."
+    assert verify.score(ref, ref) == 1.0, "identical text must score 1.0"
+    assert verify.score(ref, "gửi Request lên server bật ESP 32 rồi đọc LOG") == 1.0, \
+        "case, spacing and punctuation must not count"
+    assert verify.score("Chào bạn", "Chao ban") < 1.0, "a lost diacritic is a real error"
+    words = "một hai ba bốn năm sáu bảy tám chín mười " * 4
+    one_off = words.replace("tám", "tam", 1)
+    assert 0.95 <= verify.score(words, one_off) < 1.0, verify.score(words, one_off)
+    assert verify.score(ref, "Hôm nay trời đẹp quá đi thôi.") < 0.5, "unrelated text passes"
+    assert verify.score(ref, "") == 0.0, "an empty transcript must score 0"
+    assert verify.score("", "") == 1.0, "nothing said, nothing heard"
+    assert verify.score("abc", "abcabcabcabc") == 0.0, "the score must not go negative"
+    print("score: 1 - CER, case/spacing/punctuation ignored, clamped to 0..1")
+
+
 def check_release_notes() -> None:
     """The release publishes the CHANGELOG section of ``cli.__version__``."""
     def notes(version: str) -> subprocess.CompletedProcess:
@@ -344,6 +363,7 @@ def main() -> int:
     check_stretch()
     app._engine = StubEngine()
     check_parser()
+    check_score()
     check_release_notes()
     check_tray()
 
