@@ -1,0 +1,131 @@
+# Release builds, model inside, each smoke-tested offline before it ships:
+# a Windows installer (NSIS, all users, Program Files) and a one-file Linux server.
+#
+#   git tag v0.5.0 && git push origin v0.5.0   # build, test, publish a GitHub Release
+#                                              # (notes: that version's CHANGELOG.md section)
+#   Actions > Release > Run workflow           # build and test only; files as artifacts
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build (${{ matrix.asset }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            flags: ""
+            exe: dist/VoiceTTS/VoiceTTS.exe
+            ship: dist/VoiceTTS-*-setup.exe
+            asset: VoiceTTS-windows-x64-setup.exe
+          - os: ubuntu-latest
+            flags: --server-only
+            exe: dist/voice-tts
+            ship: dist/voice-tts
+            asset: voice-tts-linux-x86_64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Tag matches cli.__version__ and CHANGELOG.md has its notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          have="$(python cli.py --version | awk '{print $2}')"
+          if [ "${GITHUB_REF_NAME#v}" != "$have" ]; then
+            echo "::error::tag $GITHUB_REF_NAME, but cli.py says $have"
+            exit 1
+          fi
+          python docs/scripts/tool-build.py --release-notes "$have" > /dev/null
+
+      - name: Cache the model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface/hub
+          key: hf-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+
+      - name: Build
+        run: python docs/scripts/tool-build.py --package ${{ matrix.flags }}
+
+      - name: Smoke-test the build offline
+        run: python docs/scripts/tool-build.py --smoke ${{ matrix.exe }}
+
+      - name: NSIS
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue) -and
+              -not (Test-Path "${env:ProgramFiles(x86)}\NSIS\makensis.exe")) {
+            choco install nsis -y --no-progress
+          }
+
+      - name: Installer
+        if: runner.os == 'Windows'
+        run: python docs/scripts/tool-build.py --installer
+
+      - name: Install, smoke-test and uninstall the installer
+        if: runner.os == 'Windows'
+        shell: bash
+        run: python docs/scripts/tool-build.py --smoke-installer dist/VoiceTTS-*-setup.exe
+
+      - name: Name the file for the release
+        shell: bash
+        run: |
+          mkdir -p release
+          cp ${{ matrix.ship }} "release/${{ matrix.asset }}"
+          ls -l release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: release/${{ matrix.asset }}
+          compression-level: 0   # already compressed: an installer or a one-file bundle
+          retention-days: 14
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Release notes from CHANGELOG.md
+        shell: bash  # explicit bash adds pipefail, so a missing section is not hidden by tee
+        run: python3 docs/scripts/tool-build.py --release-notes "${GITHUB_REF_NAME#v}" | tee notes.md
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: release
+        run: sha256sum -- * | tee SHA256SUMS
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Voice TTS $GITHUB_REF_NAME" \
+            --notes-file notes.md

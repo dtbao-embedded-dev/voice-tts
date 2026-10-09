@@ -23,3 +23,6 @@ desktop.ini
 # skill-support-commit local files
 .claude/gitconfig.yml
 .claude/commit-backup.json
+
+# Docker secrets
+.env

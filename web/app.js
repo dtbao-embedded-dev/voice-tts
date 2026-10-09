@@ -5,9 +5,10 @@ const els = {
   status: $('status'), statusText: $('statusText'),
   text: $('text'), count: $('count'),
   voiceBtn: $('voiceBtn'), voiceName: $('voiceName'), voiceList: $('voiceList'),
-  sheet: $('sheet'), scrim: $('scrim'),
+  sheet: $('sheet'), scrim: $('scrim'), speed: $('speed'),
   playBtn: $('playBtn'), playIcon: $('playIcon'), playLabel: $('playLabel'),
   saveBtn: $('saveBtn'), timecode: $('timecode'), meter: $('meter'),
+  pron: $('pron'),
 };
 
 const REGIONS = ['Bắc', 'Trung', 'Nam'];
@@ -18,6 +19,14 @@ let voices = [];
 let voice = null;
 let speaking = false;
 let abort = null;
+let speed = 1;
+// "normal": the engine reads the text as typed. "special": the backend respells
+// the words it gets wrong first (POST, AP, Board, ESP32).
+let pronunciation = 'normal';
+// Every start and every stop bumps this. A read carries the value it started
+// with and checks it before touching the UI, so a read the user has already
+// stopped can no longer report into the one that replaced it.
+let run = 0;
 
 /* ---- This is an app: no page behaviour leaks through ------------------- */
 
@@ -181,6 +190,24 @@ function renderVoices() {
   }
 }
 
+/* ---- Reading speed ----------------------------------------------------- */
+
+// The backend stretches the time and leaves the pitch alone, so this only has
+// to travel with the request - what arrives is already at the chosen speed.
+els.speed.addEventListener('click', (e) => {
+  const opt = e.target.closest('.speed__opt');
+  if (!opt) return;
+  speed = Number(opt.dataset.speed);
+  for (const o of els.speed.children) o.setAttribute('aria-pressed', String(o === opt));
+});
+
+els.pron.addEventListener('click', (e) => {
+  const opt = e.target.closest('.speed__opt');
+  if (!opt) return;
+  pronunciation = opt.dataset.pron;
+  for (const o of els.pron.children) o.setAttribute('aria-pressed', String(o === opt));
+});
+
 /* ---- Meter ------------------------------------------------------------- */
 
 const bars = Array.from({ length: METER_BARS }, () => {
@@ -237,11 +264,15 @@ function setSpeaking(on) {
     ? '<rect x="4" y="4" width="8" height="8" rx="1.6" fill="currentColor"/>'
     : '<path d="M4 2.8v10.4l9-5.2z" fill="currentColor"/>';
   els.text.readOnly = on;
+  // The speed is baked into the request, so it is fixed for the whole read.
+  for (const o of els.speed.children) o.disabled = on;
+  for (const o of els.pron.children) o.disabled = on;
   els.meter.dataset.live = on ? '1' : '0';
   if (on) drawMeter(analyser);
 }
 
 function stop() {
+  run++;
   if (abort) abort.abort();
   for (const s of sources) { try { s.stop(); } catch { /* already finished */ } }
   sources = [];
@@ -253,6 +284,7 @@ async function speak() {
   const text = els.text.value.trim();
   if (!text) { els.text.focus(); return; }
 
+  const myRun = ++run;
   const ac = audio();
   await ac.resume();
   abort = new AbortController();
@@ -267,16 +299,18 @@ async function speak() {
     res = await fetch('/api/tts/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, voice }),
+      body: JSON.stringify({ text, voice, speed, pronunciation }),
       signal: abort.signal,
     });
   } catch {
+    if (myRun !== run) return;   // aborted by Dừng, not a failure to report
     setSpeaking(false);
     setStatus('error', 'Không gọi được backend');
     return;
   }
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
+    if (myRun !== run) return;
     setSpeaking(false);
     setStatus('error', detail.detail || `Lỗi ${res.status}`);
     return;
@@ -301,7 +335,14 @@ async function speak() {
 
       // Copy into a fresh buffer: Float32Array needs a 4-byte-aligned offset.
       const samples = new Float32Array(joined.buffer.slice(0, usable));
-      recorded.push(samples);
+      // The tape is kept as Int16. At the 20 000-character limit this is 20+
+      // minutes of audio; float32 would hold twice as much of it in memory
+      // and the WAV is 16-bit either way.
+      const pcm = new Int16Array(samples.length);
+      for (let i = 0; i < samples.length; i++) {
+        pcm[i] = Math.max(-1, Math.min(1, samples[i])) * 32767;
+      }
+      recorded.push(pcm);
       total += samples.length;
 
       const buf = ac.createBuffer(1, samples.length, recordedRate);
@@ -317,8 +358,10 @@ async function speak() {
       els.timecode.textContent = fmt(total / recordedRate);
     }
   } catch (err) {
-    if (err.name !== 'AbortError') setStatus('error', 'Luồng âm thanh bị ngắt');
+    if (myRun === run && err.name !== 'AbortError') setStatus('error', 'Luồng âm thanh bị ngắt');
   }
+
+  if (myRun !== run) return;   // stopped or superseded: this read owns nothing now
 
   if (!total) {
     setSpeaking(false);
@@ -331,7 +374,7 @@ async function speak() {
   // last scheduled buffer has actually played.
   const remaining = Math.max(0, (cursor - ac.currentTime) * 1000);
   setTimeout(() => {
-    if (!speaking) return;
+    if (myRun !== run) return;
     setSpeaking(false);
     setStatus('ready', 'Sẵn sàng');
   }, remaining);
@@ -359,20 +402,23 @@ function toWav(chunks, rate) {
 
   let off = 44;
   for (const chunk of chunks) {
-    for (let i = 0; i < chunk.length; i++, off += 2) {
-      view.setInt16(off, Math.max(-1, Math.min(1, chunk[i])) * 32767, true);
-    }
+    for (let i = 0; i < chunk.length; i++, off += 2) view.setInt16(off, chunk[i], true);
   }
   return new Blob([buf], { type: 'audio/wav' });
 }
 
 els.saveBtn.addEventListener('click', () => {
   if (!recorded.length) return;
+  // The samples already carry the speed they were read at, so this is a plain
+  // 48 kHz file - no sample-rate trickery for a player to refuse.
   const url = URL.createObjectURL(toWav(recorded, recordedRate));
   const a = document.createElement('a');
   a.href = url;
   a.download = `voice-tts-${Date.now()}.wav`;
   a.click();
+  // The save dialog is native, so the page never hears how it ended; say what
+  // was handed over rather than claiming a file exists.
+  setStatus(speaking ? 'speaking' : 'ready', 'Đã gửi file WAV sang hộp thoại lưu');
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 });
 
@@ -385,9 +431,14 @@ function setStatus(state, text) {
 
 els.playBtn.addEventListener('click', () => (speaking ? stop() : speak()));
 
-els.text.addEventListener('input', () => {
-  els.count.textContent = `${els.text.value.length} / ${els.text.maxLength}`;
-});
+function renderCount() {
+  // The limit arrives with /api/voices; until then report the length alone
+  // rather than the browser's "no limit" sentinel.
+  const max = els.text.maxLength;
+  els.count.textContent = max > 0 ? `${els.text.value.length} / ${max}` : `${els.text.value.length}`;
+}
+
+els.text.addEventListener('input', renderCount);
 
 // Ctrl+Enter is the commit gesture; Escape stops.
 addEventListener('keydown', (e) => {
@@ -414,6 +465,9 @@ async function boot() {
   }
 
   const info = await (await fetch('/api/voices')).json();
+  // The backend owns the limit; the field and the counter follow it.
+  els.text.maxLength = info.maxChars;
+  renderCount();
   voices = info.voices;
   renderVoices();
   pickVoice(info.default);
