@@ -10,30 +10,13 @@ the release before it builds.
 
 ### Added
 
-- `verify.py`: Whisper large-v3-turbo transcribes a reading and scores it against
-  its text as `1 - CER` (case, spacing and punctuation ignored). The model loads on
-  the first check, not at startup.
-- Verify mode: `voice-tts speak --verify [--min-score X]` and `"verify": true`
-  (`"min_score"`) on `POST /api/tts/stream`. The reading is sent, saved or played
-  only when it scores at least `min_score` (default 0.95), with the score in
-  `X-Verify-Score`; below it the answer is `422` (exit 1 in the CLI) with what
-  Whisper heard, and `503` when Whisper cannot run. `/api/status` reports whether
-  verify is available. Without it nothing changes: the audio still streams.
-- A *Kiểm tra* switch in the window turns verify on for the next read: the status
-  shows *Đang đọc và kiểm tra…*, then the match (*Khớp 96.3%*) while it plays, or
-  why it was rejected with what Whisper heard. It is greyed out where verify cannot
-  run.
-- The Windows installer carries Whisper large-v3-turbo, converted to int8 weights
-  at build time (0.8 GB: the 1.6 GB fp16 copy takes the installer past NSIS's 2 GB
-  limit), so verify works offline. The Linux one-file binary does not carry it and
-  reports verify unavailable.
-
-- A `special` pronunciation (`"pronunciation": "special"`, `speak --pronunciation
-  special`, *Phát âm → Đặc biệt* in the window) respells whole words the engine
-  gets wrong before it reads them (`lexicon.py`): `POST`, `GET`, `PUT`, `PATCH` and
-  `DELETE` as the English words instead of *phê ô ét tê*, `AP` as *ây pi* instead
-  of the syllable *ap*, `Board` as *bo*, and `ESP32` (any case, also `ESP 32`) as
-  *i ét pi ba hai*. The default, `normal`, reads the text as typed, as before.
+- A `special` pronunciation (`"pronunciation": "special"` on `POST /api/tts/stream`,
+  `speak --pronunciation special`, *Phát âm → Đặc biệt* in the window) respells
+  whole words the engine gets wrong before it reads them (`lexicon.py`): `POST`,
+  `GET`, `PUT`, `PATCH` and `DELETE` as the English words instead of *phê ô ét tê*,
+  `AP` as *ây pi* instead of the syllable *ap*, `Board` as *bo*, and `ESP32` (any
+  case, also `ESP 32`) as *i ét pi ba hai*. The default, `normal`, reads the text
+  as typed, as before.
 
 ## [0.6.1] - 2026-10-08
 

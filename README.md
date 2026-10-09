@@ -19,11 +19,7 @@ Desktop app that reads mixed Vietnamese/English text aloud, powered by
 - **Model** — v3 Turbo is bilingual, so Vietnamese and English mix freely inside one
   sentence; no language tagging or manual splitting is needed.
 - **Pronunciation** — `normal` reads the text as typed; `special` first respells the
-  words the engine gets wrong (POST, AP, Board, ESP32...), see
-  [Notes](#notes).
-- **Verify** — optional: Whisper large-v3-turbo hears the reading back, and it is
-  played, saved or sent only if it matches the text by 95% (configurable); otherwise
-  you get an error with what Whisper heard.
+  words the engine gets wrong (POST, AP, Board, ESP32...), see [Notes](#notes).
 
 ## Usage
 
@@ -48,13 +44,8 @@ it (plus a one-off download for a source install).
 4. **Phát âm** is *Thường* (the text as typed: `POST` is spelled *phê ô ét tê*) or
    *Đặc biệt* (`POST` read "post", `AP` "ây pi", `Board` "bo", `ESP32` "i ét pi ba
    hai").
-5. **Kiểm tra** (off by default) has Whisper hear the reading back first and plays
-   it only if it matches the text by 95% or more; the status line then shows the
-   match (*Khớp 96.3%*), or why it was rejected, with what Whisper heard. Playback
-   starts later, since the whole text is read and checked first.
-6. **Đọc** (`Ctrl+Enter`) reads it - as it is generated, or once checked; press again
-   or `Esc` to stop.
-7. **Lưu WAV** saves what was read.
+5. **Đọc** (`Ctrl+Enter`) reads it as it is generated; press again or `Esc` to stop.
+6. **Lưu WAV** saves what was read.
 
 Minimizing or closing the window hides it in the system tray and the app keeps
 running; click the tray icon to bring it back, right-click → *Thoát* to quit.
@@ -94,7 +85,6 @@ voice-tts voices                                                  # the voices t
 voice-tts status --wait 120                                       # is the server ready?
 voice-tts speak "..." --local                                     # ignore the server, run here
 voice-tts speak "Gửi POST tới ESP32" --pronunciation special      # POST "post", ESP32 "i ét pi ba hai"
-voice-tts speak -f doc.txt --verify -o doc.wav                    # save only if Whisper agrees (95%)
 ```
 
 `voice-tts <command> -h` lists every flag; [Command line](#command-line) has the
@@ -110,8 +100,6 @@ full table and the exit codes.
 | `Không có giọng '...'` (exit 2) | voice name mistyped: `voice-tts voices` lists the exact names |
 | `voice-tts` not found on Windows | open a new terminal after the install, so it sees the new `PATH` |
 | `POST` read as *phê ô ét tê*, `AP` as *ap* | the default `normal` pronunciation reads the text as typed: use `--pronunciation special` / *Phát âm → Đặc biệt* |
-| `Kiểm tra không đạt: khớp 89.1%, cần 95.0%` (exit 1) | Whisper heard something else (shown after *Whisper heard*); read again (each reading differs), switch to `special`, or lower `--min-score` |
-| `cannot verify` / `Không kiểm tra được` (503) / *Kiểm tra* greyed out | this build has no Whisper (the Linux binary), or a source install offline without the model downloaded |
 | `no audio player found` on Linux | install `pulseaudio-utils` or `alsa-utils`, or write a file with `-o` |
 
 ## Quick start (development)
@@ -200,7 +188,7 @@ voice-tts speak "Xin chào, deploy lên production server."           # play it
 voice-tts speak -f bai-doc.txt -v "Mai Anh" -s 1.25 -o bai-doc.wav  # save it
 echo "Chào bạn" | voice-tts speak -o - > chao.wav                   # pipe it
 voice-tts speak "Xin chào" --server http://192.168.0.137:8760 --token <t>
-voice-tts speak "Bật AP trên Board" --pronunciation special --verify --min-score 0.9
+voice-tts speak "Bật AP trên Board" --pronunciation special     # AP "ây pi", Board "bo"
 voice-tts voices                 # * default, + featured; --json for the raw list
 voice-tts status --wait 600      # exit 0 once the server's model is ready
 ```
@@ -214,8 +202,6 @@ voice-tts status --wait 600      # exit 0 once the server's model is ready
 | `--play` / `--no-play` | force playback on or off (default: on unless `-o`) |
 | `--raw` | with `-o`: raw float32 LE mono 48 kHz instead of a 16-bit WAV |
 | `--pronunciation P` | `normal` reads the text as typed (default); `special` respells POST, AP, Board, ESP32... first |
-| `--verify` | Whisper hears the reading back; it is saved or played only if it matches the text, else exit `1` with what Whisper heard |
-| `--min-score X` | with `--verify`: the match needed, `0`-`1` (default `0.95`) |
 | `--server URL`, `--token T` | use a running server instead of loading the model here |
 | `--local` | ignore `$VOICE_TTS_SERVER` |
 | `--timeout S` | seconds to wait on the server (default 600) |
@@ -224,16 +210,9 @@ voice-tts status --wait 600      # exit 0 once the server's model is ready
 `voices` and `status` take `--server`, `--token`, `--timeout` and `--json` too.
 `$VOICE_TTS_SERVER` and `$VOICE_TTS_TOKEN` are the defaults for `--server` and
 `--token`. Exit codes: `0` done, `1` runtime failure (unreachable server, wrong
-token, model failed, a `--verify` reading under the bar or no Whisper), `2` bad
-input (usage, empty or over-long text, unknown voice, speed or `--min-score` out of
-range).
+token, model failed), `2` bad input (usage, empty or over-long text, unknown voice,
+speed out of range).
 
-- **Two modes.** Without `--verify` the audio streams as it is generated. With it
-  the whole text is read first, Whisper large-v3-turbo transcribes it, and the
-  score `1 - CER` (case, spacing and punctuation ignored) decides: at or above
-  `--min-score` the audio is written or played and the score shown, below it
-  nothing is written. It costs about 6-7 s per 30 s of audio on a CPU, plus ~10 s
-  to load Whisper the first time.
 - **Without `--server`** the model loads in the CLI process (~30 s); for many short
   reads, start `voice-tts serve` once and point the CLI at it.
 - **With `--server`** `cli.py` imports only the standard library, so it runs on any
@@ -267,7 +246,7 @@ plain HTTP: fine on a home LAN, not for the internet.
 
 | Endpoint | Response |
 | --- | --- |
-| `GET /api/status` | `{"state": "loading" \| "ready" \| "error", "verify": {"available", "detail"}}` - the model warming up, and whether verify can run |
+| `GET /api/status` | `{"state": "loading" \| "ready" \| "error"}` while the model warms up |
 | `GET /api/voices` | the 25 preset voices with region, gender and description, the default voice, `sampleRate` and `maxChars` |
 | `POST /api/tts/stream` | raw float32 LE mono at 48 kHz, streamed as it is generated; or one 16-bit WAV file with `"format": "wav"` |
 
@@ -296,30 +275,20 @@ upgrade: since 3.8.3 `Minh Quân Pro` is `Hải Đăng`, `Anh Khôi` is `Thiện
 `Mạnh Dũng` is `Quốc Tuấn`. The old names (and `Minh Quân`) are still accepted as
 `voice` and read with the renamed voice; they are just no longer listed.
 
-`POST /api/tts/stream` takes `{"text", "voice", "speed", "format", "pronunciation",
-"verify", "min_score"}`: `text` up to 20 000 characters, `voice` a name from
-`/api/voices` (omit it for the default), `speed` between `0.5` and `2.0` (default
-`1.0`), `format` either `"f32"` (default) or `"wav"`, `pronunciation` either
-`"normal"` (default, the text as typed) or `"special"` (respelled by `lexicon.py`,
-see Notes), `verify` `false` (default) or `true`, and `min_score` between `0` and `1`
-(default `0.95`).
+`POST /api/tts/stream` takes `{"text", "voice", "speed", "format", "pronunciation"}`:
+`text` up to 20 000 characters, `voice` a name from `/api/voices` (omit it for the
+default), `speed` between `0.5` and `2.0` (default `1.0`), `format` either `"f32"`
+(default) or `"wav"`, `pronunciation` either `"normal"` (default, the text as typed)
+or `"special"` (respelled by `lexicon.py`, see Notes).
 
 | `format` | Body | `Content-Type` | Starts arriving |
 | --- | --- | --- | --- |
 | `"f32"` | raw float32 LE mono, 48 kHz, no header | `application/octet-stream` | with the first generated chunk - for live playback |
 | `"wav"` | a complete 16-bit mono WAV, 48 kHz, real length in the header and `Content-Length` | `audio/wav` | once the whole text is synthesized - for saving a file |
 
-With `"verify": true` nothing streams: the whole text is synthesized, Whisper
-large-v3-turbo transcribes it, and the body (in the requested `format`) is sent only
-if the score - `1 - CER` against `text`, case, spacing and punctuation ignored - is at
-least `min_score`. It then carries `X-Verify-Score` (`0.9630`) and
-`X-Verify-Transcript` (percent-encoded UTF-8). Below the bar the answer is `422` with
-`{"detail", "score", "transcript", "minScore"}` and no audio; `503` means verify
-cannot run here (`/api/status` says why).
-
-The answer is `400` for empty or over-long text, an unknown voice, a speed or
-`min_score` out of range, `422` for an unknown `format` or `pronunciation`, and
-`401` when the server has a token and the request does not carry it. Every `/api` call takes the token as
+The answer is `400` for empty or over-long text, an unknown voice or a speed out
+of range, `422` for an unknown `format` or `pronunciation`, and `401` when the server
+has a token and the request does not carry it. Every `/api` call takes the token as
 `Authorization: Bearer <token>`; leave the header out for a server without one.
 
 The examples below read one sentence from a LAN server (`<host>` is its address,
@@ -443,26 +412,15 @@ carries on without one: the window closes as before, `serve` keeps serving.
 - **The first launch downloads the model** (HuggingFace cache, `~/.cache/huggingface`).
   The window shows *Đang tải model…* until it is ready. This applies to a source
   checkout only.
-- **The packaged desktop build is a folder** (`dist/VoiceTTS/`, ~1.7 GB; the NSIS
-  installer around it is ~1 GB): the runtime, the web view, the tray icon,
-  both model repos (backbone + audio codec) and verify mode's Whisper are inside,
-  and `VoiceTTS.exe` takes the same subcommands as `app.py` (`VoiceTTS.exe serve
-  --tray`, say) - but, being windowed, it prints nothing; the CLI is the installed `voice-tts`. It points `HF_HOME` at its
+- **The packaged desktop build is a folder** (`dist/VoiceTTS/`, ~760 MB; the NSIS
+  installer around it is ~330 MB): the runtime, the web view, the tray icon and both
+  model repos (backbone + audio codec) are inside, and `VoiceTTS.exe` takes the same
+  subcommands as `app.py` (`VoiceTTS.exe serve --tray`, say) - but, being windowed,
+  it prints nothing; the CLI is the installed `voice-tts`. It points `HF_HOME` at its
   own copy with `HF_HUB_OFFLINE=1`, so it never touches the network. It is a folder
   and not one file because a one-file build unpacks itself into `%TEMP%` on *every*
   launch (~10 s here before *Sẵn sàng*). Building the installer compresses the model
-  with LZMA, which takes ~17 minutes.
-- **The bundled Whisper is converted at build time.** The published CTranslate2
-  copies of large-v3-turbo are fp16 (1.6 GB), and with one inside the installer
-  passes NSIS's 2 GB limit (`Internal compiler error #12345: error mmapping
-  datablock`). `tool-build.py --setup`/`--package` therefore converts
-  [`openai/whisper-large-v3-turbo`](https://huggingface.co/openai/whisper-large-v3-turbo)
-  to int8 weights (0.8 GB) once, in its own venv (`.venv/whisper-convert`:
-  transformers + CPU torch, never shipped; ~3.5 min), and caches the result as the
-  local repo `voice-tts/whisper-large-v3-turbo-int8`. The app runs Whisper in int8
-  either way, so the results match the fp16 download a source checkout uses. The
-  one-file Linux/server build carries no Whisper: there `/api/status` reports verify
-  unavailable and `--verify` exits 1.
+  with LZMA, which takes ~9 minutes.
 - **Reading speed is a time-stretch, not a playback rate.** v3 Turbo has no speed
   parameter, so the backend stretches the stream itself (WSOLA: overlap-add with a
   waveform-similarity search, `Stretch` in `app.py`). The 0.75×–1.5× buttons change
@@ -478,7 +436,12 @@ carries on without one: the window closes as before, `serve` keeps serving.
   the English words, `AP` as *ây pi*, `board` (any case) as *bo*, `ESP32` (any case,
   also `ESP 32`) as *i ét pi ba hai*. `POSTMAN`, `APP` and `onboard` are left alone,
   and so is anything inside `<en>...</en>`. Another word is one more line in
-  `ENTRIES`. The verify score applies the lexicon to both sides in either mode.
+  `ENTRIES`.
+- **Verify mode is deferred.** Checking a reading by ear - Whisper large-v3-turbo
+  transcribes it, and it is sent only if it matches the text by 95% - was built,
+  measured and taken out before release (it needs a 0.8 GB int8 model in the
+  installer). [docs/verify-whisper.md](docs/verify-whisper.md) records what it used,
+  the results and the commits that hold the code.
 - **Licence.** The model card puts every shipped artifact - weights, ONNX exports and
   the preset-voice assets - under Apache-2.0 and allows commercial use of the audio;
   keep the notices of [pnnbao97/VieNeu-TTS](https://github.com/pnnbao97/VieNeu-TTS)
@@ -498,9 +461,8 @@ carries on without one: the window closes as before, `serve` keeps serving.
 
 `.github/workflows/ci.yml` runs on every push to `main`, `developing`, `feat/**` and
 `fix/**` and on pull requests, on `ubuntu-latest` and `windows-latest` with Python
-3.12: `test_cli.py` (CLI, token guard, tray menu, time-stretcher, lexicon and
-pronunciation modes, verify mode and its score, against a stub engine and a stub
-Whisper - no model download) and `--help` for every subcommand and the
+3.12: `test_cli.py` (CLI, token guard, tray menu, the time-stretcher and the
+pronunciation lexicon, against a stub engine - no model download) and `--help` for every subcommand and the
 installer. The real-model smoke test runs locally (`tool-build.py --check`).
 
 ## Release
@@ -518,13 +480,12 @@ notes are that section, with these files and `SHA256SUMS`:
 
 | File | What it is |
 | --- | --- |
-| `VoiceTTS-windows-x64-setup.exe` | the desktop app's installer (all users, `C:\Program Files`, asks for admin): window + tray + every subcommand, model and Whisper (verify) inside |
-| `voice-tts-linux-x86_64` | console server + CLI (`serve`, `speak`, `voices`, `status`), model inside, no window, no verify |
+| `VoiceTTS-windows-x64-setup.exe` | the desktop app's installer (all users, `C:\Program Files`, asks for admin): window + tray + every subcommand, model inside |
+| `voice-tts-linux-x86_64` | console server + CLI (`serve`, `speak`, `voices`, `status`), model inside, no window |
 
 Each file is smoke-tested before it ships: `tool-build.py --smoke <file>` starts it
 as a server with `HF_HUB_OFFLINE=1`, waits for the bundled model and has it read a
-mixed sentence; the desktop build must also verify that reading offline, the server
-build must report verify unavailable. The installer gets the same test after a silent install into a temp
+mixed sentence. The installer gets the same test after a silent install into a temp
 folder (`--smoke-installer`, from an elevated terminal locally), and then must uninstall without leaving a file
 behind. *Run workflow* in the Actions tab does the build and the test
 without publishing; the files stay as artifacts for 14 days. The Linux binary is
@@ -545,18 +506,18 @@ python docs/scripts/tool-build.py --release-notes 0.5.0     # the notes a v0.5.0
 ```
 app.py                    FastAPI backend + native window entry point
 tray.py                   system tray icon, its native menu (pystray) and the popup menu
-lexicon.py                whole-word respellings applied before the engine reads the text
-verify.py                 verify mode: Whisper large-v3-turbo transcribes, 1 - CER scores
+lexicon.py                whole-word respellings for the special pronunciation
 icon.py                   the app icon, one geometry: tray/window/exe .ico and /favicon.svg
 cli.py                    command line: subcommands and flags, stdlib-only at import
-test_tts.py               assert-based smoke test over the real HTTP path, real Whisper verify
-test_cli.py               fast checks with a stub engine and Whisper: CLI, token guard, lexicon, verify
+test_tts.py               assert-based smoke test over the real HTTP path
+test_cli.py               fast checks with a stub engine: CLI (local + remote), token guard
 CHANGELOG.md              user-visible changes per version; a release publishes its section
 web/                      index.html, app.css, app.js, tray.html (tray menu) - no build step
 requirements.txt          server + CLI core (what Docker installs)
 requirements-desktop.txt  core + window + tray (what tool-build.py installs)
 Dockerfile, compose.yaml  Linux server image, token from .env
 .github/workflows/        ci.yml (tests, both OSes), release.yml (installer + Linux binary)
+docs/verify-whisper.md    deferred verify mode: what it used, results, where the code is
 docs/scripts/tool-build.py  setup / run / check / package / installer
 docs/scripts/voice-tts.nsi  the NSIS installer script tool-build.py --installer runs
 docs/scripts/tool-install.py  install / uninstall: Windows venv, Linux Docker, --remote over ssh

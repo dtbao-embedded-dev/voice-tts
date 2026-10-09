@@ -23,8 +23,6 @@ MIXED_TEXT = (
     "Chào bạn, hôm nay chúng ta sẽ deploy một model text-to-speech mới "
     "lên production server."
 )
-# Read cleanly by the default voice; the verify check must pass on it.
-VERIFY_TEXT = "Chào bạn, hôm nay chúng ta sẽ deploy một model mới lên server."
 MODEL_LOAD_TIMEOUT = 900  # first run downloads the weights from HuggingFace
 OUT_WAV = Path(__file__).resolve().parent / "out" / "smoke.wav"
 
@@ -129,33 +127,6 @@ def check_stretch() -> None:
     print("stretch: pitch held, lengths exact, chunking invariant")
 
 
-def check_verify(base: str, voice: str, mixed: np.ndarray, rate: int) -> None:
-    """Whisper hears a reading as its own text, and not as another one.
-
-    The pass case is a sentence the engine reads cleanly; MIXED_TEXT is only
-    reported, since its "text-to-speech" is exactly the kind of slip the check
-    exists to catch.
-    """
-    import verify
-
-    ok, why = verify.available()
-    assert ok, f"verify unavailable: {why}"
-    verify.model()  # load first, so the timings below are the checks alone
-    raw, rate = post_stream(base, VERIFY_TEXT, voice)
-    audio = np.frombuffer(raw, dtype=np.float32)
-    t0 = time.perf_counter()
-    score, transcript = verify.check(audio, rate, VERIFY_TEXT)
-    took = time.perf_counter() - t0
-    print(f"verify: {score:.3f} in {took:.1f}s for {len(audio) / rate:.1f}s of audio")
-    print(f"  heard: {transcript}")
-    assert score >= verify.MIN_SCORE, f"own text scored {score:.3f} < {verify.MIN_SCORE}"
-    other = verify.score("Hôm nay trời mưa to, đường phố ngập nước khắp nơi.", transcript)
-    assert other < verify.MIN_SCORE, f"another sentence scored {other:.3f}"
-
-    score, transcript = verify.check(mixed, rate, MIXED_TEXT)
-    print(f"verify (mixed, reported only): {score:.3f} heard {transcript!r}")
-
-
 def main() -> int:
     check_stretch()
 
@@ -186,7 +157,6 @@ def main() -> int:
     assert seconds > 2.0, f"too short for this sentence: {seconds:.2f}s"
     assert rms > 0.01, f"audio is silent: rms={rms:.4f}"
     assert peak <= 1.5, f"audio is clipping hard: peak={peak:.4f}"
-    check_verify(base, info["default"], audio, rate)
 
     # Rejecting bad input matters more than the happy path; check the boundary.
     for bad, why in ((" ", "empty text"), ("a" * (app.MAX_CHARS + 1), "over-long text")):

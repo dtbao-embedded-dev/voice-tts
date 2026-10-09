@@ -22,15 +22,14 @@ ENTRIES = (
     ("PUT", "put", True),
     ("PATCH", "patch", True),
     ("DELETE", "delete", True),
-    # Vietnamese letter names: "<en>a p</en>" reads right too, but Whisper hears
-    # its English vowel as "IP" often enough to fail the verify check.
+    # Vietnamese letter names: "<en>a p</en>" reads right too, but its English
+    # vowel was heard as "IP" in listening tests (docs/verify-whisper.md).
     ("AP", "ây pi", True),
     ("board", "bo", False),
     # ESP32 came out "e ét phê ba hai", esp32 as the syllable "esp" and "ba mươi
     # hai"; engineers say the letters the English way and the digits one by one.
     ("esp32", "i ét pi ba hai", False),
-    # Whisper often writes it with a space; respelled too, the verify score
-    # compares like for like (and typed that way it read "ba mươi hai").
+    # Typed with a space it read "e ét phê ba mươi hai".
     ("esp 32", "i ét pi ba hai", False),
 )
 

@@ -16,7 +16,6 @@ import os
 import socket
 import sys
 import threading
-import urllib.parse
 import wave
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -31,7 +30,6 @@ from numpy.lib.stride_tricks import sliding_window_view
 from pydantic import BaseModel
 
 import lexicon
-import verify
 
 SAMPLE_RATE = 48_000
 MAX_CHARS = 20_000
@@ -269,12 +267,6 @@ class SpeakRequest(BaseModel):
     # "normal": the engine reads the text as typed (POST spelled "phê ô ét tê").
     # "special": lexicon.py respells words first (POST as "post", AP as "ây pi").
     pronunciation: Literal["normal", "special"] = "normal"
-    # Mode 2: Whisper hears the whole reading back first, and it is sent only
-    # if it scores min_score or better - so the body arrives at the end, never
-    # streamed. Off (mode 1), nothing changes. min_score comes first: below
-    # the ``verify`` field, that name is the field and not the module.
-    min_score: float = verify.MIN_SCORE
-    verify: bool = False
 
 
 def wav_bytes(chunks) -> bytes:
@@ -299,13 +291,11 @@ def _warm() -> None:
 
 @app.get("/api/status")
 def status() -> dict:
-    ok, why = verify.available()
-    checker = {"available": ok, "detail": why}
     if _engine is not None:
-        return {"state": "ready", "verify": checker}
+        return {"state": "ready"}
     if _engine_error is not None:
-        return {"state": "error", "detail": _engine_error, "verify": checker}
-    return {"state": "loading", "verify": checker}
+        return {"state": "error", "detail": _engine_error}
+    return {"state": "loading"}
 
 
 @app.get("/api/voices")
@@ -354,38 +344,6 @@ def synthesize(text: str, voice: str | None = None, speed: float = 1.0,
     return resolved, chunks()
 
 
-class VerifyUnavailable(Exception):
-    """Whisper cannot run here: not installed, no model offline, failed to load."""
-
-
-class Rejected(Exception):
-    """A verified reading that scored under the bar; nothing is to be sent."""
-
-    def __init__(self, score: float, transcript: str, min_score: float) -> None:
-        super().__init__(f"Kiểm tra không đạt: khớp {score:.1%}, cần {min_score:.1%}.")
-        self.score, self.transcript, self.min_score = score, transcript, min_score
-
-
-def verified(text: str, chunks, min_score: float) -> tuple[np.ndarray, float, str]:
-    """Synthesize all of ``chunks`` and have Whisper hear it against ``text``.
-
-    Returns ``(audio, score, transcript)``; raises ``Rejected`` under
-    ``min_score`` and ``VerifyUnavailable`` when no check can run - asked
-    before synthesizing, so an unusable check costs nothing.
-    """
-    ok, why = verify.available()
-    if not ok:
-        raise VerifyUnavailable(why)
-    audio = np.concatenate([np.zeros(0, dtype=np.float32), *chunks])
-    try:
-        score, transcript = verify.check(audio, SAMPLE_RATE, text)
-    except Exception as exc:  # the model failed to load or to run
-        raise VerifyUnavailable(f"{type(exc).__name__}: {exc}") from exc
-    if score < min_score:
-        raise Rejected(score, transcript, min_score)
-    return audio, score, transcript
-
-
 @app.post("/api/tts/stream")
 def tts_stream(req: SpeakRequest):
     """Stream raw float32 LE samples at 48 kHz as they are generated.
@@ -398,30 +356,9 @@ def tts_stream(req: SpeakRequest):
     real length in the header and in ``Content-Length``.
     """
     try:
-        if not 0.0 <= req.min_score <= 1.0:
-            raise ValueError("min_score phải trong khoảng 0-1.")
         _, chunks = synthesize(req.text, req.voice, req.speed, req.pronunciation)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from None
-
-    if req.verify:
-        try:
-            audio, score, transcript = verified(req.text, chunks, req.min_score)
-        except VerifyUnavailable as exc:
-            raise HTTPException(503, f"Không kiểm tra được: {exc}") from None
-        except Rejected as exc:
-            return JSONResponse({"detail": str(exc), "score": round(exc.score, 4),
-                                 "transcript": exc.transcript,
-                                 "minScore": exc.min_score}, status_code=422)
-        wav = req.format == "wav"
-        return Response(
-            wav_bytes([audio]) if wav else audio.tobytes(),
-            media_type="audio/wav" if wav else "application/octet-stream",
-            # A header is Latin-1: the Vietnamese transcript travels percent-encoded.
-            headers={"X-Sample-Rate": str(SAMPLE_RATE), "Cache-Control": "no-store",
-                     "X-Verify-Score": f"{score:.4f}",
-                     "X-Verify-Transcript": urllib.parse.quote(transcript)},
-        )
 
     if req.format == "wav":
         return Response(

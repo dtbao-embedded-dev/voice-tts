@@ -8,7 +8,7 @@ const els = {
   sheet: $('sheet'), scrim: $('scrim'), speed: $('speed'),
   playBtn: $('playBtn'), playIcon: $('playIcon'), playLabel: $('playLabel'),
   saveBtn: $('saveBtn'), timecode: $('timecode'), meter: $('meter'),
-  verify: $('verify'), verifyHint: $('verifyHint'), pron: $('pron'),
+  pron: $('pron'),
 };
 
 const REGIONS = ['Bắc', 'Trung', 'Nam'];
@@ -23,10 +23,6 @@ let speed = 1;
 // "normal": the engine reads the text as typed. "special": the backend respells
 // the words it gets wrong first (POST, AP, Board, ESP32).
 let pronunciation = 'normal';
-// Mode 2: Whisper hears the reading back and the server sends it only when it
-// matches. Usable only where /api/status says verify can run.
-let verifyOn = false;
-let verifyUsable = false;
 // Every start and every stop bumps this. A read carries the value it started
 // with and checks it before touching the UI, so a read the user has already
 // stopped can no longer report into the one that replaced it.
@@ -205,26 +201,6 @@ els.speed.addEventListener('click', (e) => {
   for (const o of els.speed.children) o.setAttribute('aria-pressed', String(o === opt));
 });
 
-/* ---- Verify ---------------------------------------------------------- */
-
-els.verify.addEventListener('click', () => {
-  verifyOn = !verifyOn;
-  els.verify.setAttribute('aria-checked', String(verifyOn));
-});
-
-function applyVerify(state) {
-  verifyUsable = Boolean(state && state.available);
-  els.verify.disabled = !verifyUsable;
-  if (!verifyUsable) {
-    verifyOn = false;
-    els.verify.setAttribute('aria-checked', 'false');
-    els.verifyHint.textContent = 'Không khả dụng';
-    els.verifyHint.title = (state && state.detail) || '';
-  }
-}
-
-const percent = (score) => `${(Number(score) * 100).toFixed(1)}%`;
-
 els.pron.addEventListener('click', (e) => {
   const opt = e.target.closest('.speed__opt');
   if (!opt) return;
@@ -291,7 +267,6 @@ function setSpeaking(on) {
   // The speed is baked into the request, so it is fixed for the whole read.
   for (const o of els.speed.children) o.disabled = on;
   for (const o of els.pron.children) o.disabled = on;
-  els.verify.disabled = on || !verifyUsable;
   els.meter.dataset.live = on ? '1' : '0';
   if (on) drawMeter(analyser);
 }
@@ -317,17 +292,14 @@ async function speak() {
   sources = [];
   els.saveBtn.disabled = true;
   setSpeaking(true);
-  // Verified, nothing plays until Whisper has heard the whole reading.
-  const checked = verifyOn;
-  setStatus('speaking', checked ? 'Đang đọc và kiểm tra…' : 'Đang đọc…');
+  setStatus('speaking', 'Đang đọc…');
 
   let res;
   try {
     res = await fetch('/api/tts/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(checked ? { text, voice, speed, pronunciation, verify: true }
-                                   : { text, voice, speed, pronunciation }),
+      body: JSON.stringify({ text, voice, speed, pronunciation }),
       signal: abort.signal,
     });
   } catch {
@@ -340,12 +312,9 @@ async function speak() {
     const detail = await res.json().catch(() => ({}));
     if (myRun !== run) return;
     setSpeaking(false);
-    const heard = detail.transcript !== undefined ? ` Nghe được: “${detail.transcript}”` : '';
-    setStatus('error', (detail.detail || `Lỗi ${res.status}`) + heard);
+    setStatus('error', detail.detail || `Lỗi ${res.status}`);
     return;
   }
-  const score = res.headers.get('X-Verify-Score');
-  if (score) setStatus('speaking', `Đang đọc · khớp ${percent(score)}`);
 
   recordedRate = Number(res.headers.get('X-Sample-Rate')) || 48000;
   const reader = res.body.getReader();
@@ -407,7 +376,7 @@ async function speak() {
   setTimeout(() => {
     if (myRun !== run) return;
     setSpeaking(false);
-    setStatus('ready', score ? `Khớp ${percent(score)} · Sẵn sàng` : 'Sẵn sàng');
+    setStatus('ready', 'Sẵn sàng');
   }, remaining);
 }
 
@@ -458,7 +427,6 @@ els.saveBtn.addEventListener('click', () => {
 function setStatus(state, text) {
   els.status.dataset.state = state;
   els.statusText.textContent = text;
-  els.status.title = text;
 }
 
 els.playBtn.addEventListener('click', () => (speaking ? stop() : speak()));
@@ -491,7 +459,7 @@ async function boot() {
       await new Promise((r) => setTimeout(r, 1000));
       continue;
     }
-    if (s.state === 'ready') { applyVerify(s.verify); break; }
+    if (s.state === 'ready') break;
     if (s.state === 'error') { setStatus('error', 'Không tải được model'); return; }
     await new Promise((r) => setTimeout(r, 1000));
   }
