@@ -206,8 +206,9 @@ voice-tts status --wait 600      # exit 0 once the server's model is ready
 `voices` and `status` take `--server`, `--token`, `--timeout` and `--json` too.
 `$VOICE_TTS_SERVER` and `$VOICE_TTS_TOKEN` are the defaults for `--server` and
 `--token`. Exit codes: `0` done, `1` runtime failure (unreachable server, wrong
-token, model failed, a `--verify` reading under the bar or no Whisper), `2` bad input (usage, empty or over-long text, unknown voice,
-speed out of range).
+token, model failed, a `--verify` reading under the bar or no Whisper), `2` bad
+input (usage, empty or over-long text, unknown voice, speed or `--min-score` out of
+range).
 
 - **Two modes.** Without `--verify` the audio streams as it is generated. With it
   the whole text is read first, Whisper large-v3-turbo transcribes it, and the
@@ -422,15 +423,26 @@ carries on without one: the window closes as before, `serve` keeps serving.
 - **The first launch downloads the model** (HuggingFace cache, `~/.cache/huggingface`).
   The window shows *Đang tải model…* until it is ready. This applies to a source
   checkout only.
-- **The packaged desktop build is a folder** (`dist/VoiceTTS/`, ~760 MB; the NSIS
-  installer around it is ~330 MB): the runtime, the web view, the tray icon and both
-  model repos (backbone + audio codec) are inside, and `VoiceTTS.exe` takes the same
-  subcommands as `app.py` (`VoiceTTS.exe serve --tray`, say) - but, being windowed,
-  it prints nothing; the CLI is the installed `voice-tts`. It points `HF_HOME` at its
+- **The packaged desktop build is a folder** (`dist/VoiceTTS/`, ~1.7 GB; the NSIS
+  installer around it is ~1 GB): the runtime, the web view, the tray icon,
+  both model repos (backbone + audio codec) and verify mode's Whisper are inside,
+  and `VoiceTTS.exe` takes the same subcommands as `app.py` (`VoiceTTS.exe serve
+  --tray`, say) - but, being windowed, it prints nothing; the CLI is the installed `voice-tts`. It points `HF_HOME` at its
   own copy with `HF_HUB_OFFLINE=1`, so it never touches the network. It is a folder
   and not one file because a one-file build unpacks itself into `%TEMP%` on *every*
   launch (~10 s here before *Sẵn sàng*). Building the installer compresses the model
-  with LZMA, which takes ~9 minutes.
+  with LZMA, which takes ~17 minutes.
+- **The bundled Whisper is converted at build time.** The published CTranslate2
+  copies of large-v3-turbo are fp16 (1.6 GB), and with one inside the installer
+  passes NSIS's 2 GB limit (`Internal compiler error #12345: error mmapping
+  datablock`). `tool-build.py --setup`/`--package` therefore converts
+  [`openai/whisper-large-v3-turbo`](https://huggingface.co/openai/whisper-large-v3-turbo)
+  to int8 weights (0.8 GB) once, in its own venv (`.venv/whisper-convert`:
+  transformers + CPU torch, never shipped; ~3.5 min), and caches the result as the
+  local repo `voice-tts/whisper-large-v3-turbo-int8`. The app runs Whisper in int8
+  either way, so the results match the fp16 download a source checkout uses. The
+  one-file Linux/server build carries no Whisper: there `/api/status` reports verify
+  unavailable and `--verify` exits 1.
 - **Reading speed is a time-stretch, not a playback rate.** v3 Turbo has no speed
   parameter, so the backend stretches the stream itself (WSOLA: overlap-add with a
   waveform-similarity search, `Stretch` in `app.py`). The 0.75×–1.5× buttons change
@@ -482,12 +494,13 @@ notes are that section, with these files and `SHA256SUMS`:
 
 | File | What it is |
 | --- | --- |
-| `VoiceTTS-windows-x64-setup.exe` | the desktop app's installer (all users, `C:\Program Files`, asks for admin): window + tray + every subcommand, model inside |
-| `voice-tts-linux-x86_64` | console server + CLI (`serve`, `speak`, `voices`, `status`), model inside, no window |
+| `VoiceTTS-windows-x64-setup.exe` | the desktop app's installer (all users, `C:\Program Files`, asks for admin): window + tray + every subcommand, model and Whisper (verify) inside |
+| `voice-tts-linux-x86_64` | console server + CLI (`serve`, `speak`, `voices`, `status`), model inside, no window, no verify |
 
 Each file is smoke-tested before it ships: `tool-build.py --smoke <file>` starts it
 as a server with `HF_HUB_OFFLINE=1`, waits for the bundled model and has it read a
-mixed sentence. The installer gets the same test after a silent install into a temp
+mixed sentence; the desktop build must also verify that reading offline, the server
+build must report verify unavailable. The installer gets the same test after a silent install into a temp
 folder (`--smoke-installer`, from an elevated terminal locally), and then must uninstall without leaving a file
 behind. *Run workflow* in the Actions tab does the build and the test
 without publishing; the files stay as artifacts for 14 days. The Linux binary is

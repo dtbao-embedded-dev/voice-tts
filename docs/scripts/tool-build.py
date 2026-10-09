@@ -45,6 +45,16 @@ MODEL_REPOS = (
     "models--pnnbao-ump--VieNeu-TTS-v3-Turbo",
     "models--OpenMOSS-Team--MOSS-Audio-Tokenizer-Nano-ONNX",
 )
+# Verify mode's Whisper, desktop build only: in the one-file server build it would
+# unpack into %TEMP% on every launch, so there verify reports itself unavailable.
+# The published CTranslate2 copies are fp16 (1.6 GB), which takes the installer
+# past NSIS's 2 GB ("error mmapping datablock"); the build converts the original
+# to int8 weights instead (0.8 GB). The app runs it in int8 either way.
+WHISPER_SOURCE = "openai/whisper-large-v3-turbo"
+WHISPER_REPOS = ("models--voice-tts--whisper-large-v3-turbo-int8",)  # verify.BUNDLED_REPO
+# The converter's own venv: transformers + CPU torch, ~1 GB the app never ships.
+CONVERT_VENV = VENV / "whisper-convert"
+CONVERT_PY = CONVERT_VENV / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 HF_HUB = Path(os.environ.get("HF_HOME", Path.home() / ".cache/huggingface")) / "hub"
 # Staged outside build/ and dist/: PyInstaller's --clean wipes both.
 MODEL_STAGE = VENV / "model-bundle"
@@ -53,12 +63,15 @@ NSI = ROOT / "docs" / "scripts" / "voice-tts.nsi"
 
 # PyInstaller cannot see these through vieneu's lazy imports.
 COLLECT = ["vieneu", "onnxruntime", "sea_g2p", "kaldi_native_fbank", "soxr", "soundfile"]
+# Verify mode: CTranslate2's DLLs, faster-whisper's assets, rapidfuzz's lazily
+# imported C extensions (PyAV, which faster-whisper imports, has its own hook).
+COLLECT_DESKTOP = ["faster_whisper", "ctranslate2", "rapidfuzz"]
 # pystray picks its backend module by name at runtime; name the Windows one.
 HIDDEN = ["pystray._win32"] if os.name == "nt" else []
 # vieneu ships a Gradio demo we never import; it would double the bundle.
 EXCLUDE = ["gradio", "gradio_client", "matplotlib", "tkinter", "IPython"]
 # A server-only build has no window and no tray.
-EXCLUDE_SERVER = ["webview", "pystray", "tray"]
+EXCLUDE_SERVER = ["webview", "pystray", "tray", "faster_whisper", "ctranslate2", "av"]
 CHANGELOG = ROOT / "CHANGELOG.md"
 SMOKE_TEXT = "Xin chào, bản đóng gói này chạy offline và đọc được tiếng Việt lẫn English."
 
@@ -109,24 +122,73 @@ def ensure_deps(server_only: bool = False) -> None:
     done(t0)
 
 
-def ensure_model() -> None:
+def ensure_model(server_only: bool = False) -> None:
     """Pull the weights now, so the first launch is not a silent 30 s wait."""
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     if all((HF_HUB / repo).is_dir() for repo in MODEL_REPOS):
         print("  model ... cached", flush=True)
+    else:
+        t0 = step("model (first download, this takes a while)")
+        run([str(PY), "-c", "import app; app.engine()"], env=env)
+        done(t0)
+    if server_only:
         return
-    t0 = step("model (first download, this takes a while)")
-    run([str(PY), "-c", "import app; app.engine()"], env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+    if all((HF_HUB / repo).is_dir() for repo in WHISPER_REPOS):
+        print("  whisper ... cached", flush=True)
+        return
+    t0 = step(f"whisper (converting {WHISPER_SOURCE} to int8, first run only)")
+    convert_whisper()
     done(t0)
+
+
+def convert_whisper() -> None:
+    """Put ``WHISPER_SOURCE`` as int8 CTranslate2 weights into the HF cache.
+
+    It lands as a repo of its own (``verify.BUNDLED_REPO``) at the source's
+    revision, so ``stage_model`` copies it like the others and the offline app
+    finds it with ``try_to_load_from_cache``. The source checkpoint downloads
+    into a temp HF home and is gone afterwards; only the result is kept.
+    """
+    import tempfile
+
+    if not CONVERT_PY.exists():
+        run([str(PY), "-m", "venv", str(CONVERT_VENV)])
+    # The same CTranslate2 as the app's, so the model format matches its runtime.
+    ct2 = subprocess.run([str(PY), "-c", "import importlib.metadata as m; "
+                          "print(m.version('ctranslate2'))"],
+                         check=True, capture_output=True, text=True).stdout.strip()
+    pip = [str(CONVERT_PY), "-m", "pip", "install", "--quiet"]
+    run(pip + ["torch", "--index-url", "https://download.pytorch.org/whl/cpu"])
+    run(pip + [f"ctranslate2=={ct2}", "transformers", "huggingface_hub"])
+
+    with tempfile.TemporaryDirectory(prefix="whisper-convert-") as tmp:
+        env = {**os.environ, "HF_HOME": str(Path(tmp) / "hf"), "PYTHONIOENCODING": "utf-8"}
+        revision = subprocess.run(
+            [str(CONVERT_PY), "-c", "import sys, huggingface_hub as h; "
+             "print(h.model_info(sys.argv[1]).sha)", WHISPER_SOURCE],
+            check=True, capture_output=True, text=True, env=env).stdout.strip()
+        out = Path(tmp) / "int8"
+        # ct2-transformers-converter, without relying on the venv's Scripts on PATH.
+        run([str(CONVERT_PY), "-c", "from ctranslate2.converters.transformers import main; main()",
+             "--model", WHISPER_SOURCE, "--revision", revision, "--output_dir", str(out),
+             "--quantization", "int8",
+             "--copy_files", "tokenizer.json", "preprocessor_config.json"], env=env)
+        repo = HF_HUB / WHISPER_REPOS[0]
+        if repo.exists():
+            shutil.rmtree(repo)
+        (repo / "refs").mkdir(parents=True)
+        (repo / "refs" / "main").write_text(revision)
+        shutil.copytree(out, repo / "snapshots" / revision)
 
 
 def setup(server_only: bool = False) -> None:
     print("Voice TTS build" + (" (server only)" if server_only else ""), flush=True)
     ensure_venv()
     ensure_deps(server_only)
-    ensure_model()
+    ensure_model(server_only)
 
 
-def stage_model() -> Path:
+def stage_model(server_only: bool = False) -> Path:
     """Copy the revision each repo currently points at into ``MODEL_STAGE``.
 
     The HuggingFace cache keeps every revision it has ever seen; only the one
@@ -136,7 +198,7 @@ def stage_model() -> Path:
     """
     if MODEL_STAGE.exists():
         shutil.rmtree(MODEL_STAGE)
-    for repo in MODEL_REPOS:
+    for repo in MODEL_REPOS + (() if server_only else WHISPER_REPOS):
         src = HF_HUB / repo
         if not src.is_dir():
             sys.exit(f"ERROR: model cache missing at {src} - run --setup first")
@@ -148,14 +210,19 @@ def stage_model() -> Path:
     return MODEL_STAGE
 
 
-def verify_stage(stage: Path) -> None:
+def verify_stage(stage: Path, server_only: bool = False) -> None:
     """Load the engine against the staged cache alone, with the network off.
 
     This is the same situation the packaged exe is in, and it costs seconds
     against the minutes PyInstaller spends - so a missing repo surfaces here
-    rather than on the machine the exe was carried to.
+    rather than on the machine the exe was carried to. The desktop build loads
+    Whisper the same way.
     """
-    run([str(PY), "-c", "import app; app.engine()"],
+    code = "import app; app.engine()"
+    if not server_only:
+        code += ("; import verify; ok, why = verify.available(); "
+                 "assert ok, why; verify.model()")
+    run([str(PY), "-c", code],
         env={**os.environ, "HF_HOME": str(stage), "HF_HUB_OFFLINE": "1",
              "PYTHONIOENCODING": "utf-8"})
 
@@ -177,11 +244,11 @@ def package(server_only: bool = False) -> Path:
     done(t0)
 
     t0 = step("model")
-    stage = stage_model()
+    stage = stage_model(server_only)
     done(t0, f"{dir_size(stage) / 1e6:.0f} MB")
 
     t0 = step("offline check")
-    verify_stage(stage)
+    verify_stage(stage, server_only)
     done(t0)
 
     exe = exe_path(server_only)
@@ -204,7 +271,7 @@ def package(server_only: bool = False) -> Path:
            "--name", exe.stem, *icon_flags,
            "--add-data", f"web{os.pathsep}web",
            "--add-data", f"{stage}{os.pathsep}hf"]
-    for mod in COLLECT:
+    for mod in COLLECT + ([] if server_only else COLLECT_DESKTOP):
         cmd += ["--collect-all", mod]
     for mod in [] if server_only else HIDDEN:
         cmd += ["--hidden-import", mod]
@@ -329,6 +396,7 @@ def smoke(exe: Path) -> int:
         print(f"smoke: {seconds:.2f} s, peak {peak}", flush=True)
         if seconds < 2.0 or peak < 3000:
             raise SystemExit(f"ERROR: audio too short or silent ({seconds:.2f} s, peak {peak})")
+        check_verify(url, desktop=exe.stem == exe_path(False).stem)
         print("smoke: OK")
         passed = True
         return 0
@@ -346,6 +414,42 @@ def smoke(exe: Path) -> int:
         if not passed:  # the build's own output is the first thing to read then
             log.seek(0)
             print(log.read().decode("utf-8", "replace")[-2000:], flush=True)
+
+
+def check_verify(url: str, desktop: bool) -> None:
+    """The desktop build verifies offline; the server build says it cannot.
+
+    ``min_score`` 0 makes this a check that Whisper runs from the bundle, not of
+    how well one reading went - a release must not hinge on that. A score this
+    low would still mean it heard no speech at all.
+    """
+    import json
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    with urllib.request.urlopen(f"{url}/api/status", timeout=30) as resp:
+        state = json.load(resp)["verify"]
+    if not desktop:
+        if state["available"]:
+            raise SystemExit("ERROR: the server build claims verify, but carries no Whisper")
+        print(f"smoke: verify unavailable, as it should be ({state['detail']})", flush=True)
+        return
+    if not state["available"]:
+        raise SystemExit(f"ERROR: verify unavailable in the desktop build: {state['detail']}")
+    body = json.dumps({"text": SMOKE_TEXT, "verify": True, "min_score": 0,
+                       "format": "wav"}).encode()
+    req = urllib.request.Request(f"{url}/api/tts/stream", data=body,
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            score = float(resp.headers["X-Verify-Score"])
+            heard = urllib.parse.unquote(resp.headers["X-Verify-Transcript"])
+    except urllib.error.HTTPError as exc:
+        raise SystemExit(f"ERROR: verify failed: {exc.code} {exc.read()[:300]!r}") from None
+    print(f"smoke: verify {score:.1%}, heard {heard!r}", flush=True)
+    if score < 0.5:
+        raise SystemExit(f"ERROR: Whisper heard almost nothing of the reading ({score:.1%})")
 
 
 def release_notes(version: str) -> int:

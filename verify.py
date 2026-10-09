@@ -14,6 +14,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import re
+import sys
 import threading
 import unicodedata
 
@@ -22,9 +23,13 @@ import numpy as np
 import lexicon
 
 MODEL = "large-v3-turbo"
-# faster-whisper's own name for it; looked up in the HF cache to answer
-# available() without loading anything.
+# faster-whisper's own name for it: fp16 weights, downloaded on first use.
 MODEL_REPO = "mobiuslabsgmbh/faster-whisper-large-v3-turbo"
+# What the desktop build carries instead: openai/whisper-large-v3-turbo
+# converted to int8 weights by tool-build.py. Half the size - the fp16 model
+# pushes the installer past NSIS's 2 GB - and the same results, since the model
+# runs in int8 either way. A local name in the HF cache, never downloaded.
+BUNDLED_REPO = "voice-tts/whisper-large-v3-turbo-int8"
 WHISPER_RATE = 16_000
 MIN_SCORE = 0.95
 
@@ -56,6 +61,19 @@ def score(reference: str, transcript: str) -> float:
     return max(0.0, 1.0 - Levenshtein.distance(ref, hyp) / len(ref))
 
 
+def _source() -> str | None:
+    """What to load: the bundled int8 copy, else the download, else None."""
+    from huggingface_hub import try_to_load_from_cache
+
+    bundled = try_to_load_from_cache(BUNDLED_REPO, "model.bin")
+    if isinstance(bundled, str):
+        return os.path.dirname(bundled)
+    if os.environ.get("HF_HUB_OFFLINE") == "1":
+        cached = try_to_load_from_cache(MODEL_REPO, "model.bin")
+        return MODEL if isinstance(cached, str) else None
+    return MODEL
+
+
 def available() -> tuple[bool, str]:
     """Whether a check can run here, and why not when it cannot.
 
@@ -67,12 +85,11 @@ def available() -> tuple[bool, str]:
     if _error is not None:
         return False, _error
     if importlib.util.find_spec("faster_whisper") is None:
+        if getattr(sys, "frozen", False):  # the one-file server build leaves it out
+            return False, "Bản này không kèm Whisper."
         return False, "Chưa cài faster-whisper (pip install -r requirements.txt)."
-    if os.environ.get("HF_HUB_OFFLINE") == "1":
-        from huggingface_hub import try_to_load_from_cache
-
-        if not isinstance(try_to_load_from_cache(MODEL_REPO, "model.bin"), str):
-            return False, f"Bản này không kèm model Whisper {MODEL}."
+    if _source() is None:
+        return False, f"Bản này không kèm model Whisper {MODEL}."
     return True, ""
 
 
@@ -83,10 +100,13 @@ def model():
         if _model is None:
             from faster_whisper import WhisperModel
 
+            source = _source()
+            if source is None:
+                raise RuntimeError(f"no Whisper {MODEL} in the cache and the network is off")
             try:
                 # Half the logical CPUs: the hyperthread siblings add little to
                 # CTranslate2's matrix kernels and would starve the TTS engine.
-                _model = WhisperModel(MODEL, device="cpu", compute_type="int8",
+                _model = WhisperModel(source, device="cpu", compute_type="int8",
                                       cpu_threads=max(1, (os.cpu_count() or 2) // 2))
             except Exception as exc:
                 _error = f"Không nạp được Whisper: {type(exc).__name__}: {exc}"

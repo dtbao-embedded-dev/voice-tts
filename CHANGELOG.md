@@ -23,6 +23,10 @@ the release before it builds.
   shows *Đang đọc và kiểm tra…*, then the match (*Khớp 96.3%*) while it plays, or
   why it was rejected with what Whisper heard. It is greyed out where verify cannot
   run.
+- The Windows installer carries Whisper large-v3-turbo, converted to int8 weights
+  at build time (0.8 GB: the 1.6 GB fp16 copy takes the installer past NSIS's 2 GB
+  limit), so verify works offline. The Linux one-file binary does not carry it and
+  reports verify unavailable.
 
 ### Fixed
 
