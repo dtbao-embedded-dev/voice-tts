@@ -8,6 +8,8 @@ the release before it builds.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-09
+
 ### Added
 
 - The project is licensed under the Apache License 2.0 (`LICENSE`).

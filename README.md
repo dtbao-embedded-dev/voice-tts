@@ -1,7 +1,7 @@
 # Voice TTS
 
 [![CI](https://github.com/dtbao-embedded-dev/voice-tts/actions/workflows/ci.yml/badge.svg)](https://github.com/dtbao-embedded-dev/voice-tts/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.7.0-blue)](https://github.com/dtbao-embedded-dev/voice-tts/releases)
+[![Version](https://img.shields.io/badge/version-0.8.0-blue)](https://github.com/dtbao-embedded-dev/voice-tts/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 Desktop app that reads mixed Vietnamese/English text aloud, powered by
@@ -278,7 +278,7 @@ plain HTTP: fine on a home LAN, not for the internet.
 | Endpoint | Response |
 | --- | --- |
 | `GET /api/status` | `{"state": "loading" \| "ready" \| "error"}` while the model warms up |
-| `GET /api/version` | `{"version": "0.7.0"}` - the version the server runs (`voice-tts --version` is the CLI's own) |
+| `GET /api/version` | `{"version": "0.8.0"}` - the version the server runs (`voice-tts --version` is the CLI's own) |
 | `GET /api/voices` | the 25 preset voices with region, gender and description, the default voice, `sampleRate` and `maxChars` |
 | `GET /api/lexicon` | `{"builtin": [...], "user": [...]}`, each entry `{"word", "say", "matchCase"}` |
 | `PUT /api/lexicon` | replaces the user's words with `{"user": [...]}`; answers the new state, `400` for an empty, duplicate or over-long entry |
@@ -388,7 +388,7 @@ The other endpoints take the same header:
 ```bash
 curl -H "Authorization: Bearer <token>" http://<host>:8760/api/voices   # names to use as "voice"
 curl -H "Authorization: Bearer <token>" http://<host>:8760/api/status   # {"state": "ready"}
-curl -H "Authorization: Bearer <token>" http://<host>:8760/api/version  # {"version": "0.7.0"}
+curl -H "Authorization: Bearer <token>" http://<host>:8760/api/version  # {"version": "0.8.0"}
 ```
 
 ## Docker (Linux server)

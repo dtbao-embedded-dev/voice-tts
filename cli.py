@@ -27,7 +27,7 @@ import urllib.request
 import wave
 from array import array
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 DEFAULT_PORT = 8760
 # The window's own backend. A fixed port keeps the page at one origin, and the
