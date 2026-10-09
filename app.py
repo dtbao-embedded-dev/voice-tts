@@ -29,6 +29,8 @@ from fastapi.staticfiles import StaticFiles
 from numpy.lib.stride_tricks import sliding_window_view
 from pydantic import BaseModel
 
+import lexicon
+
 SAMPLE_RATE = 48_000
 MAX_CHARS = 20_000
 
@@ -262,6 +264,9 @@ class SpeakRequest(BaseModel):
     # "f32": raw float32 streamed as it is generated. "wav": the whole reading
     # as one 16-bit file, sent once it is complete.
     format: Literal["f32", "wav"] = "f32"
+    # "normal": the engine reads the text as typed (POST spelled "phê ô ét tê").
+    # "special": lexicon.py respells words first (POST as "post", AP as "ây pi").
+    pronunciation: Literal["normal", "special"] = "normal"
 
 
 def wav_bytes(chunks) -> bytes:
@@ -303,7 +308,11 @@ def voices() -> dict:
     }
 
 
-def synthesize(text: str, voice: str | None = None, speed: float = 1.0):
+PRONUNCIATIONS = ("normal", "special")
+
+
+def synthesize(text: str, voice: str | None = None, speed: float = 1.0,
+               pronunciation: str = "normal"):
     """Validate a request and return ``(voice, chunks)``.
 
     ``chunks`` yields float32 arrays at ``SAMPLE_RATE`` as the engine produces
@@ -316,6 +325,8 @@ def synthesize(text: str, voice: str | None = None, speed: float = 1.0):
         raise ValueError("Chưa có văn bản để đọc.")
     if len(text) > MAX_CHARS:
         raise ValueError(f"Văn bản dài quá {MAX_CHARS} ký tự.")
+    if pronunciation not in PRONUNCIATIONS:
+        raise ValueError(f"Cách đọc phải là {' hoặc '.join(PRONUNCIATIONS)}.")
     if not SPEED_MIN <= speed <= SPEED_MAX:
         raise ValueError(f"Tốc độ phải trong khoảng {SPEED_MIN}-{SPEED_MAX}.")
 
@@ -324,8 +335,10 @@ def synthesize(text: str, voice: str | None = None, speed: float = 1.0):
     if resolved is None:
         raise ValueError(f"Không có giọng '{voice}'.")
 
+    spoken = lexicon.apply(text) if pronunciation == "special" else text
+
     def chunks():
-        for chunk in stretch(tts.infer_stream(text, voice=resolved), speed):
+        for chunk in stretch(tts.infer_stream(spoken, voice=resolved), speed):
             yield np.asarray(chunk, dtype=np.float32)
 
     return resolved, chunks()
@@ -343,7 +356,7 @@ def tts_stream(req: SpeakRequest):
     real length in the header and in ``Content-Length``.
     """
     try:
-        _, chunks = synthesize(req.text, req.voice, req.speed)
+        _, chunks = synthesize(req.text, req.voice, req.speed, req.pronunciation)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from None
 

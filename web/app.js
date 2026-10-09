@@ -8,6 +8,7 @@ const els = {
   sheet: $('sheet'), scrim: $('scrim'), speed: $('speed'),
   playBtn: $('playBtn'), playIcon: $('playIcon'), playLabel: $('playLabel'),
   saveBtn: $('saveBtn'), timecode: $('timecode'), meter: $('meter'),
+  pron: $('pron'),
 };
 
 const REGIONS = ['Bắc', 'Trung', 'Nam'];
@@ -19,6 +20,9 @@ let voice = null;
 let speaking = false;
 let abort = null;
 let speed = 1;
+// "normal": the engine reads the text as typed. "special": the backend respells
+// the words it gets wrong first (POST, AP, Board, ESP32).
+let pronunciation = 'normal';
 // Every start and every stop bumps this. A read carries the value it started
 // with and checks it before touching the UI, so a read the user has already
 // stopped can no longer report into the one that replaced it.
@@ -197,6 +201,13 @@ els.speed.addEventListener('click', (e) => {
   for (const o of els.speed.children) o.setAttribute('aria-pressed', String(o === opt));
 });
 
+els.pron.addEventListener('click', (e) => {
+  const opt = e.target.closest('.speed__opt');
+  if (!opt) return;
+  pronunciation = opt.dataset.pron;
+  for (const o of els.pron.children) o.setAttribute('aria-pressed', String(o === opt));
+});
+
 /* ---- Meter ------------------------------------------------------------- */
 
 const bars = Array.from({ length: METER_BARS }, () => {
@@ -255,6 +266,7 @@ function setSpeaking(on) {
   els.text.readOnly = on;
   // The speed is baked into the request, so it is fixed for the whole read.
   for (const o of els.speed.children) o.disabled = on;
+  for (const o of els.pron.children) o.disabled = on;
   els.meter.dataset.live = on ? '1' : '0';
   if (on) drawMeter(analyser);
 }
@@ -287,7 +299,7 @@ async function speak() {
     res = await fetch('/api/tts/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, voice, speed }),
+      body: JSON.stringify({ text, voice, speed, pronunciation }),
       signal: abort.signal,
     });
   } catch {

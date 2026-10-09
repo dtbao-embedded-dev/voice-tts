@@ -50,6 +50,7 @@ class StubEngine:
         return name if name in self.VOICES else None
 
     def infer_stream(self, text, voice=None):
+        self.last_text = text
         # A 220 Hz tone, 0.1 s per word, in a few chunks - enough to be audible
         # and to be told apart from silence.
         n = int(app.SAMPLE_RATE * 0.1 * max(1, len(text.split())))
@@ -321,6 +322,98 @@ def check_icon(base: str, tmp: Path) -> None:
     print("icon: disc + ring + 5 bars, ICO with small sizes, /favicon.svg on the page")
 
 
+def check_lexicon(base: str, tmp: Path) -> None:
+    """POST, AP and Board reach the engine in a spelling it reads right."""
+    import lexicon
+    from vieneu_utils.phonemize_text import normalize_to_chunks_v3_with_gaps,         phonemize_text_with_emotions
+
+    cases = {
+        "Gửi POST tới AP trên Board.": "Gửi post tới ây pi trên bo.",
+        "GET, PUT, PATCH và DELETE": "get, put, patch và delete",
+        "board, BOARD, Board-level": "bo, bo, bo-level",
+        "ESP32, esp32, ESP 32, Esp32-S3":
+            "i ét pi ba hai, i ét pi ba hai, i ét pi ba hai, i ét pi ba hai-S3",
+        # Whole words only, and what the user already marked as English stays.
+        "POSTMAN, APP, onboard, Boards, ap, Post, ESP320, ESP":
+            "POSTMAN, APP, onboard, Boards, ap, Post, ESP320, ESP",
+        "đọc <en>AP board</en> nguyên văn, AP thì không": "đọc <en>AP board</en> nguyên văn, ây pi thì không",
+    }
+    for text, want in cases.items():
+        assert lexicon.apply(text) == want, f"{text!r} -> {lexicon.apply(text)!r}"
+
+    # What the engine's own front end makes of it, model-free: the spelled-out
+    # Vietnamese letters (phê ô ét tê) are the bug being fixed.
+    def phonemes(text: str) -> str:
+        chunks, _ = normalize_to_chunks_v3_with_gaps(lexicon.apply(text), max_chars=256)
+        return " ".join(phonemize_text_with_emotions(c) for c in chunks)
+
+    for text, want, wrong in (("Gửi POST lên server", "pˈoʊst", "fˈe ˈo"),
+                              ("Gọi GET", "ɡˈɛt", "ɣˈəː2 ˈɛ"),
+                              ("Kết nối AP wifi", "ˈəɪ pˈi", "ˈæp"),
+                              ("Cắm Board vào", "bˈɔ ", "bˈɔːɹd"),
+                              ("Nạp ESP32 xong", "ˈi ˈɛɜt̪ pˈi bˈaː hˈaːj", "fˈe")):
+        got = phonemes(text)
+        assert want in got and wrong not in got, f"{text!r}: {got!r}"
+
+    # "normal" (the default) hands the engine the text as typed - POST is
+    # spelled as before; "special" respells it first.
+    raw = "Gửi POST tới AP trên Board"
+    for body, want in (({"text": raw}, raw),
+                       ({"text": raw, "pronunciation": "normal"}, raw),
+                       ({"text": raw, "pronunciation": "special"}, "Gửi post tới ây pi trên bo")):
+        status, _, answer = post(base, body)
+        assert status == 200, f"{body}: {status} {answer[:200]!r}"
+        assert app._engine.last_text == want, (body, app._engine.last_text)
+    assert post(base, {"text": raw, "pronunciation": "loud"})[0] == 422, "unknown mode accepted"
+
+    # The CLI, in-process and against the server, sends the same choice.
+    for flags, want in (([], raw), (["--pronunciation", "special"], "Gửi post tới ây pi trên bo")):
+        out = tmp / "pron.wav"
+        assert cli.main(["speak", raw, "-o", str(out), "-q", *flags]) == 0
+        assert app._engine.last_text == want, ("local", flags, app._engine.last_text)
+        code, _, err = run_cli("speak", raw, "-o", str(out), "--server", base, *flags)
+        assert code == 0, err
+        assert app._engine.last_text == want, ("remote", flags, app._engine.last_text)
+    code, _, _ = run_cli("speak", raw, "-o", "-", "--server", base, "--pronunciation", "loud")
+    assert code == 2, "an unknown --pronunciation must be a usage error"
+    print("lexicon: POST/GET/... as English words, AP as ây pi, Board as bo, whole words only")
+
+
+def check_install_files() -> None:
+    """tool-install.py copies every module of ours that the app imports.
+
+    A new module left off APP_FILES installs fine and then dies on the first
+    import, on the Docker host and in the Windows venv alike.
+    """
+    import ast
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("tool_install",
+                                                  ROOT / "docs/scripts/tool-install.py")
+    tool_install = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool_install)
+    ours = {f.stem for f in ROOT.glob("*.py")}
+    docker_context = (ROOT / ".dockerignore").read_text(encoding="utf-8").split()
+    docker_copy = next(line for line in (ROOT / "Dockerfile").read_text(encoding="utf-8")
+                       .splitlines() if line.startswith("COPY app.py")) + " "
+    for name in ("app.py", "cli.py", "tray.py", "icon.py"):
+        for node in ast.walk(ast.parse((ROOT / name).read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                mods = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                mods = [node.module]
+            else:
+                continue
+            for mod in mods:
+                if mod in ours:
+                    assert f"{mod}.py" in tool_install.APP_FILES,                         f"{name} imports {mod}, which tool-install.py does not copy"
+                # The image is the server: no window, so no tray.
+                if mod in ours and mod != "tray" and name != "tray.py":
+                    assert f"!{mod}.py" in docker_context,                         f"{name} imports {mod}, which .dockerignore keeps out of the image"
+                    assert f" {mod}.py " in docker_copy,                         f"{name} imports {mod}, which the Dockerfile does not COPY"
+    print("install: tool-install.py and the Docker image carry every module the app imports")
+
+
 def check_release_notes() -> None:
     """The release publishes the CHANGELOG section of ``cli.__version__``."""
     def notes(version: str) -> subprocess.CompletedProcess:
@@ -344,6 +437,7 @@ def main() -> int:
     check_stretch()
     app._engine = StubEngine()
     check_parser()
+    check_install_files()
     check_release_notes()
     check_tray()
 
@@ -353,6 +447,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         check_remote(base, Path(tmp))
         check_wav_format(base)
+        check_lexicon(base, Path(tmp))
         check_local(Path(tmp))
         check_icon(base, Path(tmp))
     print("OK")

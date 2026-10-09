@@ -18,6 +18,8 @@ Desktop app that reads mixed Vietnamese/English text aloud, powered by
   than a lower one.
 - **Model** — v3 Turbo is bilingual, so Vietnamese and English mix freely inside one
   sentence; no language tagging or manual splitting is needed.
+- **Pronunciation** — `normal` reads the text as typed; `special` first respells the
+  words the engine gets wrong (POST, AP, Board, ESP32...), see [Notes](#notes).
 
 ## Usage
 
@@ -39,8 +41,11 @@ it (plus a one-off download for a source install).
 2. Paste or type the text - up to 20 000 characters, Vietnamese and English mixed
    freely in one sentence.
 3. **Giọng đọc** picks the voice (★ = featured); **Tốc độ** picks 0.75×-1.5×.
-4. **Đọc** (`Ctrl+Enter`) reads it as it is generated; press again or `Esc` to stop.
-5. **Lưu WAV** saves what was read.
+4. **Phát âm** is *Thường* (the text as typed: `POST` is spelled *phê ô ét tê*) or
+   *Đặc biệt* (`POST` read "post", `AP` "ây pi", `Board` "bo", `ESP32` "i ét pi ba
+   hai").
+5. **Đọc** (`Ctrl+Enter`) reads it as it is generated; press again or `Esc` to stop.
+6. **Lưu WAV** saves what was read.
 
 Minimizing or closing the window hides it in the system tray and the app keeps
 running; click the tray icon to bring it back, right-click → *Thoát* to quit.
@@ -79,6 +84,7 @@ cat notes.txt | voice-tts speak -o - > notes.wav                  # a pipe to a 
 voice-tts voices                                                  # the voices to pick from
 voice-tts status --wait 120                                       # is the server ready?
 voice-tts speak "..." --local                                     # ignore the server, run here
+voice-tts speak "Gửi POST tới ESP32" --pronunciation special      # POST "post", ESP32 "i ét pi ba hai"
 ```
 
 `voice-tts <command> -h` lists every flag; [Command line](#command-line) has the
@@ -93,6 +99,7 @@ full table and the exit codes.
 | Page says *Đang tải model…* for long | first start after install is loading or downloading the model; wait |
 | `Không có giọng '...'` (exit 2) | voice name mistyped: `voice-tts voices` lists the exact names |
 | `voice-tts` not found on Windows | open a new terminal after the install, so it sees the new `PATH` |
+| `POST` read as *phê ô ét tê*, `AP` as *ap* | the default `normal` pronunciation reads the text as typed: use `--pronunciation special` / *Phát âm → Đặc biệt* |
 | `no audio player found` on Linux | install `pulseaudio-utils` or `alsa-utils`, or write a file with `-o` |
 
 ## Quick start (development)
@@ -181,6 +188,7 @@ voice-tts speak "Xin chào, deploy lên production server."           # play it
 voice-tts speak -f bai-doc.txt -v "Mai Anh" -s 1.25 -o bai-doc.wav  # save it
 echo "Chào bạn" | voice-tts speak -o - > chao.wav                   # pipe it
 voice-tts speak "Xin chào" --server http://192.168.0.137:8760 --token <t>
+voice-tts speak "Bật AP trên Board" --pronunciation special     # AP "ây pi", Board "bo"
 voice-tts voices                 # * default, + featured; --json for the raw list
 voice-tts status --wait 600      # exit 0 once the server's model is ready
 ```
@@ -193,6 +201,7 @@ voice-tts status --wait 600      # exit 0 once the server's model is ready
 | `-o`, `--output` | write to a file, or `-` for stdout; without it the text is played |
 | `--play` / `--no-play` | force playback on or off (default: on unless `-o`) |
 | `--raw` | with `-o`: raw float32 LE mono 48 kHz instead of a 16-bit WAV |
+| `--pronunciation P` | `normal` reads the text as typed (default); `special` respells POST, AP, Board, ESP32... first |
 | `--server URL`, `--token T` | use a running server instead of loading the model here |
 | `--local` | ignore `$VOICE_TTS_SERVER` |
 | `--timeout S` | seconds to wait on the server (default 600) |
@@ -266,10 +275,11 @@ upgrade: since 3.8.3 `Minh Quân Pro` is `Hải Đăng`, `Anh Khôi` is `Thiện
 `Mạnh Dũng` is `Quốc Tuấn`. The old names (and `Minh Quân`) are still accepted as
 `voice` and read with the renamed voice; they are just no longer listed.
 
-`POST /api/tts/stream` takes `{"text", "voice", "speed", "format"}`: `text` up to
-20 000 characters, `voice` a name from `/api/voices` (omit it for the
+`POST /api/tts/stream` takes `{"text", "voice", "speed", "format", "pronunciation"}`:
+`text` up to 20 000 characters, `voice` a name from `/api/voices` (omit it for the
 default), `speed` between `0.5` and `2.0` (default `1.0`), `format` either `"f32"`
-(default) or `"wav"`.
+(default) or `"wav"`, `pronunciation` either `"normal"` (default, the text as typed)
+or `"special"` (respelled by `lexicon.py`, see Notes).
 
 | `format` | Body | `Content-Type` | Starts arriving |
 | --- | --- | --- | --- |
@@ -277,7 +287,7 @@ default), `speed` between `0.5` and `2.0` (default `1.0`), `format` either `"f32
 | `"wav"` | a complete 16-bit mono WAV, 48 kHz, real length in the header and `Content-Length` | `audio/wav` | once the whole text is synthesized - for saving a file |
 
 The answer is `400` for empty or over-long text, an unknown voice or a speed out
-of range, `422` for an unknown `format`, and `401` when the server
+of range, `422` for an unknown `format` or `pronunciation`, and `401` when the server
 has a token and the request does not carry it. Every `/api` call takes the token as
 `Authorization: Bearer <token>`; leave the header out for a server without one.
 
@@ -417,6 +427,21 @@ carries on without one: the window closes as before, `serve` keeps serving.
   the duration and leave the pitch where it is, so the voice at 0.75× is the voice at
   1×, only slower. The stream is always 48 kHz and a saved WAV is a plain 48 kHz file
   carrying the speed it was read at.
+- **Two pronunciations: `normal` (default) and `special`.** The engine's text front
+  end spells an upper-case word it does not know with Vietnamese letter names
+  (`POST` is *phê ô ét tê*), turns `AP` into the syllable *ap*, and reads `Board` as
+  English. `normal` leaves that as it is: the text is read as typed. `special`
+  (`"pronunciation": "special"`, `--pronunciation special`, *Phát âm → Đặc biệt*)
+  has `lexicon.py` rewrite whole words first: `POST`/`GET`/`PUT`/`PATCH`/`DELETE` as
+  the English words, `AP` as *ây pi*, `board` (any case) as *bo*, `ESP32` (any case,
+  also `ESP 32`) as *i ét pi ba hai*. `POSTMAN`, `APP` and `onboard` are left alone,
+  and so is anything inside `<en>...</en>`. Another word is one more line in
+  `ENTRIES`.
+- **Verify mode is deferred.** Checking a reading by ear - Whisper large-v3-turbo
+  transcribes it, and it is sent only if it matches the text by 95% - was built,
+  measured and taken out before release (it needs a 0.8 GB int8 model in the
+  installer). [docs/verify-whisper.md](docs/verify-whisper.md) records what it used,
+  the results and the commits that hold the code.
 - **Licence.** The model card puts every shipped artifact - weights, ONNX exports and
   the preset-voice assets - under Apache-2.0 and allows commercial use of the audio;
   keep the notices of [pnnbao97/VieNeu-TTS](https://github.com/pnnbao97/VieNeu-TTS)
@@ -436,8 +461,8 @@ carries on without one: the window closes as before, `serve` keeps serving.
 
 `.github/workflows/ci.yml` runs on every push to `main`, `developing`, `feat/**` and
 `fix/**` and on pull requests, on `ubuntu-latest` and `windows-latest` with Python
-3.12: `test_cli.py` (CLI, token guard, tray menu and the time-stretcher, against a
-stub engine - no model download) and `--help` for every subcommand and the
+3.12: `test_cli.py` (CLI, token guard, tray menu, the time-stretcher and the
+pronunciation lexicon, against a stub engine - no model download) and `--help` for every subcommand and the
 installer. The real-model smoke test runs locally (`tool-build.py --check`).
 
 ## Release
@@ -481,6 +506,7 @@ python docs/scripts/tool-build.py --release-notes 0.5.0     # the notes a v0.5.0
 ```
 app.py                    FastAPI backend + native window entry point
 tray.py                   system tray icon, its native menu (pystray) and the popup menu
+lexicon.py                whole-word respellings for the special pronunciation
 icon.py                   the app icon, one geometry: tray/window/exe .ico and /favicon.svg
 cli.py                    command line: subcommands and flags, stdlib-only at import
 test_tts.py               assert-based smoke test over the real HTTP path
@@ -491,6 +517,7 @@ requirements.txt          server + CLI core (what Docker installs)
 requirements-desktop.txt  core + window + tray (what tool-build.py installs)
 Dockerfile, compose.yaml  Linux server image, token from .env
 .github/workflows/        ci.yml (tests, both OSes), release.yml (installer + Linux binary)
+docs/verify-whisper.md    deferred verify mode: what it used, results, where the code is
 docs/scripts/tool-build.py  setup / run / check / package / installer
 docs/scripts/voice-tts.nsi  the NSIS installer script tool-build.py --installer runs
 docs/scripts/tool-install.py  install / uninstall: Windows venv, Linux Docker, --remote over ssh

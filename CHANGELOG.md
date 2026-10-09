@@ -6,6 +6,18 @@ Every user-visible change, newest first. The format follows
 (`tool-build.py --release-notes <version>`), and a tag without a section here fails
 the release before it builds.
 
+## [Unreleased]
+
+### Added
+
+- A `special` pronunciation (`"pronunciation": "special"` on `POST /api/tts/stream`,
+  `speak --pronunciation special`, *Phát âm → Đặc biệt* in the window) respells
+  whole words the engine gets wrong before it reads them (`lexicon.py`): `POST`,
+  `GET`, `PUT`, `PATCH` and `DELETE` as the English words instead of *phê ô ét tê*,
+  `AP` as *ây pi* instead of the syllable *ap*, `Board` as *bo*, and `ESP32` (any
+  case, also `ESP 32`) as *i ét pi ba hai*. The default, `normal`, reads the text
+  as typed, as before.
+
 ## [0.6.1] - 2026-10-08
 
 ### Changed
