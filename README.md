@@ -548,7 +548,8 @@ carries on without one: the window closes as before, `serve` keeps serving.
   (`"pronunciation": "special"`, `--pronunciation special`, *Phát âm → Đặc biệt*)
   has `lexicon.py` rewrite whole words first: `POST`/`GET`/`PUT`/`PATCH`/`DELETE` as
   the English words, `AP` as *ây pi*, `board` (any case) as *bo*, `ESP32` (any case,
-  also `ESP 32`) as *i ét pi ba hai*. `POSTMAN`, `APP` and `onboard` are left alone,
+  also `ESP 32`) as *i ét pi ba hai*, `ESP` on its own (any case) as *i ét pi*.
+  `POSTMAN`, `APP` and `onboard` are left alone,
   and so is anything inside `<en>...</en>`. Another built-in word is one more line
   in `ENTRIES`.
 - **Your own words.** *Từ điển* in the window, `voice-tts lexicon add` or

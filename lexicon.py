@@ -42,6 +42,8 @@ ENTRIES = (
     ("esp32", "i ét pi ba hai", False),
     # Typed with a space it read "e ét phê ba mươi hai".
     ("esp 32", "i ét pi ba hai", False),
+    # On its own ("ESP HTTP client") it read "e ét phê", heard as "ESV" or "es phê".
+    ("esp", "i ét pi", False),
 )
 
 ENV_DATA = "VOICE_TTS_DATA"

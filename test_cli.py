@@ -466,9 +466,10 @@ def check_lexicon(base: str, tmp: Path) -> None:
         "board, BOARD, Board-level": "bo, bo, bo-level",
         "ESP32, esp32, ESP 32, Esp32-S3":
             "i ét pi ba hai, i ét pi ba hai, i ét pi ba hai, i ét pi ba hai-S3",
+        "bằng ESP HTTP client, hỏi về esp": "bằng i ét pi HTTP client, hỏi về i ét pi",
         # Whole words only, and what the user already marked as English stays.
-        "POSTMAN, APP, onboard, Boards, ap, Post, ESP320, ESP":
-            "POSTMAN, APP, onboard, Boards, ap, Post, ESP320, ESP",
+        "POSTMAN, APP, onboard, Boards, ap, Post, ESP320, ESPs":
+            "POSTMAN, APP, onboard, Boards, ap, Post, ESP320, ESPs",
         "đọc <en>AP board</en> nguyên văn, AP thì không": "đọc <en>AP board</en> nguyên văn, ây pi thì không",
     }
     for text, want in cases.items():
