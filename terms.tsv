@@ -127,7 +127,7 @@ SOT-223	SOT-223	ok	en	on
 16 MHz	16 MHz	ok	en	on
 50 Hz	50 Hz	ok	en	on
 100 ms	100 ms	ok	en	on
-1–2 m	1–2 m	ok	en	on
+1–2 m	1 đến 2 mét	ok	en	on
 30 cm	30 cm	ok	en	on
 5 mm	5 mm	ok	en	on
 25°C	25°C	ok	en	on
@@ -494,136 +494,136 @@ diode zener	diode zener	ok	mixed	on
 cầu diode	cầu diode	ok	mixed	on
 transistor công suất	transistor công suất	ok	mixed	on
 pin lithium	pin lithium	ok	mixed	on
-tụ 1000uF ở đây		units	mixed	pending
-5V		units	en	pending
-12V		units	en	pending
-24V		units	en	pending
--5V		units	en	pending
-+5V		units	en	pending
-+3.3V		units	en	pending
-±12V		units	en	pending
-3.3V		units	en	pending
-3,3 V		units	en	pending
-3,3V		units	en	pending
-1.8V		units	en	pending
-2,64V		units	en	pending
-50 mV		units	en	pending
-1100mV		units	en	pending
-2.5 kV		units	en	pending
-20 mA		units	en	pending
-dòng 500mA		units	en	pending
-500 µA		units	en	pending
-500 μA		units	en	pending
-500 uA		units	en	pending
-10 nA		units	en	pending
-10A		units	en	pending
-5mW		units	en	pending
-1 kΩ		units	en	pending
-68 kΩ		units	en	pending
-45kΩ		units	en	pending
-4,7kΩ		units	en	pending
-10kΩ		units	en	pending
-1 MΩ		units	en	pending
-100 kΩ ±1%		units	en	pending
-100nF		units	en	pending
-0.1µF		units	en	pending
-0.1μF		units	en	pending
-0.1uF		units	en	pending
-10uF		units	en	pending
-10µF		units	en	pending
-10μF		units	en	pending
-4.7uF		units	en	pending
-4,7µF		units	en	pending
-22pF		units	en	pending
-100pF		units	en	pending
-4.7µH		units	en	pending
-4.7μH		units	en	pending
-4.7uH		units	en	pending
-100uH		units	en	pending
-10mH		units	en	pending
-10 µs		units	en	pending
-10 μs		units	en	pending
-10 us		units	en	pending
-8,7 µs		units	en	pending
-20 ns		units	en	pending
-2.4 GHz		units	en	pending
-2,4 GHz		units	en	pending
-1.2 GHz		units	en	pending
--70 dBm		units	en	pending
-20 dBm		units	en	pending
-220VAC		units	en	pending
-12VDC		units	en	pending
-1-2m		units	en	pending
-1-2 m		units	en	pending
-0-5V		units	en	pending
-5-12V		units	en	pending
-1-2A		units	en	pending
-0-3.3V		units	en	pending
-0–3.3V		units	en	pending
-3.3-5V		units	en	pending
-0-3,3V		units	en	pending
-0 - 3.3V		units	en	pending
-0~3.3V		units	en	pending
-0~5V		units	en	pending
--40~85°C		units	en	pending
-−40°C		units	en	pending
-−70 dBm		units	en	pending
-−5V		units	en	pending
-0 đến 3.3V		units	en	pending
-3.3V±5%		units	en	pending
-3.3V ± 0.1V		units	en	pending
-5V±10%		units	en	pending
-5V 2A		units	en	pending
-5V2A		units	en	pending
-12V5A		units	en	pending
-3.3V/500mA		units	en	pending
-5V/2A		units	en	pending
-12V/1A		units	en	pending
-1/4W		units	en	pending
-1/2W		units	en	pending
-1/4 W		units	en	pending
-100R		units	en	pending
-0R		units	en	pending
-1R		units	en	pending
-0x3C		units	en	pending
-0x76		units	en	pending
-0xFF		units	en	pending
-0x1A		units	en	pending
-0x5A		units	en	pending
-nguồn 3.3V		units	mixed	pending
-tụ 100nF		units	mixed	pending
-tụ 22pF		units	mixed	pending
-tụ 470uF		units	mixed	pending
-tụ 1000uF 16V		units	mixed	pending
-tụ 100uF/25V		units	mixed	pending
-cầu chì 10A		units	mixed	pending
-nguồn tổ ong 12V 5A		units	mixed	pending
-adapter 5V 2A		units	mixed	pending
-sạc 5V2A		units	mixed	pending
-sạc 5V/2A		units	mixed	pending
-pin 3,7V		units	mixed	pending
-pin 3.7V 2000mAh		units	mixed	pending
-pin 9V		units	mixed	pending
-cuộn cảm 10uH		units	mixed	pending
-điện trở 1M		units	mixed	pending
-trở 1M		units	mixed	pending
-địa chỉ 0x3C		units	mixed	pending
-tụ 104		units	mixed	pending
-tụ 103		units	mixed	pending
-tụ 102		units	mixed	pending
-tụ 105		units	mixed	pending
-tụ 221		units	mixed	pending
-tụ gốm 104		units	mixed	pending
-tụ 104 50V		units	mixed	pending
-tụ 22p		units	mixed	pending
-tụ 10p		units	mixed	pending
-tụ 100n		units	mixed	pending
-tụ 1u		units	mixed	pending
-tụ 0.1u		units	mixed	pending
-tụ 104 và tụ 22p		units	mixed	pending
-lớp 5A		units	mixed	pending
-2N2222A ở đây		units	mixed	pending
-AO3400A ở đây		units	mixed	pending
+tụ 1000uF ở đây	tụ 1000 mi cờ rô pha ra ở đây	units	mixed	on
+5V	5 vôn	units	en	on
+12V	12 vôn	units	en	on
+24V	24 vôn	units	en	on
+-5V	-5 vôn	units	en	on
++5V	+5 vôn	units	en	on
++3.3V	+3.3 vôn	units	en	on
+±12V	±12 vôn	units	en	on
+3.3V	3.3 vôn	units	en	on
+3,3 V	3,3 vôn	units	en	on
+3,3V	3,3 vôn	units	en	on
+1.8V	1.8 vôn	units	en	on
+2,64V	2,64 vôn	units	en	on
+50 mV	50 mi li vôn	units	en	on
+1100mV	1100 mi li vôn	units	en	on
+2.5 kV	2.5 ki lô vôn	units	en	on
+20 mA	20 mi li am pe	units	en	on
+dòng 500mA	dòng 500 mi li am pe	units	en	on
+500 µA	500 mi cờ rô am pe	units	en	on
+500 μA	500 mi cờ rô am pe	units	en	on
+500 uA	500 mi cờ rô am pe	units	en	on
+10 nA	10 na nô am pe	units	en	on
+10A	10 am pe	units	en	on
+5mW	5 mi li oát	units	en	on
+1 kΩ	1 ki lô ôm	units	en	on
+68 kΩ	68 ki lô ôm	units	en	on
+45kΩ	45 ki lô ôm	units	en	on
+4,7kΩ	4,7 ki lô ôm	units	en	on
+10kΩ	10 ki lô ôm	units	en	on
+1 MΩ	1 mê ga ôm	units	en	on
+100 kΩ ±1%	100 ki lô ôm ±1%	units	en	on
+100nF	100 na nô pha ra	units	en	on
+0.1µF	0.1 mi cờ rô pha ra	units	en	on
+0.1μF	0.1 mi cờ rô pha ra	units	en	on
+0.1uF	0.1 mi cờ rô pha ra	units	en	on
+10uF	10 mi cờ rô pha ra	units	en	on
+10µF	10 mi cờ rô pha ra	units	en	on
+10μF	10 mi cờ rô pha ra	units	en	on
+4.7uF	4.7 mi cờ rô pha ra	units	en	on
+4,7µF	4,7 mi cờ rô pha ra	units	en	on
+22pF	22 pi cô pha ra	units	en	on
+100pF	100 pi cô pha ra	units	en	on
+4.7µH	4.7 mi cờ rô hen ri	units	en	on
+4.7μH	4.7 mi cờ rô hen ri	units	en	on
+4.7uH	4.7 mi cờ rô hen ri	units	en	on
+100uH	100 mi cờ rô hen ri	units	en	on
+10mH	10 mi li hen ri	units	en	on
+10 µs	10 mi cờ rô giây	units	en	on
+10 μs	10 mi cờ rô giây	units	en	on
+10 us	10 mi cờ rô giây	units	en	on
+8,7 µs	8,7 mi cờ rô giây	units	en	on
+20 ns	20 na nô giây	units	en	on
+2.4 GHz	2.4 di ga héc	units	en	on
+2,4 GHz	2,4 di ga héc	units	en	on
+1.2 GHz	1.2 di ga héc	units	en	on
+-70 dBm	-70 đê bê em	units	en	on
+20 dBm	20 đê bê em	units	en	on
+220VAC	220 vôn a xê	units	en	on
+12VDC	12 vôn đê xê	units	en	on
+1-2m	1 đến 2 mét	units	en	on
+1-2 m	1 đến 2 mét	units	en	on
+0-5V	0 đến 5 vôn	units	en	on
+5-12V	5 đến 12 vôn	units	en	on
+1-2A	1 đến 2 am pe	units	en	on
+0-3.3V	0 đến 3.3 vôn	units	en	on
+0–3.3V	0 đến 3.3 vôn	units	en	on
+3.3-5V	3.3 đến 5 vôn	units	en	on
+0-3,3V	0 đến 3,3 vôn	units	en	on
+0 - 3.3V	0 đến 3.3 vôn	units	en	on
+0~3.3V	0 đến 3.3 vôn	units	en	on
+0~5V	0 đến 5 vôn	units	en	on
+-40~85°C	-40 đến 85 độ xê	units	en	on
+−40°C	-40°C	units	en	on
+−70 dBm	-70 đê bê em	units	en	on
+−5V	-5 vôn	units	en	on
+0 đến 3.3V	0 đến 3.3 vôn	units	en	on
+3.3V±5%	3.3 vôn±5%	units	en	on
+3.3V ± 0.1V	3.3 vôn ± 0.1 vôn	units	en	on
+5V±10%	5 vôn±10%	units	en	on
+5V 2A	5 vôn 2 am pe	units	en	on
+5V2A	5 vôn 2 am pe	units	en	on
+12V5A	12 vôn 5 am pe	units	en	on
+3.3V/500mA	3.3 vôn, 500 mi li am pe	units	en	on
+5V/2A	5 vôn, 2 am pe	units	en	on
+12V/1A	12 vôn, 1 am pe	units	en	on
+1/4W	một phần tư oát	units	en	on
+1/2W	một phần hai oát	units	en	on
+1/4 W	một phần tư oát	units	en	on
+100R	100 ôm	units	en	on
+0R	0 ôm	units	en	on
+1R	1 ôm	units	en	on
+0x3C	không ích ba xi	units	en	on
+0x76	không ích bảy sáu	units	en	on
+0xFF	không ích ép ép	units	en	on
+0x1A	không ích một ây	units	en	on
+0x5A	không ích năm ây	units	en	on
+nguồn 3.3V	nguồn 3.3 vôn	units	mixed	on
+tụ 100nF	tụ 100 na nô pha ra	units	mixed	on
+tụ 22pF	tụ 22 pi cô pha ra	units	mixed	on
+tụ 470uF	tụ 470 mi cờ rô pha ra	units	mixed	on
+tụ 1000uF 16V	tụ 1000 mi cờ rô pha ra 16 vôn	units	mixed	on
+tụ 100uF/25V	tụ 100 mi cờ rô pha ra, 25 vôn	units	mixed	on
+cầu chì 10A	cầu chì 10 am pe	units	mixed	on
+nguồn tổ ong 12V 5A	nguồn tổ ong 12 vôn 5 am pe	units	mixed	on
+adapter 5V 2A	adapter 5 vôn 2 am pe	units	mixed	on
+sạc 5V2A	sạc 5 vôn 2 am pe	units	mixed	on
+sạc 5V/2A	sạc 5 vôn, 2 am pe	units	mixed	on
+pin 3,7V	pin 3,7 vôn	units	mixed	on
+pin 3.7V 2000mAh	pin 3.7 vôn 2000mAh	units	mixed	on
+pin 9V	pin 9 vôn	units	mixed	on
+cuộn cảm 10uH	cuộn cảm 10 mi cờ rô hen ri	units	mixed	on
+điện trở 1M	điện trở 1 mê ga ôm	units	mixed	on
+trở 1M	trở 1 mê ga ôm	units	mixed	on
+địa chỉ 0x3C	địa chỉ không ích ba xi	units	mixed	on
+tụ 104	tụ một không bốn	units	mixed	on
+tụ 103	tụ một không ba	units	mixed	on
+tụ 102	tụ một không hai	units	mixed	on
+tụ 105	tụ một không năm	units	mixed	on
+tụ 221	tụ hai hai một	units	mixed	on
+tụ gốm 104	tụ gốm một không bốn	units	mixed	on
+tụ 104 50V	tụ một không bốn 50 vôn	units	mixed	on
+tụ 22p	tụ 22 pi cô	units	mixed	on
+tụ 10p	tụ 10 pi cô	units	mixed	on
+tụ 100n	tụ 100 na nô	units	mixed	on
+tụ 1u	tụ 1 mi cờ rô	units	mixed	on
+tụ 0.1u	tụ 0.1 mi cờ rô	units	mixed	on
+tụ 104 và tụ 22p	tụ một không bốn và tụ 22 pi cô	units	mixed	on
+lớp 5A	lớp 5A	units	mixed	on
+2N2222A ở đây	2N2222A ở đây	units	mixed	on
+AO3400A ở đây	AO3400A ở đây	units	mixed	on
 UART		acronym	en	pending
 UART0		acronym	en	pending
 USART		acronym	en	pending
