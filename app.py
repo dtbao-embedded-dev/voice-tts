@@ -298,6 +298,14 @@ def status() -> dict:
     return {"state": "loading"}
 
 
+@app.get("/api/version")
+def version() -> dict:
+    """The version this server runs, so a client can tell it from its own."""
+    import cli  # standard library only at import; the version lives there
+
+    return {"version": cli.__version__}
+
+
 @app.get("/api/voices")
 def voices() -> dict:
     return {

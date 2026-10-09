@@ -247,6 +247,7 @@ plain HTTP: fine on a home LAN, not for the internet.
 | Endpoint | Response |
 | --- | --- |
 | `GET /api/status` | `{"state": "loading" \| "ready" \| "error"}` while the model warms up |
+| `GET /api/version` | `{"version": "0.7.0"}` - the version the server runs (`voice-tts --version` is the CLI's own) |
 | `GET /api/voices` | the 25 preset voices with region, gender and description, the default voice, `sampleRate` and `maxChars` |
 | `POST /api/tts/stream` | raw float32 LE mono at 48 kHz, streamed as it is generated; or one 16-bit WAV file with `"format": "wav"` |
 
@@ -348,6 +349,7 @@ The other endpoints take the same header:
 ```bash
 curl -H "Authorization: Bearer <token>" http://<host>:8760/api/voices   # names to use as "voice"
 curl -H "Authorization: Bearer <token>" http://<host>:8760/api/status   # {"state": "ready"}
+curl -H "Authorization: Bearer <token>" http://<host>:8760/api/version  # {"version": "0.7.0"}
 ```
 
 ## Docker (Linux server)

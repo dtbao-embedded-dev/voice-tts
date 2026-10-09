@@ -6,6 +6,13 @@ Every user-visible change, newest first. The format follows
 (`tool-build.py --release-notes <version>`), and a tag without a section here fails
 the release before it builds.
 
+## [Unreleased]
+
+### Added
+
+- `GET /api/version` answers `{"version": "<version>"}`, the version the server
+  runs - `voice-tts --version` only ever told the CLI's own.
+
 ## [0.7.0] - 2026-10-09
 
 ### Added

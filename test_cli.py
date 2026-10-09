@@ -96,6 +96,9 @@ def check_token(base: str) -> None:
         cookie = {"Cookie": f"{app.TOKEN_COOKIE}={TOKEN}"}
         assert request(f"{base}/api/voices", cookie)[0] == 200, "cookie token refused"
         assert request(f"{base}/api/voices", {"Cookie": f"{app.TOKEN_COOKIE}=x"})[0] == 401
+        assert request(f"{base}/api/version")[0] == 401, "version must sit behind the token"
+        status, _, body = request(f"{base}/api/version", good)
+        assert status == 200 and json.loads(body) == {"version": cli.__version__},             f"/api/version: {status} {body!r}"
 
         status, headers, _ = request(f"{base}/?token={TOKEN}")
         assert status == 200, f"/?token= gave {status}"
@@ -107,7 +110,7 @@ def check_token(base: str) -> None:
         assert request(f"{base}/web/app.js")[0] == 200, "static files must stay open"
     finally:
         app.set_token(None)
-    print("token: 401 without, 200 with Bearer or cookie, /?token= sets it")
+    print("token: 401 without, 200 with Bearer or cookie, /?token= sets it; /api/version")
 
 
 def run_cli(*args: str, stdin: bytes = b"") -> tuple[int, bytes, str]:
