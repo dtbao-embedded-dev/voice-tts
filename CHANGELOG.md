@@ -14,6 +14,10 @@ the release before it builds.
   turn comes (and how long it waited), and how it ended - done, hung up or failed -
   with the audio length, engine time, RTF and time to first audio. The lines go to
   stderr at any `--log-level`. `VOICE_TTS_LOG_TEXT=1` adds the text itself.
+- `VOICE_TTS_THREADS=<n>` sets the CPU threads a reading runs on (unset: the
+  engine's own choice, about one per physical core, at most 8). On a CPU with
+  performance and efficiency cores, the number of performance cores is fastest:
+  6 on an i5-14600K, RTF 0.267 against 0.273 at the default.
 
 ### Fixed
 
