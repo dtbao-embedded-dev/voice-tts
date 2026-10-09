@@ -21,7 +21,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-COPY app.py cli.py icon.py lexicon.py ./
+COPY app.py cli.py icon.py lexicon.py respell.py ./
 COPY web ./web
 
 # Run unprivileged; the volume mount point must already belong to that user,

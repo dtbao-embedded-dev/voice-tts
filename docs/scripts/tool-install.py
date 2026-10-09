@@ -30,7 +30,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-APP_FILES = ("app.py", "cli.py", "tray.py", "icon.py", "lexicon.py", "requirements.txt",
+APP_FILES = ("app.py", "cli.py", "tray.py", "icon.py", "lexicon.py", "respell.py", "requirements.txt",
              "requirements-desktop.txt")
 APP_DIRS = ("web",)
 DOCKER_FILES = ("Dockerfile", "compose.yaml", ".dockerignore")

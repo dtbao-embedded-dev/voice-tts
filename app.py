@@ -34,6 +34,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 from pydantic import BaseModel
 
 import lexicon
+import respell
 
 SAMPLE_RATE = 48_000
 MAX_CHARS = 20_000
@@ -364,7 +365,7 @@ class SpeakRequest(BaseModel):
     # whole reading as one file, sent once it is complete.
     format: Literal["f32", "wav", "mp3", "ogg"] = "f32"
     # "normal": the engine reads the text as typed (POST spelled "phê ô ét tê").
-    # "special": lexicon.py respells words first (POST as "post", AP as "ây pi").
+    # "special": respell.py rewrites terms first (POST as "post", AP as "ây pi").
     pronunciation: Literal["normal", "special"] = "normal"
 
 
@@ -474,7 +475,7 @@ def synthesize(text: str, voice: str | None = None, speed: float = 1.0,
     if resolved is None:
         raise ValueError(f"Không có giọng '{voice}'.")
 
-    spoken = lexicon.apply(text, lexicon.load_user()) if pronunciation == "special" else text
+    spoken = respell.special(text, lexicon.load_user()) if pronunciation == "special" else text
 
     def generate():
         for chunk in stretch(tts.infer_stream(spoken, voice=resolved,
