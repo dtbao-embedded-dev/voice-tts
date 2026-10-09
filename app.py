@@ -157,7 +157,8 @@ def engine():
             from vieneu import Vieneu
 
             try:
-                _engine = Vieneu(precision=MODEL_PRECISION, threads=ENGINE_THREADS)
+                with onnx_sessions_on(ENGINE_DEVICE):
+                    _engine = Vieneu(precision=MODEL_PRECISION, threads=ENGINE_THREADS)
             except Exception as exc:  # surfaced to the UI via /api/status
                 _engine_error = f"{type(exc).__name__}: {exc}"
                 raise
@@ -212,6 +213,52 @@ _turns = Turns(MAX_STREAMS)
 # i5-14600K (6 P + 8 E cores), fp32, RTF was 0.341 with 2 threads, 0.285 with 4,
 # 0.267 with 6, 0.273 with 8, 0.284 with 12, 0.287 with 14 and 0.296 with 20.
 ENGINE_THREADS = max(0, int(os.environ.get("VOICE_TTS_THREADS", "0")))
+
+# Where the engine's ONNX graphs run: "cpu", or "gpu" through DirectML (Windows, any
+# DirectX 12 GPU - AMD, Intel or NVIDIA). DirectML ships in onnxruntime-directml,
+# which installs the same `onnxruntime` module as the CPU package, so it replaces
+# that package instead of sitting beside it.
+DEVICES = ("cpu", "gpu")
+ENGINE_DEVICE = os.environ.get("VOICE_TTS_DEVICE", "cpu").strip().lower()
+
+
+@contextmanager
+def onnx_sessions_on(device: str):
+    """Open every ONNX session the engine loads inside this block on ``device``.
+
+    vieneu's ONNX engine opens its sessions on the CPU provider and takes no
+    provider of its own, so for "gpu" the session constructor is swapped for the
+    length of the load: a session asked for on the CPU alone gets DirectML first,
+    with the CPU behind it for any node DirectML cannot run. Sessions opened after
+    the load - the cloning encoders, which this app never uses - stay on the CPU.
+    Only the engine opens sessions during the load; it holds ``_engine_lock``.
+    """
+    if device not in DEVICES:
+        raise ValueError(f"VOICE_TTS_DEVICE={device!r}: use one of {', '.join(DEVICES)}")
+    if device == "cpu":
+        yield
+        return
+    import onnxruntime as ort
+
+    if "DmlExecutionProvider" not in ort.get_available_providers():
+        raise RuntimeError("VOICE_TTS_DEVICE=gpu needs onnxruntime-directml "
+                           "installed in place of onnxruntime")
+    plain = ort.InferenceSession
+
+    def on_gpu(path, sess_options=None, providers=None, **kwargs):
+        if providers == ["CPUExecutionProvider"]:
+            sess_options = sess_options or ort.SessionOptions()
+            # DirectML supports neither memory patterns nor parallel execution.
+            sess_options.enable_mem_pattern = False
+            sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            providers = ["DmlExecutionProvider", "CPUExecutionProvider"]
+        return plain(path, sess_options, providers=providers, **kwargs)
+
+    ort.InferenceSession = on_gpu
+    try:
+        yield
+    finally:
+        ort.InferenceSession = plain
 
 # What each reading logs carries no text unless this is set: the text is what a
 # listener typed, and the journal keeps it long after the reading is gone.

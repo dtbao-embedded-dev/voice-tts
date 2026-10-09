@@ -880,6 +880,85 @@ def check_engine_threads() -> None:
     print("engine threads: VOICE_TTS_THREADS reaches the engine, unset leaves it at 0")
 
 
+def check_engine_device() -> None:
+    """VOICE_TTS_DEVICE=gpu opens the engine's ONNX sessions on DirectML; cpu leaves them."""
+    import types
+
+    def device_with(value: str | None) -> str:
+        env = {k: v for k, v in os.environ.items() if k != "VOICE_TTS_DEVICE"}
+        if value is not None:
+            env["VOICE_TTS_DEVICE"] = value
+        out = subprocess.run([sys.executable, "-c", "import app; print(app.ENGINE_DEVICE)"],
+                             cwd=ROOT, env=env, capture_output=True, text=True, timeout=60)
+        assert out.returncode == 0, out.stderr
+        return out.stdout.split()[-1]
+
+    assert device_with(None) == "cpu", "unset must keep the engine on the CPU"
+    assert device_with(" GPU ") == "gpu"
+
+    # A stand-in onnxruntime records each session it opens; a stand-in vieneu opens
+    # one the way vieneu's ONNX engine does, on the CPU provider alone.
+    class SessionOptions:
+        enable_mem_pattern = True
+        execution_mode = "parallel"
+
+    def load(device: str, available: list[str]) -> tuple[list, types.ModuleType]:
+        opened = []
+        ort = types.ModuleType("onnxruntime")
+        ort.SessionOptions = SessionOptions
+        ort.ExecutionMode = types.SimpleNamespace(ORT_SEQUENTIAL="sequential")
+        ort.get_available_providers = lambda: available
+        ort.InferenceSession = plain = \
+            lambda path, so=None, providers=None: opened.append((path, providers, so))
+        ort.plain = plain
+
+        def make(**kwargs):
+            import onnxruntime
+
+            onnxruntime.InferenceSession("vieneu_decode_step.onnx", onnxruntime.SessionOptions(),
+                                         providers=["CPUExecutionProvider"])
+            return StubEngine()
+
+        fake = types.ModuleType("vieneu")
+        fake.Vieneu = make
+        saved = {name: sys.modules.get(name) for name in ("vieneu", "onnxruntime")}
+        saved_state = app._engine, app._engine_error, app.ENGINE_DEVICE
+        sys.modules["vieneu"], sys.modules["onnxruntime"] = fake, ort
+        app._engine, app._engine_error, app.ENGINE_DEVICE = None, None, device
+        try:
+            app.engine()
+        except Exception:
+            ort.error = app._engine_error
+        finally:
+            for name, module in saved.items():
+                if module is None:
+                    sys.modules.pop(name, None)
+                else:
+                    sys.modules[name] = module
+            app._engine, app._engine_error, app.ENGINE_DEVICE = saved_state
+        return opened, ort
+
+    gpu = ["DmlExecutionProvider", "CPUExecutionProvider"]
+    opened, ort = load("gpu", gpu)
+    [(_, providers, so)] = opened
+    assert providers == gpu, providers
+    assert so.enable_mem_pattern is False and so.execution_mode == "sequential", vars(so)
+    assert ort.InferenceSession is ort.plain, "the session constructor must be put back after the load"
+
+    opened, ort = load("cpu", gpu)
+    [(_, providers, so)] = opened
+    assert providers == ["CPUExecutionProvider"], providers
+    assert so.enable_mem_pattern is True and so.execution_mode == "parallel", vars(so)
+
+    # No DirectML in this onnxruntime: the load fails and /api/status says why.
+    opened, ort = load("gpu", ["CPUExecutionProvider"])
+    assert not opened and "onnxruntime-directml" in ort.error, ort.error
+    opened, ort = load("tpu", gpu)
+    assert not opened and "VOICE_TTS_DEVICE" in ort.error, ort.error
+    print("engine device: VOICE_TTS_DEVICE=gpu puts the sessions on DirectML, "
+          "unset keeps them on the CPU, a missing DirectML fails the load")
+
+
 def check_model_precision() -> None:
     """The build fetches and ships the ONNX graphs the app loads, and only those.
 
@@ -930,6 +1009,7 @@ def main() -> int:
     check_install_files()
     check_terms()
     check_engine_threads()
+    check_engine_device()
     check_model_precision()
     check_release_notes()
     check_tray()
