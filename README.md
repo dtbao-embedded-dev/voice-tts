@@ -1,6 +1,7 @@
 # Voice TTS
 
 [![CI](https://github.com/dtbao-embedded-dev/voice-tts/actions/workflows/ci.yml/badge.svg)](https://github.com/dtbao-embedded-dev/voice-tts/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-0.7.0-blue)](https://github.com/dtbao-embedded-dev/voice-tts/releases)
 
 Desktop app that reads mixed Vietnamese/English text aloud, powered by
 [VieNeu-TTS v3 Turbo](https://github.com/pnnbao97/VieNeu-TTS).
@@ -469,7 +470,8 @@ installer. The real-model smoke test runs locally (`tool-build.py --check`).
 
 ## Release
 
-Write the version's section in `CHANGELOG.md` first, bump `cli.__version__`, then:
+Write the version's section in `CHANGELOG.md` first, bump `cli.__version__` and the
+version badge at the top of this file (`test_cli.py` fails if they differ), then:
 
 ```
 git tag v0.5.0 && git push origin v0.5.0

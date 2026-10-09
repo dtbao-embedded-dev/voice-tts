@@ -430,7 +430,13 @@ def check_release_notes() -> None:
     assert body.strip() and "## [" not in body, f"section of {cli.__version__} is off: {body!r}"
     proc = notes("9.9.9")
     assert proc.returncode == 1, f"a missing version must fail the release, got {proc.returncode}"
-    print(f"release notes: CHANGELOG section for {cli.__version__}, a missing one fails")
+    # The repo is private, so the README's version badge is static: a release cut
+    # that bumps cli.__version__ has to bump the badge with it.
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    badge = f"https://img.shields.io/badge/version-{cli.__version__}-blue"
+    assert badge in readme, f"README.md has no version badge for {cli.__version__}"
+    print(f"release notes: CHANGELOG section and README badge for {cli.__version__}, "
+          "a missing one fails")
 
 
 def main() -> int:
