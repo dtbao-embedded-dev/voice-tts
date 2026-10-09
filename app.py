@@ -12,10 +12,12 @@ from __future__ import annotations
 
 import hmac
 import io
+import itertools
 import os
 import socket
 import sys
 import threading
+import time
 import wave
 from collections import deque
 from contextlib import asynccontextmanager, closing, contextmanager
@@ -190,6 +192,11 @@ class Turns:
                 self._busy -= 1
                 self._cv.notify_all()
 
+    def load(self) -> tuple[int, int]:
+        """``(reading, waiting)`` right now."""
+        with self._cv:
+            return self._busy, len(self._waiting)
+
 
 # Readings the engine runs at once. On CPU it takes one ONNX call at a time, so a
 # second reading adds no throughput and only halves everyone's speed: on an
@@ -198,6 +205,18 @@ class Turns:
 # faster than real time and finishes the queue sooner on average.
 MAX_STREAMS = max(1, int(os.environ.get("VOICE_TTS_MAX_STREAMS", "1")))
 _turns = Turns(MAX_STREAMS)
+
+# What each reading logs carries no text unless this is set: the text is what a
+# listener typed, and the journal keeps it long after the reading is gone.
+LOG_TEXT = os.environ.get("VOICE_TTS_LOG_TEXT", "") == "1"
+_reading_ids = itertools.count(1)
+
+
+def log_reading(rid: int, event: str) -> None:
+    """One line per step of a reading, on stderr whatever uvicorn's log level:
+    the homelab service runs at ``warning``, which silences uvicorn's access log.
+    A windowed build has no stderr, and print() then writes nothing."""
+    print(f"reading #{rid} {event}", file=sys.stderr, flush=True)
 
 
 REGIONS = ("Bắc", "Trung", "Nam")
@@ -429,13 +448,16 @@ CHUNK_CHARS = 120
 
 
 def synthesize(text: str, voice: str | None = None, speed: float = 1.0,
-               pronunciation: str = "normal"):
+               pronunciation: str = "normal", origin: str | None = None):
     """Validate a request and return ``(voice, chunks)``.
 
     ``chunks`` yields float32 arrays at ``SAMPLE_RATE`` as the engine produces
     them, time-scaled by ``speed``. Validation runs here, eagerly, and raises
     ``ValueError`` - so the HTTP route can still answer 400 before streaming,
     and the CLI can report it before opening any output.
+
+    ``origin`` (``"client=<ip> format=<fmt>"``) logs the reading's queue, start
+    and end; the CLI passes none and logs nothing.
     """
     text = text.strip()
     if not text:
@@ -454,16 +476,66 @@ def synthesize(text: str, voice: str | None = None, speed: float = 1.0,
 
     spoken = lexicon.apply(text, lexicon.load_user()) if pronunciation == "special" else text
 
+    def generate():
+        for chunk in stretch(tts.infer_stream(spoken, voice=resolved,
+                                              max_chars=CHUNK_CHARS), speed):
+            yield np.asarray(chunk, dtype=np.float32)
+
     def chunks():
         # The turn is taken on the first chunk asked for, not here, so a
         # request that fails validation never queues; closing the generator
         # (the listener hung up) gives the turn back.
         with _turns.turn():
-            for chunk in stretch(tts.infer_stream(spoken, voice=resolved,
-                                                  max_chars=CHUNK_CHARS), speed):
-                yield np.asarray(chunk, dtype=np.float32)
+            yield from generate()
 
-    return resolved, chunks()
+    def logged_chunks():
+        # chunks(), plus a line when the reading queues, when its turn comes and
+        # when it ends - done, hung-up or error - with what it cost.
+        rid = next(_reading_ids)
+        reading, waiting = _turns.load()
+        log_reading(rid, f"queue {origin} ahead={reading + waiting} reading={reading} "
+                         f"waiting={waiting}" + (f" text={text!r}" if LOG_TEXT else ""))
+        arrived = time.monotonic()
+        with _turns.turn():
+            waited = time.monotonic() - arrived
+            log_reading(rid, f"start waited={waited:.2f}s voice={resolved} speed={speed:.2f} "
+                             f"pronunciation={pronunciation} chars={len(text)} "
+                             f"spoken_chars={len(spoken)}")
+            source = generate()
+            frames = count = 0
+            compute = first = 0.0
+            outcome, detail = "done", ""
+            try:
+                while True:
+                    # Only the time spent in the engine counts toward the RTF: a
+                    # stream sits at the yield below while the client drains it.
+                    begun = time.monotonic()
+                    try:
+                        chunk = next(source)
+                    except StopIteration:
+                        break
+                    now = time.monotonic()
+                    compute += now - begun
+                    if not count:
+                        first = now - arrived
+                    frames += len(chunk)
+                    count += 1
+                    yield chunk
+            except GeneratorExit:
+                outcome = "hung-up"
+                raise
+            except Exception as exc:
+                outcome, detail = "error", f" error={exc!r}"
+                raise
+            finally:
+                source.close()
+                audio = frames / SAMPLE_RATE
+                rtf = f"{compute / audio:.2f}" if audio else "-"
+                log_reading(rid, f"{outcome} audio={audio:.2f}s compute={compute:.2f}s "
+                                 f"rtf={rtf} first={first:.2f}s chunks={count} "
+                                 f"wall={time.monotonic() - arrived:.2f}s{detail}")
+
+    return resolved, (logged_chunks() if origin else chunks())
 
 
 class ClosingStream(StreamingResponse):
@@ -486,7 +558,7 @@ class ClosingStream(StreamingResponse):
 
 
 @app.post("/api/tts/stream")
-def tts_stream(req: SpeakRequest):
+def tts_stream(req: SpeakRequest, request: Request):
     """Stream raw float32 LE samples at 48 kHz as they are generated.
 
     ``speed`` scales the duration and leaves the pitch where it is, so the
@@ -497,7 +569,9 @@ def tts_stream(req: SpeakRequest):
     file with its real length in ``Content-Length``.
     """
     try:
-        _, chunks = synthesize(req.text, req.voice, req.speed, req.pronunciation)
+        client = request.client.host if request.client else "-"
+        _, chunks = synthesize(req.text, req.voice, req.speed, req.pronunciation,
+                               origin=f"client={client} format={req.format}")
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from None
 

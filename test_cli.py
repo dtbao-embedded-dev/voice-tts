@@ -393,6 +393,60 @@ def check_turns(base: str) -> None:
           "the rest in arrival order, a hang-up hands the turn on")
 
 
+def check_reading_log(base: str) -> None:
+    """Every reading leaves queue, start and end lines on stderr - whatever the
+    uvicorn log level - and the text itself only with VOICE_TTS_LOG_TEXT=1."""
+    stub = app._engine
+    engine = app._engine = SlowEngine(chunks=8, delay=0.05)
+    err = io.StringIO()
+    try:
+        with contextlib.redirect_stderr(err):
+            first = threading.Thread(target=post, args=(base, {"text": "trước", "format": "wav"}))
+            first.start()
+            time.sleep(0.1)  # "trước" holds the turn, so the next one queues
+            assert post(base, {"text": "bí mật", "format": "wav", "speed": 1.25})[0] == 200
+            first.join(10)
+
+            # Hung up after the first bytes of a long stream.
+            engine.chunks, engine.delay = 1000, 0.01
+            conn = http.client.HTTPConnection("127.0.0.1", urlsplit(base).port, timeout=10)
+            conn.request("POST", "/api/tts/stream", json.dumps({"text": "bỏ dở"}),
+                         {"Content-Type": "application/json"})
+            conn.getresponse().read(WORD * 4)
+            conn.close()
+            engine.chunks, engine.delay = 2, 0.0
+            assert post(base, {"text": "sau đó", "format": "wav"})[0] == 200  # waits out the hang-up
+
+            app.LOG_TEXT = True
+            assert post(base, {"text": "nói to", "format": "wav"})[0] == 200
+    finally:
+        app.LOG_TEXT = False
+        app._engine = stub
+    lines = [line for line in err.getvalue().splitlines() if line.startswith("reading #")]
+
+    def of(rid: str) -> list[str]:
+        return [line.split(" ", 2)[2] for line in lines if line.split(" ", 2)[1] == rid]
+
+    ids = list(dict.fromkeys(line.split(" ", 2)[1] for line in lines))
+    assert len(ids) == 5, f"expected 5 readings in the log, got {ids}: {lines}"
+    first_id, secret, dropped, after, loud = ids
+
+    queue, start, end = of(secret)
+    assert queue.startswith("queue client=127.0.0.1 format=wav ahead=1 reading=1 waiting=0"), queue
+    assert "bí mật" not in "\n".join(lines), "text logged without VOICE_TTS_LOG_TEXT"
+    assert start.startswith("start waited=") and "voice=Stub A" in start, start
+    assert "speed=1.25 pronunciation=normal chars=6" in start, start
+    waited = float(start.split("waited=")[1].split("s")[0])
+    assert waited > 0.1, f"queued behind a 0.4 s reading but waited {waited} s"
+    assert end.startswith("done audio=") and " rtf=" in end and " chunks=" in end, end
+
+    assert of(first_id)[0].split(" ")[3] == "ahead=0", of(first_id)
+    assert of(dropped)[-1].startswith("hung-up "), of(dropped)
+    assert of(after)[-1].startswith("done "), of(after)
+    assert of(loud)[0].endswith("text='nói to'"), of(loud)
+    print("reading log: queue, start, done / hung-up per reading; text only on request")
+
+
 def check_local(tmp: Path) -> None:
     """The in-process engine path (the stub stands in for VieNeu)."""
     out = tmp / "local.wav"
@@ -784,6 +838,7 @@ def main() -> int:
         check_remote(base, Path(tmp))
         check_wav_format(base)
         check_turns(base)
+        check_reading_log(base)
         check_encode(base, Path(tmp))
         check_lexicon(base, Path(tmp))
         check_lexicon_user(base, Path(tmp))
