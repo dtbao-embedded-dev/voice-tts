@@ -21,11 +21,23 @@ the release before it builds.
   `lexicon.json` in the data dir (`$VOICE_TTS_DATA`, `%APPDATA%\VoiceTTS`,
   `~/.local/share/voice-tts`; the `voice-tts-data` volume in Docker). A user word
   replaces a built-in one with the same spelling, and the longest word wins.
+- The window remembers the voice, speed, pronunciation and the draft across a
+  reload and a restart; a browser on the LAN server remembers them per browser.
 
 ### Changed
 
+- The window's backend listens on the fixed port 8761 (`gui --port`, any free port
+  if it is taken) and keeps a WebView2 profile in `<data dir>/webview`, so what the
+  page stores survives a restart.
 - The lexicon respells in one pass, longest word first, so a spelling one entry
   produces is never respelled by another.
+
+### Fixed
+
+- On Windows a second server could bind a port already in use and split its
+  connections; the port is now claimed exclusively.
+- A request refused for its token, or an `/api/encode` call refused for its format,
+  could reach a Windows client as a reset connection instead of the error.
 
 ## [0.7.0] - 2026-10-09
 

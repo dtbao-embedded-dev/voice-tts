@@ -28,6 +28,39 @@ let pronunciation = 'normal';
 // stopped can no longer report into the one that replaced it.
 let run = 0;
 
+/* ---- Preferences: what the user chose survives a reload and a restart -- */
+
+// Per viewer, in this browser (the desktop window keeps a profile of its own).
+// Storage can be missing or refuse - a private window, cleared site data - so
+// every access is guarded and the app works the same without it.
+const PREFS_KEY = 'voice-tts:prefs';
+const DRAFT_KEY = 'voice-tts:draft';
+
+function loadPrefs() {
+  try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; } catch { return {}; }
+}
+
+function savePrefs() {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ voice, speed, pronunciation }));
+  } catch { /* nothing to keep it in */ }
+}
+
+let draftTimer = 0;
+function saveDraft() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    try {
+      if (els.text.value) localStorage.setItem(DRAFT_KEY, els.text.value);
+      else localStorage.removeItem(DRAFT_KEY);
+    } catch { /* nothing to keep it in */ }
+  }, 500);
+}
+
+function loadDraft() {
+  try { return localStorage.getItem(DRAFT_KEY) || ''; } catch { return ''; }
+}
+
 /* ---- This is an app: no page behaviour leaks through ------------------- */
 
 addEventListener('contextmenu', (e) => e.preventDefault());
@@ -150,8 +183,9 @@ addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
 
 /* ---- Voices ------------------------------------------------------------ */
 
-function pickVoice(name) {
+function pickVoice(name, remember = true) {
   voice = name;
+  if (remember) savePrefs();
   els.voiceName.textContent = name;
   for (const el of els.voiceList.querySelectorAll('.voice-item')) {
     el.setAttribute('aria-selected', String(el.dataset.name === name));
@@ -194,18 +228,34 @@ function renderVoices() {
 
 // The backend stretches the time and leaves the pitch alone, so this only has
 // to travel with the request - what arrives is already at the chosen speed.
-els.speed.addEventListener('click', (e) => {
-  const opt = e.target.closest('.speed__opt');
+// Both setters ignore a value no button offers, so a stale or hand-edited
+// preference falls back to the default instead of reaching the backend.
+function setSpeed(value) {
+  const opt = [...els.speed.children].find((o) => Number(o.dataset.speed) === Number(value));
   if (!opt) return;
   speed = Number(opt.dataset.speed);
   for (const o of els.speed.children) o.setAttribute('aria-pressed', String(o === opt));
+}
+
+function setPronunciation(value) {
+  const opt = [...els.pron.children].find((o) => o.dataset.pron === value);
+  if (!opt) return;
+  pronunciation = opt.dataset.pron;
+  for (const o of els.pron.children) o.setAttribute('aria-pressed', String(o === opt));
+}
+
+els.speed.addEventListener('click', (e) => {
+  const opt = e.target.closest('.speed__opt');
+  if (!opt) return;
+  setSpeed(opt.dataset.speed);
+  savePrefs();
 });
 
 els.pron.addEventListener('click', (e) => {
   const opt = e.target.closest('.speed__opt');
   if (!opt) return;
-  pronunciation = opt.dataset.pron;
-  for (const o of els.pron.children) o.setAttribute('aria-pressed', String(o === opt));
+  setPronunciation(opt.dataset.pron);
+  savePrefs();
 });
 
 /* ---- Meter ------------------------------------------------------------- */
@@ -438,7 +488,7 @@ function renderCount() {
   els.count.textContent = max > 0 ? `${els.text.value.length} / ${max}` : `${els.text.value.length}`;
 }
 
-els.text.addEventListener('input', renderCount);
+els.text.addEventListener('input', () => { renderCount(); saveDraft(); });
 
 // Ctrl+Enter is the commit gesture; Escape stops.
 addEventListener('keydown', (e) => {
@@ -450,6 +500,11 @@ addEventListener('keydown', (e) => {
 });
 
 async function boot() {
+  const prefs = loadPrefs();
+  setSpeed(prefs.speed);
+  setPronunciation(prefs.pronunciation);
+  els.text.value = loadDraft();
+  renderCount();
   setStatus('loading', 'Đang tải model…');
   for (;;) {
     let s;
@@ -470,7 +525,10 @@ async function boot() {
   renderCount();
   voices = info.voices;
   renderVoices();
-  pickVoice(info.default);
+  // A voice the server no longer lists - an SDK upgrade renamed it, or this is
+  // another server - falls back to the default rather than failing the read.
+  const known = voices.some((v) => v.name === prefs.voice);
+  pickVoice(known ? prefs.voice : info.default, false);
   els.playBtn.disabled = false;
   setStatus('ready', 'Sẵn sàng');
   els.text.focus();

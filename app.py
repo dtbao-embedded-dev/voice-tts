@@ -513,8 +513,17 @@ def start_server(port: int = 0, host: str = "127.0.0.1",
     only hides it by retrying the connect for a second or two.
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind((host, port))
+    if sys.platform == "win32":
+        # Windows' SO_REUSEADDR lets a second socket bind a port that is in use,
+        # and the two then split the connections; claim the port outright.
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+    else:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        sock.bind((host, port))
+    except OSError:
+        sock.close()
+        raise
     sock.listen(2048)  # uvicorn's default backlog; its own listen() is then a no-op
     bound_port = sock.getsockname()[1]
 
@@ -522,6 +531,23 @@ def start_server(port: int = 0, host: str = "127.0.0.1",
     thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]}, daemon=True)
     thread.start()
     return server, bound_port, thread
+
+
+def start_gui_server(port: int) -> tuple[uvicorn.Server, int, threading.Thread]:
+    """``start_server`` on ``port``, or on any free port if that one is taken.
+
+    The window asks for a fixed port so its page keeps one origin - the settings
+    and history it stores belong to that origin. A second window, or another
+    program on the port, still gets a working app, just without those.
+    """
+    try:
+        return start_server(port)
+    except OSError:
+        if not port:
+            raise
+        print(f"voice-tts: port {port} is taken; this window will not see saved "
+              "settings or history", file=sys.stderr)
+        return start_server(0)
 
 
 def lan_address() -> str:
@@ -614,7 +640,7 @@ def run_gui(port: int = 0, tray: bool = True) -> None:
 
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("VoiceTTS.Desktop")
 
-    _, port, _ = start_server(port)
+    _, port, _ = start_gui_server(port)
     url = f"http://127.0.0.1:{port}/"
     # pywebview asks WinForms for FormStartPosition.CenterScreen, but it does so
     # after the form handle exists, so the window lands at 78,78 instead. Passing
@@ -665,8 +691,11 @@ def run_gui(port: int = 0, tray: bool = True) -> None:
         else:
             icon = None  # no tray here: closing the window quits, as before
 
-    # Returns when the window is destroyed; daemon threads go with it.
-    webview.start(icon=window_icon())
+    # Returns when the window is destroyed; daemon threads go with it. pywebview
+    # defaults to a private profile, wiped on exit; a profile kept in the data dir
+    # is what lets the page remember settings, the draft and the history.
+    webview.start(icon=window_icon(), private_mode=False,
+                  storage_path=str(lexicon.data_dir() / "webview"))
     if icon is not None:
         icon.stop()
 

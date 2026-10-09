@@ -49,6 +49,10 @@ it (plus a one-off download for a source install).
 5. **Đọc** (`Ctrl+Enter`) reads it as it is generated; press again or `Esc` to stop.
 6. **Lưu WAV** saves what was read.
 
+The window remembers the voice, speed and pronunciation you picked and the text you
+were typing, across a restart. A browser on the LAN server remembers them per
+browser.
+
 Minimizing or closing the window hides it in the system tray and the app keeps
 running; click the tray icon to bring it back, right-click → *Thoát* to quit.
 To have it start with Windows, install with `--autostart`.
@@ -465,6 +469,12 @@ carries on without one: the window closes as before, `serve` keeps serving.
   the same place the longer one wins (`ESP32 S3` before `ESP32`). On a LAN server the
   list is the server's: everyone who holds the token reads and edits the same one.
   Up to 500 words, 64 characters a word and 128 for how it is read.
+- **What the window remembers lives in its own browser profile.** Settings and the
+  draft are kept by the page (`localStorage`), so they belong to its origin. The
+  window therefore serves its backend on a fixed port, `8761` (`voice-tts gui
+  --port`), and keeps a WebView2 profile in `<data dir>/webview` instead of
+  pywebview's private one. If 8761 is taken - a second window, another program -
+  that window runs on any free port and starts without them.
 - **Verify mode is deferred.** Checking a reading by ear - Whisper large-v3-turbo
   transcribes it, and it is sent only if it matches the text by 95% - was built,
   measured and taken out before release (it needs a 0.8 GB int8 model in the

@@ -30,6 +30,9 @@ from array import array
 __version__ = "0.7.0"
 
 DEFAULT_PORT = 8760
+# The window's own backend. A fixed port keeps the page at one origin, and the
+# settings and history the page stores are keyed by it.
+GUI_PORT = 8761
 ENV_TOKEN = "VOICE_TTS_TOKEN"
 ENV_SERVER = "VOICE_TTS_SERVER"
 LOCAL_SERVER = f"http://127.0.0.1:{DEFAULT_PORT}"
@@ -71,8 +74,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
 
     gui = sub.add_parser("gui", help="open the desktop window (default)")
-    gui.add_argument("--port", type=int, default=0,
-                     help="loopback port for the backend (default: any free port)")
+    gui.add_argument("--port", type=int, default=GUI_PORT,
+                     help="loopback port for the backend; any free one if it is taken "
+                          "(default: %(default)s)")
     gui.add_argument("--tray", action=argparse.BooleanOptionalAction, default=True,
                      help="minimize and close hide the window into the system tray; "
                           "--no-tray makes close quit (default: on)")

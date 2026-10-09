@@ -315,6 +315,30 @@ def check_local(tmp: Path) -> None:
     print("local: in-process engine, speed, validation -> 2")
 
 
+def check_gui_port() -> None:
+    """The window's backend keeps one port, so the page's storage keeps one origin;
+    a port already taken - by another app or a second window - falls back."""
+    assert cli.parse(cli.build_parser(), []).port == cli.GUI_PORT == 8761, \
+        "gui no longer defaults to the fixed port"
+    with socket.socket() as holder:
+        holder.bind(("127.0.0.1", 0))
+        holder.listen(1)
+        taken = holder.getsockname()[1]
+        try:
+            app.start_server(taken)
+        except OSError:
+            pass
+        else:
+            raise AssertionError("a second server bound a port that is in use")
+        server, port, thread = app.start_gui_server(taken)
+        try:
+            assert port != taken and port > 0, f"no fallback from {taken}: {port}"
+        finally:
+            server.should_exit = True
+            thread.join(timeout=5)
+    print("gui port: fixed by default, an occupied port is refused and falls back")
+
+
 def check_tray() -> None:
     """The tray's menu and its fallback, without putting an icon on screen."""
     import tray
@@ -603,6 +627,7 @@ def main() -> int:
     check_install_files()
     check_release_notes()
     check_tray()
+    check_gui_port()
 
     _, port, _ = app.start_server(host="127.0.0.1", port=0)
     base = f"http://127.0.0.1:{port}"
