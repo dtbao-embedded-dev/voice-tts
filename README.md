@@ -21,7 +21,8 @@ Desktop app that reads mixed Vietnamese/English text aloud, powered by
 - **Model** — v3 Turbo is bilingual, so Vietnamese and English mix freely inside one
   sentence; no language tagging or manual splitting is needed.
 - **Pronunciation** — `normal` reads the text as typed; `special` first respells the
-  words the engine gets wrong (POST, AP, Board, ESP32...), see [Notes](#notes).
+  words the engine gets wrong (POST, AP, Board, ESP32, units such as 3,3V and
+  10µF...), see [Notes](#notes).
 
 ## Usage
 
@@ -127,7 +128,7 @@ full table and the exit codes.
 | Page says *Đang tải model…* for long | first start after install is loading or downloading the model; wait |
 | `Không có giọng '...'` (exit 2) | voice name mistyped: `voice-tts voices` lists the exact names |
 | `voice-tts` not found on Windows | open a new terminal after the install, so it sees the new `PATH` |
-| `POST` read as *phê ô ét tê*, `AP` as *ap* | the default `normal` pronunciation reads the text as typed: use `--pronunciation special` / *Phát âm → Đặc biệt* |
+| `POST` read as *phê ô ét tê*, `AP` as *ap*, `3,3V` as *vê* | the default `normal` pronunciation reads the text as typed: use `--pronunciation special` / *Phát âm → Đặc biệt* |
 | `no audio player found` on Linux | install `pulseaudio-utils` or `alsa-utils`, or write a file with `-o` |
 
 ## Quick start (development)
@@ -570,12 +571,19 @@ carries on without one: the window closes as before, `serve` keeps serving.
   (`POST` is *phê ô ét tê*), turns `AP` into the syllable *ap*, and reads `Board` as
   English. `normal` leaves that as it is: the text is read as typed. `special`
   (`"pronunciation": "special"`, `--pronunciation special`, *Phát âm → Đặc biệt*)
-  has `lexicon.py` rewrite whole words first: `POST`/`GET`/`PUT`/`PATCH`/`DELETE` as
-  the English words, `AP` as *ây pi*, `board` (any case) as *bo*, `ESP32` (any case,
-  also `ESP 32`) as *i ét pi ba hai*, `ESP` on its own (any case) as *i ét pi*.
-  `POSTMAN`, `APP` and `onboard` are left alone,
-  and so is anything inside `<en>...</en>`. Another built-in word is one more line
-  in `ENTRIES`.
+  has `respell.py` rewrite the text first; [docs/pronunciation.md](docs/pronunciation.md)
+  has every rule, and `terms.tsv` the terms they are checked against.
+  - Whole words from `lexicon.py`: `POST`/`GET`/`PUT`/`PATCH`/`DELETE` as the English
+    words, `AP` as *ây pi*, `board` (any case) as *bo*, `ESP32` (any case, also
+    `ESP 32`) as *i ét pi ba hai*, `ESP` on its own (any case) as *i ét pi*. `POSTMAN`,
+    `APP` and `onboard` are left alone. Another built-in word is one more line in
+    `ENTRIES`.
+  - Units after a number: `3,3V` as *vôn* (the engine says the letter *vê*), `5mW` as
+    *mi li oát* (it says megawatts), `10µF` as *mi cờ rô pha ra* (it drops the µ),
+    `1-2m` as *một đến hai mét*, `3.3V/500mA` as two quantities, `100R` as *ôm*,
+    `tụ 104` as *một không bốn*, `0x3C` as *không ích ba xi*.
+
+  Anything inside `<en>...</en>` is left alone.
 - **Your own words.** *Từ điển* in the window, `voice-tts lexicon add` or
   `PUT /api/lexicon` add words on top of the built-ins, read in `special` only (`normal` stays the text as typed). They live in `lexicon.json` in the data dir: `$VOICE_TTS_DATA`,
   else `%APPDATA%\VoiceTTS` on Windows and `~/.local/share/voice-tts` on Linux;
