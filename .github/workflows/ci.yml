@@ -46,7 +46,7 @@ jobs:
         shell: bash
         run: |
           python cli.py --version
-          for cmd in gui serve speak voices status; do
+          for cmd in gui serve speak voices status lexicon; do
             python cli.py "$cmd" --help > /dev/null
           done
 

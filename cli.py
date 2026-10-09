@@ -121,6 +121,24 @@ def build_parser() -> argparse.ArgumentParser:
     voices.add_argument("--json", action="store_true", help="print the /api/voices JSON")
     add_client_flags(voices, local=True)
 
+    lex = sub.add_parser(
+        "lexicon", help="list or edit the words the special pronunciation respells",
+        description="The user's own words, read in --pronunciation special on top of the "
+                    "built-in ones. Without --server this edits the file in the data dir "
+                    "($VOICE_TTS_DATA); with it, the server's list.")
+    lex_sub = lex.add_subparsers(dest="action", metavar="ACTION", required=True)
+    lex_list = lex_sub.add_parser("list", help="the built-in words and yours")
+    lex_list.add_argument("--json", action="store_true", help="print the /api/lexicon JSON")
+    lex_add = lex_sub.add_parser("add", help="add a word, or change how one is read")
+    lex_add.add_argument("word", help="the word as written, e.g. MQTT")
+    lex_add.add_argument("say", help="how to read it, e.g. 'em kiu ti ti'")
+    lex_add.add_argument("--case", action="store_true",
+                         help="match this exact case only (default: any case)")
+    lex_remove = lex_sub.add_parser("remove", help="remove one of your words")
+    lex_remove.add_argument("word")
+    for cmd in (lex_list, lex_add, lex_remove):
+        add_client_flags(cmd, local=True)
+
     status = sub.add_parser("status", help="ask a server whether its model is ready")
     status.add_argument("--json", action="store_true", help="print the /api/status JSON")
     status.add_argument("--wait", type=float, default=0, metavar="SECONDS",
@@ -558,6 +576,57 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0 if state["state"] == "ready" else 1
 
 
+def cmd_lexicon(args: argparse.Namespace) -> int:
+    import lexicon
+
+    if server_url(args):
+        def load() -> list[dict]:
+            return get_json(args, "/api/lexicon")["user"]
+
+        def store(user: list[dict]) -> None:
+            call(args, "/api/lexicon", {"user": user}, method="PUT").close()
+
+        def builtin() -> list[dict]:
+            return get_json(args, "/api/lexicon")["builtin"]
+    else:
+        def load() -> list[dict]:
+            try:
+                return lexicon.load_user()
+            except ValueError as exc:
+                raise CliError(1, str(exc)) from None
+
+        def store(user: list[dict]) -> None:
+            try:
+                lexicon.save_user(user)
+            except ValueError as exc:
+                raise CliError(2, str(exc)) from None
+
+        builtin = lexicon.builtin
+
+    user = load()
+    if args.action == "list":
+        if args.json:
+            print(json.dumps({"builtin": builtin(), "user": user}, ensure_ascii=False, indent=2))
+            return 0
+        rows = [(e, "") for e in user] + [(e, "built-in") for e in builtin()]
+        width = max(len(e["word"]) for e, _ in rows)
+        say = max(len(e["say"]) for e, _ in rows)
+        for e, note in rows:
+            case = "case" if e["matchCase"] else "    "
+            print(f"{e['word']:<{width}}  {e['say']:<{say}}  {case}  {note}".rstrip())
+        return 0
+
+    key = args.word.strip().casefold()
+    kept = [e for e in user if e["word"].casefold() != key]
+    if args.action == "add":
+        store(kept + [{"word": args.word, "say": args.say, "matchCase": args.case}])
+    else:
+        if len(kept) == len(user):
+            raise CliError(2, f"'{args.word}' is not one of your words")
+        store(kept)
+    return 0
+
+
 def cmd_gui(args: argparse.Namespace) -> int:
     import app
 
@@ -576,7 +645,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
 
 HANDLERS = {"gui": cmd_gui, "serve": cmd_serve, "speak": cmd_speak,
-            "voices": cmd_voices, "status": cmd_status}
+            "voices": cmd_voices, "status": cmd_status, "lexicon": cmd_lexicon}
 
 
 def main(argv: list[str] | None = None) -> int:

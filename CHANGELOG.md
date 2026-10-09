@@ -16,6 +16,16 @@ the release before it builds.
 - MP3 and OGG (Vorbis) output: `"format": "mp3"` / `"ogg"` on `POST /api/tts/stream`,
   `POST /api/encode?format=` to encode 16-bit PCM a client already holds, and
   `voice-tts speak -o out.mp3` (format from the extension, or `--format`).
+- Your own pronunciation words, read in `special` on top of the built-ins:
+  `GET`/`PUT /api/lexicon` and `voice-tts lexicon list|add|remove`, stored in
+  `lexicon.json` in the data dir (`$VOICE_TTS_DATA`, `%APPDATA%\VoiceTTS`,
+  `~/.local/share/voice-tts`; the `voice-tts-data` volume in Docker). A user word
+  replaces a built-in one with the same spelling, and the longest word wins.
+
+### Changed
+
+- The lexicon respells in one pass, longest word first, so a spelling one entry
+  produces is never respelled by another.
 
 ## [0.7.0] - 2026-10-09
 

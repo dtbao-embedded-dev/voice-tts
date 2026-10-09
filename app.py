@@ -366,7 +366,7 @@ def synthesize(text: str, voice: str | None = None, speed: float = 1.0,
     if resolved is None:
         raise ValueError(f"Không có giọng '{voice}'.")
 
-    spoken = lexicon.apply(text) if pronunciation == "special" else text
+    spoken = lexicon.apply(text, lexicon.load_user()) if pronunciation == "special" else text
 
     def chunks():
         for chunk in stretch(tts.infer_stream(spoken, voice=resolved), speed):
@@ -415,6 +415,39 @@ def tts_stream(req: SpeakRequest):
         media_type="application/octet-stream",
         headers={"X-Sample-Rate": str(SAMPLE_RATE), "Cache-Control": "no-store"},
     )
+
+
+class LexiconEntry(BaseModel):
+    word: str
+    say: str
+    matchCase: bool = False
+
+
+class LexiconBody(BaseModel):
+    user: list[LexiconEntry]
+
+
+def _lexicon_state(user: list[dict]) -> dict:
+    return {"builtin": lexicon.builtin(), "user": user}
+
+
+@app.get("/api/lexicon")
+def lexicon_get() -> dict:
+    """The built-in words and the user's own, which ``special`` reads with."""
+    try:
+        return _lexicon_state(lexicon.load_user())
+    except ValueError as exc:
+        raise HTTPException(500, str(exc)) from None
+
+
+@app.put("/api/lexicon")
+def lexicon_put(body: LexiconBody) -> dict:
+    """Replace the user's words. One list for the whole server: on a LAN server
+    everyone who holds the token reads, and edits, the same one."""
+    try:
+        return _lexicon_state(lexicon.save_user([e.model_dump() for e in body.user]))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
 
 
 @app.post("/api/encode")

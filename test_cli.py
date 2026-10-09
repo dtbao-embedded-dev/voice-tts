@@ -9,6 +9,7 @@ The real-model path is ``test_tts.py`` itself.
 
 from __future__ import annotations
 
+import contextlib
 import io
 import json
 import os
@@ -449,6 +450,92 @@ def check_lexicon(base: str, tmp: Path) -> None:
     print("lexicon: POST/GET/... as English words, AP as ây pi, Board as bo, whole words only")
 
 
+def lexicon_call(base: str, method: str, body=None, headers: dict | None = None):
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(f"{base}/api/lexicon", data=data, method=method,
+                                 headers={"Content-Type": "application/json", **(headers or {})})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.status, json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read()
+
+
+def check_lexicon_user(base: str, tmp: Path) -> None:
+    """Words the user adds: stored in the data dir, read in special mode only."""
+    os.environ["VOICE_TTS_DATA"] = str(tmp / "data")
+    try:
+        status, state = lexicon_call(base, "GET")
+        assert status == 200 and state["user"] == [], state
+        assert {"word": "POST", "say": "post", "matchCase": True} in state["builtin"], state
+
+        mine = [{"word": "MQTT", "say": "em kiu ti ti", "matchCase": False},
+                {"word": "AP", "say": "a pê", "matchCase": True},
+                {"word": "ESP32 S3", "say": "i ét pi ba hai ét ba", "matchCase": False}]
+        status, state = lexicon_call(base, "PUT", {"user": mine})
+        assert status == 200 and state["user"] == mine, (status, state)
+        stored = json.loads((tmp / "data" / "lexicon.json").read_text(encoding="utf-8"))
+        assert stored == {"entries": mine}, stored
+
+        # The user's AP replaces the built-in one; the longer ESP32 S3 wins over
+        # the built-in ESP32 at the same place; mqtt matches in any case.
+        raw = "Gửi mqtt qua AP tới ESP32 S3 và ESP32, POST"
+        want = "Gửi em kiu ti ti qua a pê tới i ét pi ba hai ét ba và i ét pi ba hai, post"
+        for body, expect in (({"text": raw, "pronunciation": "special"}, want),
+                             ({"text": raw}, raw)):
+            status, _, answer = post(base, body)
+            assert status == 200, answer[:200]
+            assert app._engine.last_text == expect, (body, app._engine.last_text)
+
+        for bad in ([{"word": "", "say": "x"}], [{"word": "x", "say": " "}],
+                    [{"word": "x" * 65, "say": "x"}], [{"word": "x", "say": "x" * 129}],
+                    [{"word": "Dup", "say": "a"}, {"word": "dup", "say": "b"}]):
+            status, _ = lexicon_call(base, "PUT", {"user": bad})
+            assert status == 400, f"{bad} accepted ({status})"
+        assert lexicon_call(base, "PUT", {"user": "MQTT"})[0] == 422, "a non-list accepted"
+        assert lexicon_call(base, "GET")[1]["user"] == mine, "a rejected PUT changed the list"
+
+        app.set_token(TOKEN)
+        try:
+            assert lexicon_call(base, "GET")[0] == 401, "lexicon open without the token"
+            assert lexicon_call(base, "PUT", {"user": []})[0] == 401, "PUT without the token"
+            good = {"Authorization": f"Bearer {TOKEN}"}
+            assert lexicon_call(base, "GET", headers=good)[0] == 200
+        finally:
+            app.set_token(None)
+
+        # The CLI: in this process it edits the file, with --server the server's.
+        out = io.StringIO()
+        assert cli.main(["lexicon", "add", "UART", "du a ét", "--local"]) == 0
+        assert cli.main(["lexicon", "add", "MQTT", "mờ qui tê tê", "--case", "--local"]) == 0
+        with contextlib.redirect_stdout(out):
+            assert cli.main(["lexicon", "list", "--json", "--local"]) == 0
+        user = json.loads(out.getvalue())["user"]
+        assert {"word": "UART", "say": "du a ét", "matchCase": False} in user, user
+        assert {"word": "MQTT", "say": "mờ qui tê tê", "matchCase": True} in user, user
+        assert len(user) == 4, "add of an existing word must replace it"
+        assert cli.main(["lexicon", "remove", "uart", "--local"]) == 0
+        assert cli.main(["lexicon", "remove", "uart", "--local"]) == 2, "removing a ghost"
+        assert cli.main(["lexicon", "add", "", "x", "--local"]) == 2, "empty word accepted"
+
+        remote = ("--server", base)
+        code, _, err = run_cli("lexicon", "add", "I2C", "i hai xi", *remote)
+        assert code == 0, err
+        assert any(e["word"] == "I2C" for e in lexicon_call(base, "GET")[1]["user"])
+        code, stdout, err = run_cli("lexicon", "list", *remote)
+        table = stdout.decode("utf-8")
+        assert code == 0 and "I2C" in table and "i hai xi" in table and "POST" in table, table
+        code, _, err = run_cli("lexicon", "remove", "I2C", *remote)
+        assert code == 0, err
+        assert not any(e["word"] == "I2C" for e in lexicon_call(base, "GET")[1]["user"])
+        code, _, err = run_cli("lexicon", "add", "x", "y" * 129, *remote)
+        assert code == 2, f"an over-long spelling over HTTP: exit {code}, {err}"
+    finally:
+        lexicon_call(base, "PUT", {"user": []})
+        del os.environ["VOICE_TTS_DATA"]
+    print("lexicon user: data-dir JSON, overrides, longest first, 400/401, CLI local + remote")
+
+
 def check_install_files() -> None:
     """tool-install.py copies every module of ours that the app imports.
 
@@ -525,6 +612,7 @@ def main() -> int:
         check_wav_format(base)
         check_encode(base, Path(tmp))
         check_lexicon(base, Path(tmp))
+        check_lexicon_user(base, Path(tmp))
         check_local(Path(tmp))
         check_icon(base, Path(tmp))
     print("OK")

@@ -193,6 +193,9 @@ voice-tts speak -f bai-doc.txt -o bai-doc.mp3                       # MP3 (or .o
 voice-tts speak "Xin chào" --server http://192.168.0.137:8760 --token <t>
 voice-tts speak "Bật AP trên Board" --pronunciation special     # AP "ây pi", Board "bo"
 voice-tts voices                 # * default, + featured; --json for the raw list
+voice-tts lexicon add MQTT "em kiu ti ti"   # read MQTT that way in --pronunciation special
+voice-tts lexicon list           # your words, then the built-in ones; --json for the raw list
+voice-tts lexicon remove MQTT
 voice-tts status --wait 600      # exit 0 once the server's model is ready
 ```
 
@@ -212,6 +215,9 @@ voice-tts status --wait 600      # exit 0 once the server's model is ready
 | `-q`, `--quiet` | nothing on stderr except errors |
 
 `voices` and `status` take `--server`, `--token`, `--timeout` and `--json` too.
+`lexicon add WORD SAY [--case]` adds a word or changes how one is read (`--case`:
+that exact case only), `lexicon remove WORD` drops one; without `--server` they edit
+`lexicon.json` in the data dir, with it the server's list.
 `$VOICE_TTS_SERVER` and `$VOICE_TTS_TOKEN` are the defaults for `--server` and
 `--token`. Exit codes: `0` done, `1` runtime failure (unreachable server, wrong
 token, model failed), `2` bad input (usage, empty or over-long text, unknown voice,
@@ -253,6 +259,8 @@ plain HTTP: fine on a home LAN, not for the internet.
 | `GET /api/status` | `{"state": "loading" \| "ready" \| "error"}` while the model warms up |
 | `GET /api/version` | `{"version": "0.7.0"}` - the version the server runs (`voice-tts --version` is the CLI's own) |
 | `GET /api/voices` | the 25 preset voices with region, gender and description, the default voice, `sampleRate` and `maxChars` |
+| `GET /api/lexicon` | `{"builtin": [...], "user": [...]}`, each entry `{"word", "say", "matchCase"}` |
+| `PUT /api/lexicon` | replaces the user's words with `{"user": [...]}`; answers the new state, `400` for an empty, duplicate or over-long entry |
 | `POST /api/tts/stream` | raw float32 LE mono at 48 kHz, streamed as it is generated; or one WAV, MP3 or OGG file with `"format"` |
 | `POST /api/encode?format=mp3\|ogg` | the request body - 16-bit LE mono PCM at 48 kHz - encoded as one MP3 or OGG (Vorbis) file; how the window saves what it already read |
 
@@ -447,8 +455,16 @@ carries on without one: the window closes as before, `serve` keeps serving.
   has `lexicon.py` rewrite whole words first: `POST`/`GET`/`PUT`/`PATCH`/`DELETE` as
   the English words, `AP` as *ây pi*, `board` (any case) as *bo*, `ESP32` (any case,
   also `ESP 32`) as *i ét pi ba hai*. `POSTMAN`, `APP` and `onboard` are left alone,
-  and so is anything inside `<en>...</en>`. Another word is one more line in
-  `ENTRIES`.
+  and so is anything inside `<en>...</en>`. Another built-in word is one more line
+  in `ENTRIES`.
+- **Your own words.** `voice-tts lexicon add` or `PUT /api/lexicon` add words on top
+  of the built-ins, read in `special` only (`normal` stays the text as typed). They live in `lexicon.json` in the data dir: `$VOICE_TTS_DATA`,
+  else `%APPDATA%\VoiceTTS` on Windows and `~/.local/share/voice-tts` on Linux;
+  the Docker image keeps it in the `voice-tts-data` volume (`/data/app`). A word you
+  add replaces a built-in one with the same spelling, and where two words start at
+  the same place the longer one wins (`ESP32 S3` before `ESP32`). On a LAN server the
+  list is the server's: everyone who holds the token reads and edits the same one.
+  Up to 500 words, 64 characters a word and 128 for how it is read.
 - **Verify mode is deferred.** Checking a reading by ear - Whisper large-v3-turbo
   transcribes it, and it is sent only if it matches the text by 95% - was built,
   measured and taken out before release (it needs a 0.8 GB int8 model in the
