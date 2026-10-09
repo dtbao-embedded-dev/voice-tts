@@ -393,6 +393,9 @@ def check_install_files() -> None:
     tool_install = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(tool_install)
     ours = {f.stem for f in ROOT.glob("*.py")}
+    docker_context = (ROOT / ".dockerignore").read_text(encoding="utf-8").split()
+    docker_copy = next(line for line in (ROOT / "Dockerfile").read_text(encoding="utf-8")
+                       .splitlines() if line.startswith("COPY app.py")) + " "
     for name in ("app.py", "cli.py", "tray.py", "icon.py"):
         for node in ast.walk(ast.parse((ROOT / name).read_text(encoding="utf-8"))):
             if isinstance(node, ast.Import):
@@ -404,7 +407,11 @@ def check_install_files() -> None:
             for mod in mods:
                 if mod in ours:
                     assert f"{mod}.py" in tool_install.APP_FILES,                         f"{name} imports {mod}, which tool-install.py does not copy"
-    print("install: tool-install.py copies every module the app imports")
+                # The image is the server: no window, so no tray.
+                if mod in ours and mod != "tray" and name != "tray.py":
+                    assert f"!{mod}.py" in docker_context,                         f"{name} imports {mod}, which .dockerignore keeps out of the image"
+                    assert f" {mod}.py " in docker_copy,                         f"{name} imports {mod}, which the Dockerfile does not COPY"
+    print("install: tool-install.py and the Docker image carry every module the app imports")
 
 
 def check_release_notes() -> None:
