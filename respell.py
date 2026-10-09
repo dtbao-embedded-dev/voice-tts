@@ -311,6 +311,108 @@ def _acronyms(text: str, keep: _Kept) -> str:
     return _ACRONYM.sub(acronym, text)
 
 
+# ---------------------------------------------------------------- code tokens
+
+# Digital acronyms that turn up in lower case inside identifiers (gpio_set_level,
+# adc_cali_raw_to_voltage): spelled like their upper-case form.
+CODE_ACRONYMS = {
+    "UART", "USART", "SPI", "I2C", "I2S", "GPIO", "ADC", "DAC", "PWM", "LEDC", "MCPWM", "DMA",
+    "RTC", "WDT", "NVS", "OTA", "MQTT", "HTTP", "HTTPS", "TCP", "UDP", "IP", "DNS", "MDNS", "DHCP",
+    "SNTP", "NTP", "TLS", "SSL", "BLE", "GATT", "GAP", "USB", "CDC", "JTAG", "SDIO", "SDMMC",
+    "SD", "LCD", "TFT", "ISR", "IRQ", "CPU", "NVIC", "PLL", "ULP", "VFS", "CRC", "AES", "SHA",
+    "RSA", "URL", "API", "SDK", "TWAI", "RMT", "PCNT", "CAM", "IO", "ESP", "IDF", "MAC", "STA",
+}
+# Parts of identifiers read their own way: ESP_LOGI is "log ai", CONFIG_..._HZ "héc".
+CODE_PARTS = {"uint": "iu int", "HZ": "héc", "ATTR": "attribute"}
+_LOG_LEVEL = re.compile(r"LOG([IEWDV])")
+# FreeRTOS names its functions with a type prefix: vTaskDelay, xQueueSend, pdMS_TO_TICKS.
+_HUNGARIAN = r"(?:v|x|ux|pv|pd|prv|ul|us|uc)(?=[A-Z])"
+_IDENTIFIER = re.compile(rf"(?<![\w.])(?:[A-Za-z]\w*_\w*|{_HUNGARIAN}\w+)(?![\w.])")
+_IDENT_PARTS = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+")
+_NO_VOWEL = re.compile(r"[^aeiouyAEIOUY]+")
+
+_URL = re.compile(r"(?i)(?<![\w.])(https?|ftp|mqtts?|wss?)://([^\s\"'<>()]+)")
+_PATH = re.compile(r"(?<![\w/.])(/[\w.\-]+(?:/[\w.\-]+)*)/?(?![\w/])")
+_DIR = re.compile(r"(?<![\w/])([\w.\-]+)/(?=\s|$)")
+# File extensions said as a word, or their own way; any other is spelled with English
+# letter names (.c xi, .cpp xi pi pi).
+_EXT_WORDS = {"bin", "elf", "json", "yaml", "log", "hex", "map", "ini", "conf", "bat",
+              "defaults", "html"}
+_EXT_SAY = {"py": "pai", "txt": "ti ích ti", "exe": "i ích i", "ino": "i nô", "cmake": "xi make"}
+_FILE = re.compile(
+    r"(?<![\w.])([\w\-]*)\.(c|h|cpp|hpp|cc|py|sh|txt|bin|elf|json|yaml|yml|md|csv|ino|ld|mk|"
+    r"cmake|ini|cfg|conf|log|hex|uf2|map|so|dll|exe|bat|ps1|js|ts|html|css|xml|defaults)(?![\w.])")
+_VERSION = re.compile(r"(?<![\w.])[vV](\d+(?:\.\d+)+)(?![\w.])")
+_PORT = re.compile(r"(?i)\b(port|cổng)\s+(\d{4,5})(?![\w.,])")
+_NOT_EQUAL = re.compile(r"\s*!=\s*")
+_ASCII_WORD = re.compile(r"\b[A-Za-z]+\b")
+# A whole number, not part of a name or of a decimal: 2048 in "(task, 2048, NULL)".
+_INTEGER = re.compile(r"(?<!\w)(?<!\d[.,])\d+(?!\w|[.,]\d)")
+
+
+def _spell_lower(part: str) -> str:
+    return " ".join(EN_LETTERS[c.upper()] for c in part)
+
+
+def _code_part(part: str, user, keep: _Kept) -> str:
+    said = lexicon.sub(part, user, keep)
+    if said != part:
+        return said
+    if part in CODE_PARTS:
+        return keep(CODE_PARTS[part])
+    level = _LOG_LEVEL.fullmatch(part)
+    if level:
+        return keep(f"log {EN_LETTERS[level[1]]}")
+    if part.isdigit():
+        return keep(" ".join(digit_words(part)))
+    if len(part) == 1 and part.isupper():
+        return keep(EN_LETTERS[part])  # the C of CMakeLists
+    if part.upper() in CODE_ACRONYMS or part in ELECTRICAL:
+        return part.upper()  # spelled by the acronym pass
+    if part.islower() and (len(part) == 1 or _NO_VOWEL.fullmatch(part)):
+        return keep(_spell_lower(part))  # t, x, nvs, pd
+    if part.isupper() and _NO_VOWEL.fullmatch(part):
+        return part  # MS: the acronym pass spells it
+    return keep(part.lower())  # TO, TICKS, Handle: the English word
+
+
+def _code_name(name: str, user, keep: _Kept) -> str:
+    """An identifier, a file name or a path segment, one part at a time."""
+    return " ".join(_code_part(p, user, keep) for p in _IDENT_PARTS.findall(name))
+
+
+def _code(text: str, user, keep: _Kept) -> str:
+    # A line of code or log with no Vietnamese in it puts sea_g2p in English mode,
+    # where 2048 is "two thousand forty eight": its numbers are said digit by digit.
+    # Vietnamese typed without marks ("thanh ghi 32 bit") is not such a line.
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        if line.isascii() and sum(map(_english, _ASCII_WORD.findall(line))) >= 2:
+            lines[i] = _INTEGER.sub(lambda m: keep(" ".join(digit_words(m[0]))), line)
+    text = "\n".join(lines)
+
+    def url(m: re.Match) -> str:
+        rest = " gạch chéo ".join(p for p in m[2].rstrip("/.").split("/") if p)
+        return f"{keep(_spell_lower(m[1].lower()))} {rest}"
+
+    text = _URL.sub(url, text)
+    text = _PATH.sub(lambda m: " ".join(
+        f"{keep('gạch chéo')} {_code_name(p, user, keep)}" for p in m[1].split("/") if p), text)
+    text = _DIR.sub(r"\1", text)
+
+    def file(m: re.Match) -> str:
+        ext = m[2].lower()
+        say = _EXT_SAY.get(ext) or (ext if ext in _EXT_WORDS else _spell_lower(ext))
+        name = f"{_code_name(m[1], user, keep)} " if m[1] else ""
+        return f"{name}{keep(f'chấm {say}')}"
+
+    text = _FILE.sub(file, text)
+    text = _VERSION.sub(lambda m: f"{keep('vi')} {m[1]}", text)
+    text = _PORT.sub(lambda m: f"{m[1]} {keep(' '.join(digit_words(m[2])))}", text)
+    text = _NOT_EQUAL.sub(lambda m: f" {keep('khác')} ", text)
+    return _IDENTIFIER.sub(lambda m: _code_name(m[0], user, keep), text)
+
+
 # ---------------------------------------------------------------- entry point
 
 def _unicode(text: str) -> str:
@@ -322,6 +424,7 @@ def _rewrite(text: str, user) -> str:
     keep = _Kept()
     text = _unicode(text)
     text = lexicon.sub(text, user, keep)
+    text = _code(text, user, keep)
     text = _units(text, keep)
     text = _acronyms(text, keep)
     return keep.restore(text)

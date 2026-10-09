@@ -149,10 +149,10 @@ Vcc/2	Vcc/2	ok	en	on
 12dB	12dB	ok	en	on
 100kHz	100kHz	ok	en	on
 task	task	ok	en	on
-xTaskCreate	xTaskCreate	ok	en	on
-xQueueSend	xQueueSend	ok	en	on
-xSemaphoreTake	xSemaphoreTake	ok	en	on
-portMAX_DELAY	portMAX_DELAY	ok	en	on
+xTaskCreate	ích task create	ok	en	on
+xQueueSend	ích queue send	ok	en	on
+xSemaphoreTake	ích semaphore take	ok	en	on
+portMAX_DELAY	port max delay	ok	en	on
 scheduler	scheduler	ok	en	on
 preemptive	preemptive	ok	en	on
 tick	tick	ok	en	on
@@ -187,8 +187,8 @@ macro	macro	ok	en	on
 #ifdef	#ifdef	ok	en	on
 #endif	#endif	ok	en	on
 header	header	ok	en	on
-app_main	app_main	ok	en	on
-app_main()	app_main()	ok	en	on
+app_main	app main	ok	en	on
+app_main()	app main()	ok	en	on
 Make	Make	ok	en	on
 Ninja	Ninja	ok	en	on
 Clang	Clang	ok	en	on
@@ -894,61 +894,61 @@ IRF540N	i rờ ép năm bốn không nờ	acronym	en-vi	on
 1N5819	một nờ năm tám một chín	acronym	en-vi	on
 N-MOSFET	N-MOSFET	acronym	en-vi	on
 P-MOSFET	P-MOSFET	acronym	en-vi	on
-ESP_LOGI		code	en	pending
-ESP_LOGE		code	en	pending
-ESP_LOGW		code	en	pending
-ESP_OK		code	en	pending
-ESP_FAIL		code	en	pending
-ESP_ERROR_CHECK		code	en	pending
-esp_err_t		code	en	pending
-pdMS_TO_TICKS		code	en	pending
-nvs_flash_init		code	en	pending
-gpio_set_level		code	en	pending
-esp_wifi_start		code	en	pending
-CONFIG_LOG_DEFAULT_LEVEL		code	en	pending
-CONFIG_FREERTOS_HZ		code	en	pending
-IRAM_ATTR		code	en	pending
-uint8_t		code	en	pending
-uint32_t		code	en	pending
-int32_t		code	en	pending
-size_t		code	en	pending
-SemaphoreHandle_t		code	en	pending
-TaskHandle_t		code	en	pending
-QueueHandle_t		code	en	pending
-vTaskDelay		code	en	pending
-.c		code	en	pending
-.h		code	en	pending
-main.c		code	en	pending
-main.h		code	en	pending
-app.cpp		code	en	pending
-build.sh		code	en	pending
-CMakeLists.txt		code	en	pending
-firmware.bin		code	en	pending
-sdkconfig.defaults		code	en	pending
-v5.3		code	en	pending
-v1.0.2		code	en	pending
-IDF v5.3.1		code	en	pending
-ESP-IDF v5.3		code	en	pending
-port 8080		code	en	pending
-https://github.com		code	en	pending
-http://192.168.4.1		code	en	pending
-/dev/ttyUSB0		code	en	pending
-components/		code	en	pending
-x != 0		code	en	pending
-stack size 2048		code	en	pending
-xTaskCreate(task, "name", 2048, NULL, 5, NULL)		code	en	pending
-ESP_LOGI(TAG, "x")		code	en	pending
-HTTP/1.1		code	en	pending
-802.11 b/g/n		code	en	pending
-softAP		code	en	pending
-esp32c3		code	en	pending
-phiên bản v5.3		code	mixed	pending
-cổng 1883		code	mixed	pending
-gọi hàm adc_cali_raw_to_voltage		code	mixed	pending
-mở file main.c		code	mixed	pending
-chạy idf.py build		code	mixed	pending
-bấm Ctrl+C		code	mixed	pending
-bấm Ctrl+]		code	mixed	pending
+ESP_LOGI	i ét pi log ai	code	en	on
+ESP_LOGE	i ét pi log i	code	en	on
+ESP_LOGW	i ét pi log đắp bờ liu	code	en	on
+ESP_OK	i ét pi ô kê	code	en	on
+ESP_FAIL	i ét pi fail	code	en	on
+ESP_ERROR_CHECK	i ét pi error check	code	en	on
+esp_err_t	i ét pi err ti	code	en	on
+pdMS_TO_TICKS	pi đi em ét to ticks	code	en	on
+nvs_flash_init	en vi ét flash init	code	en	on
+gpio_set_level	di pi ai ô set level	code	en	on
+esp_wifi_start	i ét pi wifi start	code	en	on
+CONFIG_LOG_DEFAULT_LEVEL	config log default level	code	en	on
+CONFIG_FREERTOS_HZ	config free a ti ô ét héc	code	en	on
+IRAM_ATTR	ai ram attribute	code	en	on
+uint8_t	iu int tám ti	code	en	on
+uint32_t	iu int ba hai ti	code	en	on
+int32_t	int ba hai ti	code	en	on
+size_t	size ti	code	en	on
+SemaphoreHandle_t	semaphore handle ti	code	en	on
+TaskHandle_t	task handle ti	code	en	on
+QueueHandle_t	queue handle ti	code	en	on
+vTaskDelay	vi task delay	code	en	on
+.c	chấm xi	code	en	on
+.h	chấm ếch	code	en	on
+main.c	main chấm xi	code	en	on
+main.h	main chấm ếch	code	en	on
+app.cpp	app chấm xi pi pi	code	en	on
+build.sh	build chấm ét ếch	code	en	on
+CMakeLists.txt	xi make lists chấm ti ích ti	code	en	on
+firmware.bin	firmware chấm bin	code	en	on
+sdkconfig.defaults	sdkconfig chấm defaults	code	en	on
+v5.3	vi 5.3	code	en	on
+v1.0.2	vi 1.0.2	code	en	on
+IDF v5.3.1	ai đi ép vi 5.3.1	code	en	on
+ESP-IDF v5.3	i ét pi-ai đi ép vi 5.3	code	en	on
+port 8080	port tám không tám không	code	en	on
+https://github.com	ếch ti ti pi ét github.com	code	en	on
+http://192.168.4.1	ếch ti ti pi 192.168.4.1	code	en	on
+/dev/ttyUSB0	gạch chéo dev gạch chéo ti ti oai iu ét bi không	code	en	on
+components/	components	code	en	on
+x != 0	x khác 0	code	en	on
+stack size 2048	stack size hai không bốn tám	code	en	on
+xTaskCreate(task, "name", 2048, NULL, 5, NULL)	ích task create(task, "name", hai không bốn tám, NULL, năm, NULL)	code	en	on
+ESP_LOGI(TAG, "x")	i ét pi log ai(tag, "x")	code	en	on
+HTTP/1.1	ếch ti ti pi một chấm một	code	en	on
+802.11 b/g/n	tám không hai chấm một một bi di en	code	en	on
+softAP	soft ây pi	code	en	on
+esp32c3	i ét pi ba hai xi ba	code	en	on
+phiên bản v5.3	phiên bản vi 5.3	code	mixed	on
+cổng 1883	cổng một tám tám ba	code	mixed	on
+gọi hàm adc_cali_raw_to_voltage	gọi hàm ây đi xi cali raw to voltage	code	mixed	on
+mở file main.c	mở file main chấm xi	code	mixed	on
+chạy idf.py build	chạy ai đi ép chấm pai build	code	mixed	on
+bấm Ctrl+C	bấm control xi	code	mixed	on
+bấm Ctrl+]	bấm control ngoặc vuông	code	mixed	on
 OK	ô kê	lexicon	en	on
 FIFO	phai phô	lexicon	en	on
 fifo	phai phô	lexicon	en	on
