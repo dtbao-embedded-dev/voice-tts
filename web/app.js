@@ -542,7 +542,10 @@ async function streamSentence(sentence, seg, myRun) {
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      if (myRun !== run) return 'aborted';
+      if (myRun !== run) {
+        reader.cancel().catch(() => {});   // let the backend stop making it
+        return 'aborted';
+      }
 
       const joined = new Uint8Array(tail.length + value.length);
       joined.set(tail); joined.set(value, tail.length);
@@ -579,6 +582,7 @@ async function read(from = 0) {
   stop();
   const myRun = run;
   await audio().resume();
+  if (myRun !== run) return;   // another read or a stop came in meanwhile
   abort = new AbortController();
   resetTape(readingKey());
   Object.assign(tape, { sentences, first: Math.min(from, sentences.length - 1),
@@ -741,10 +745,14 @@ function render() {
 }
 
 // The time display follows the clock while something plays.
+// One chain only: play() starts it on every seek, and a chain left running
+// would draw the same frame again for as long as playback lasts.
+let tickRaf = 0;
 function tick() {
+  cancelAnimationFrame(tickRaf);
   if (!player.playing) return;
   renderTime();
-  requestAnimationFrame(tick);
+  tickRaf = requestAnimationFrame(tick);
 }
 
 // The one button: read, pause, carry on, or play again. A tape that starts
@@ -1082,15 +1090,19 @@ function remember() {
 async function loadHistory(id) {
   const rec = await historyGet(id);
   if (!rec) { renderHistory(); return; }
+  // Everything slow first: once stop() has run, nothing may wait, or a read
+  // started meanwhile would fill the same tape.
+  const pcm = new Int16Array(await rec.audio.arrayBuffer());
   stop();
+  const myRun = run;
   els.text.value = rec.text;
   setSpeed(rec.speed);
   setPronunciation(rec.pronunciation);
-  pickVoice(rec.voice);
+  // As at boot: a voice since renamed or removed falls back to the default.
+  pickVoice(voices.some((v) => v.name === rec.voice) ? rec.voice : defaultVoice);
   savePrefs();
   renderCount();
   saveDraft();
-  const pcm = new Int16Array(await rec.audio.arrayBuffer());
   resetTape(readingKey(), rec.rate);
   appendTape(pcm);
   // What it holds is all there is to it: playable as it is, kept as it was.
@@ -1098,7 +1110,7 @@ async function loadHistory(id) {
     sentences: rec.sentences, segments: rec.segments });
   buildReader();
   await audio().resume();
-  play(0);
+  if (myRun === run) play(0);
 }
 
 function fmtWhen(ms) {
