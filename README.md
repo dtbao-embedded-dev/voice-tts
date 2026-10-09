@@ -454,7 +454,7 @@ carries on without one: the window closes as before, `serve` keeps serving.
   became *phê ô ét tê*), turns `AP` into the syllable *ap*, and reads `Board` as
   English. `lexicon.py` rewrites those whole words first: `POST`/`GET`/`PUT`/
   `PATCH`/`DELETE` as the English words, `AP` as *ây pi*, `board` (any case) as
-  *bo*. `POSTMAN`, `APP` and `onboard` are left alone, and so is anything inside
+  *bo*, `ESP32` (any case, also `ESP 32`) as *i ét pi ba hai*. `POSTMAN`, `APP` and `onboard` are left alone, and so is anything inside
   `<en>...</en>`. Another word that reads wrong is one more line in `ENTRIES`.
 - **Licence.** The model card puts every shipped artifact - weights, ONNX exports and
   the preset-voice assets - under Apache-2.0 and allows commercial use of the audio;

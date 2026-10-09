@@ -26,6 +26,12 @@ ENTRIES = (
     # its English vowel as "IP" often enough to fail the verify check.
     ("AP", "ây pi", True),
     ("board", "bo", False),
+    # ESP32 came out "e ét phê ba hai", esp32 as the syllable "esp" and "ba mươi
+    # hai"; engineers say the letters the English way and the digits one by one.
+    ("esp32", "i ét pi ba hai", False),
+    # Whisper often writes it with a space; respelled too, the verify score
+    # compares like for like (and typed that way it read "ba mươi hai").
+    ("esp 32", "i ét pi ba hai", False),
 )
 
 _EN_SPAN = re.compile(r"(<en>.*?</en>)", re.IGNORECASE | re.DOTALL)

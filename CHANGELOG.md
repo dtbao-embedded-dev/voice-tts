@@ -32,7 +32,8 @@ the release before it builds.
 
 - `POST`, `GET`, `PUT`, `PATCH` and `DELETE` were spelled with Vietnamese letter
   names (*phê ô ét tê*); they are read as the English words. `AP` is read *ây pi*
-  instead of the syllable *ap*, and `Board` as *bo*. Whole words only (`lexicon.py`).
+  instead of the syllable *ap*, `Board` as *bo*, and `ESP32` (any case, also
+  `ESP 32`) as *i ét pi ba hai*. Whole words only (`lexicon.py`).
 
 ## [0.6.1] - 2026-10-08
 

@@ -435,8 +435,11 @@ def check_lexicon(base: str) -> None:
         "Gửi POST tới AP trên Board.": "Gửi post tới ây pi trên bo.",
         "GET, PUT, PATCH và DELETE": "get, put, patch và delete",
         "board, BOARD, Board-level": "bo, bo, bo-level",
+        "ESP32, esp32, ESP 32, Esp32-S3":
+            "i ét pi ba hai, i ét pi ba hai, i ét pi ba hai, i ét pi ba hai-S3",
         # Whole words only, and what the user already marked as English stays.
-        "POSTMAN, APP, onboard, Boards, ap, Post": "POSTMAN, APP, onboard, Boards, ap, Post",
+        "POSTMAN, APP, onboard, Boards, ap, Post, ESP320, ESP":
+            "POSTMAN, APP, onboard, Boards, ap, Post, ESP320, ESP",
         "đọc <en>AP board</en> nguyên văn, AP thì không": "đọc <en>AP board</en> nguyên văn, ây pi thì không",
     }
     for text, want in cases.items():
@@ -451,7 +454,8 @@ def check_lexicon(base: str) -> None:
     for text, want, wrong in (("Gửi POST lên server", "pˈoʊst", "fˈe ˈo"),
                               ("Gọi GET", "ɡˈɛt", "ɣˈəː2 ˈɛ"),
                               ("Kết nối AP wifi", "ˈəɪ pˈi", "ˈæp"),
-                              ("Cắm Board vào", "bˈɔ ", "bˈɔːɹd")):
+                              ("Cắm Board vào", "bˈɔ ", "bˈɔːɹd"),
+                              ("Nạp ESP32 xong", "ˈi ˈɛɜt̪ pˈi bˈaː hˈaːj", "fˈe")):
         got = phonemes(text)
         assert want in got and wrong not in got, f"{text!r}: {got!r}"
 
