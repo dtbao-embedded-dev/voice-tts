@@ -19,6 +19,8 @@ import unicodedata
 
 import numpy as np
 
+import lexicon
+
 MODEL = "large-v3-turbo"
 # faster-whisper's own name for it; looked up in the HF cache to answer
 # available() without loading anything.
@@ -34,8 +36,13 @@ _lock = threading.Lock()
 
 
 def canonical(text: str) -> str:
-    """``text`` as compared: NFC, lower case, letters and digits only."""
-    text = unicodedata.normalize("NFC", _EN_TAG.sub(" ", text)).lower()
+    """``text`` as compared: respelled, NFC, lower case, letters and digits only.
+
+    The lexicon runs on both sides, so "Board" asked for and "bo" heard - or
+    "AP" written by Whisper for the "ây pi" that was read - are the same word.
+    """
+    text = _EN_TAG.sub(" ", lexicon.apply(unicodedata.normalize("NFC", text)))
+    text = unicodedata.normalize("NFC", text).lower()
     return "".join(ch for ch in text if ch.isalnum())
 
 

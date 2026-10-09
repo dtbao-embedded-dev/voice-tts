@@ -417,6 +417,13 @@ carries on without one: the window closes as before, `serve` keeps serving.
   the duration and leave the pitch where it is, so the voice at 0.75× is the voice at
   1×, only slower. The stream is always 48 kHz and a saved WAV is a plain 48 kHz file
   carrying the speed it was read at.
+- **Some words are respelled before the engine reads them.** Its text front end
+  spells an upper-case word it does not know with Vietnamese letter names (`POST`
+  became *phê ô ét tê*), turns `AP` into the syllable *ap*, and reads `Board` as
+  English. `lexicon.py` rewrites those whole words first: `POST`/`GET`/`PUT`/
+  `PATCH`/`DELETE` as the English words, `AP` as *ây pi*, `board` (any case) as
+  *bo*. `POSTMAN`, `APP` and `onboard` are left alone, and so is anything inside
+  `<en>...</en>`. Another word that reads wrong is one more line in `ENTRIES`.
 - **Licence.** The model card puts every shipped artifact - weights, ONNX exports and
   the preset-voice assets - under Apache-2.0 and allows commercial use of the audio;
   keep the notices of [pnnbao97/VieNeu-TTS](https://github.com/pnnbao97/VieNeu-TTS)
@@ -481,6 +488,8 @@ python docs/scripts/tool-build.py --release-notes 0.5.0     # the notes a v0.5.0
 ```
 app.py                    FastAPI backend + native window entry point
 tray.py                   system tray icon, its native menu (pystray) and the popup menu
+lexicon.py                whole-word respellings applied before the engine reads the text
+verify.py                 verify mode: Whisper large-v3-turbo transcribes, 1 - CER scores
 icon.py                   the app icon, one geometry: tray/window/exe .ico and /favicon.svg
 cli.py                    command line: subcommands and flags, stdlib-only at import
 test_tts.py               assert-based smoke test over the real HTTP path

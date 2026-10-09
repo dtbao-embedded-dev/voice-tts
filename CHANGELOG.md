@@ -14,6 +14,12 @@ the release before it builds.
   its text as `1 - CER` (case, spacing and punctuation ignored). The model loads on
   the first check, not at startup.
 
+### Fixed
+
+- `POST`, `GET`, `PUT`, `PATCH` and `DELETE` were spelled with Vietnamese letter
+  names (*phê ô ét tê*); they are read as the English words. `AP` is read *ây pi*
+  instead of the syllable *ap*, and `Board` as *bo*. Whole words only (`lexicon.py`).
+
 ## [0.6.1] - 2026-10-08
 
 ### Changed

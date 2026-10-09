@@ -29,6 +29,8 @@ from fastapi.staticfiles import StaticFiles
 from numpy.lib.stride_tricks import sliding_window_view
 from pydantic import BaseModel
 
+import lexicon
+
 SAMPLE_RATE = 48_000
 MAX_CHARS = 20_000
 
@@ -324,8 +326,10 @@ def synthesize(text: str, voice: str | None = None, speed: float = 1.0):
     if resolved is None:
         raise ValueError(f"Không có giọng '{voice}'.")
 
+    spoken = lexicon.apply(text)
+
     def chunks():
-        for chunk in stretch(tts.infer_stream(text, voice=resolved), speed):
+        for chunk in stretch(tts.infer_stream(spoken, voice=resolved), speed):
             yield np.asarray(chunk, dtype=np.float32)
 
     return resolved, chunks()

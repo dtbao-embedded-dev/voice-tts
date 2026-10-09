@@ -50,6 +50,7 @@ class StubEngine:
         return name if name in self.VOICES else None
 
     def infer_stream(self, text, voice=None):
+        self.last_text = text
         # A 220 Hz tone, 0.1 s per word, in a few chunks - enough to be audible
         # and to be told apart from silence.
         n = int(app.SAMPLE_RATE * 0.1 * max(1, len(text.split())))
@@ -321,6 +322,46 @@ def check_icon(base: str, tmp: Path) -> None:
     print("icon: disc + ring + 5 bars, ICO with small sizes, /favicon.svg on the page")
 
 
+def check_lexicon(base: str) -> None:
+    """POST, AP and Board reach the engine in a spelling it reads right."""
+    import lexicon
+    import verify
+    from vieneu_utils.phonemize_text import normalize_to_chunks_v3_with_gaps,         phonemize_text_with_emotions
+
+    cases = {
+        "Gửi POST tới AP trên Board.": "Gửi post tới ây pi trên bo.",
+        "GET, PUT, PATCH và DELETE": "get, put, patch và delete",
+        "board, BOARD, Board-level": "bo, bo, bo-level",
+        # Whole words only, and what the user already marked as English stays.
+        "POSTMAN, APP, onboard, Boards, ap, Post": "POSTMAN, APP, onboard, Boards, ap, Post",
+        "đọc <en>AP board</en> nguyên văn, AP thì không": "đọc <en>AP board</en> nguyên văn, ây pi thì không",
+    }
+    for text, want in cases.items():
+        assert lexicon.apply(text) == want, f"{text!r} -> {lexicon.apply(text)!r}"
+
+    # What the engine's own front end makes of it, model-free: the spelled-out
+    # Vietnamese letters (phê ô ét tê) are the bug being fixed.
+    def phonemes(text: str) -> str:
+        chunks, _ = normalize_to_chunks_v3_with_gaps(lexicon.apply(text), max_chars=256)
+        return " ".join(phonemize_text_with_emotions(c) for c in chunks)
+
+    for text, want, wrong in (("Gửi POST lên server", "pˈoʊst", "fˈe ˈo"),
+                              ("Gọi GET", "ɡˈɛt", "ɣˈəː2 ˈɛ"),
+                              ("Kết nối AP wifi", "ˈəɪ pˈi", "ˈæp"),
+                              ("Cắm Board vào", "bˈɔ ", "bˈɔːɹd")):
+        got = phonemes(text)
+        assert want in got and wrong not in got, f"{text!r}: {got!r}"
+
+    # The HTTP path rewrites before the engine sees the text.
+    status, _, body = post(base, {"text": "Gửi POST tới AP trên Board"})
+    assert status == 200, f"{status} {body[:200]!r}"
+    assert app._engine.last_text == "Gửi post tới ây pi trên bo", app._engine.last_text
+
+    # Whisper writes what it hears its own way; the score compares like for like.
+    assert verify.score("Gửi POST tới AP trên Board", "Gửi Post tới AP trên bo") == 1.0
+    print("lexicon: POST/GET/... as English words, AP as ây pi, Board as bo, whole words only")
+
+
 def check_score() -> None:
     """The verify score: 1 - CER over text reduced to letters and digits."""
     import verify
@@ -373,6 +414,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         check_remote(base, Path(tmp))
         check_wav_format(base)
+        check_lexicon(base)
         check_local(Path(tmp))
         check_icon(base, Path(tmp))
     print("OK")
