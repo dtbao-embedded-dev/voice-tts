@@ -36,6 +36,14 @@ the release before it builds.
   now use the same letter names: `I2C` was *i hai xê* and is *ai hai xi*, `HTTP`,
   `USB` and `IP` sound slightly different. `voice-tts lexicon add` keeps any old
   spelling.
+- The `special` pronunciation reads code: identifiers part by part (`ESP_LOGI` *i ét
+  pi log ai*, `uint8_t` *iu int tám ti*; `gạch dưới` was read aloud), file names
+  (`main.c` *main chấm xi*, was *main. xê*), versions (`v5.3` *vi năm chấm ba*, was
+  *vê năm. ba*), URLs and paths (`/` *gạch chéo*, was *trên*), ports digit by digit,
+  and the numbers of a code line (`2048` was *two thousand forty eight*).
+- About 80 more built-in lexicon words, Vietnamese and English: `FreeRTOS`,
+  `PSRAM`, `JTAG`, `OK` *ô kê*, `FIFO`, `VOUT` *vê ao*, `module` *mô đun*, `mass`
+  *mát*, `SOT-23`, `VĐK` *vi điều khiển*, `HĐH` *hệ điều hành*...
 
 ## [0.8.2] - 2026-10-09
 
