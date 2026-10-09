@@ -52,7 +52,8 @@ the release before it builds.
   if it is not made yet.
 - The window's backend listens on the fixed port 8761 (`gui --port`, any free port
   if it is taken) and keeps a WebView2 profile in `<data dir>/webview`, so what the
-  page stores survives a restart.
+  page stores survives a restart. It answers only requests addressed to
+  `127.0.0.1` or `localhost` on that port.
 - The lexicon respells in one pass, longest word first, so a spelling one entry
   produces is never respelled by another.
 

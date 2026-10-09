@@ -492,7 +492,10 @@ carries on without one: the window closes as before, `serve` keeps serving.
   add replaces a built-in one with the same spelling, and where two words start at
   the same place the longer one wins (`ESP32 S3` before `ESP32`). On a LAN server the
   list is the server's: everyone who holds the token reads and edits the same one.
-  Up to 500 words, 64 characters a word and 128 for how it is read.
+  Up to 500 words, 64 characters a word and 128 for how it is read. The window
+  reads a changed list anew only when the change came through its own *Từ điển*;
+  after `voice-tts lexicon` or another LAN client edits it, *Phát lại* still plays
+  the old audio until the text or a setting changes.
 - **The window reads one sentence per request.** `web/text.js` splits the text at
   `. ! ? …` before a space and at line breaks (not after `3.14`, `v.v.`, `TP.` and
   the like, nor inside `<en>...</en>`), and each sentence is its own
@@ -507,7 +510,10 @@ carries on without one: the window closes as before, `serve` keeps serving.
   window therefore serves its backend on a fixed port, `8761` (`voice-tts gui
   --port`), and keeps a WebView2 profile in `<data dir>/webview` instead of
   pywebview's private one. If 8761 is taken - a second window, another program -
-  that window runs on any free port and starts without them.
+  that window runs on any free port and starts without them. Having no token, the
+  window's backend answers only requests addressed to `127.0.0.1` or `localhost`
+  on its port (`421` otherwise), so a web page cannot reach it by pointing a
+  hostname of its own at the loopback address.
 - **Verify mode is deferred.** Checking a reading by ear - Whisper large-v3-turbo
   transcribes it, and it is sent only if it matches the text by 95% - was built,
   measured and taken out before release (it needs a 0.8 GB int8 model in the
