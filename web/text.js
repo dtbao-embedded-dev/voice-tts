@@ -65,8 +65,17 @@
 
   // A dropped or picked file, as text to read. UTF-8, with or without a BOM;
   // Markdown is recognised by its extension only, so a .txt stays as written.
+  // Anything else - another extension, bytes that are not UTF-8 - throws, so a
+  // stray image never replaces what the user typed.
   function decodeFile(bytes, name) {
-    const text = new TextDecoder('utf-8').decode(bytes).replace(/\r\n?/g, '\n');
+    if (!/\.(txt|md|markdown)$/i.test(name)) throw new Error('Chỉ mở được file .txt hoặc .md');
+    let text;
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch {
+      throw new Error(`${name} không phải văn bản UTF-8`);
+    }
+    text = text.replace(/\r\n?/g, '\n');
     return /\.(md|markdown)$/i.test(name) ? stripMarkdown(text) : text;
   }
 

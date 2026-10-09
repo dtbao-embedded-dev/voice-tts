@@ -51,6 +51,10 @@ function checkDecode() {
   assert.equal(decodeFile(bytes('# Đầu\r\nthân'), 'GHI-CHU.MD'), 'Đầu\nthân', '.md not stripped');
   assert.equal(decodeFile(bytes('# giữ nguyên\r\n'), 'a.txt'), '# giữ nguyên\n', '.txt changed');
   assert.equal(decodeFile(bytes('*x*'), 'a.markdown'), 'x', '.markdown not stripped');
+  // Anything else is refused before it can replace what the user typed.
+  assert.throws(() => decodeFile(bytes('x'), 'anh.png'), /txt|md/, 'a .png accepted');
+  assert.throws(() => decodeFile(new Uint8Array([0x89, 0x50, 0xff, 0xfe]), 'a.txt'),
+    /UTF-8/, 'binary bytes decoded');
   console.log('decode: UTF-8 with or without BOM, CRLF, Markdown by extension only');
 }
 

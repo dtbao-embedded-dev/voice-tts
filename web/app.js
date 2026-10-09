@@ -21,6 +21,10 @@ const PRIME_SECONDS = 0.3;   // head start so a slow chunk never starves playbac
 const METER_BARS = 40;
 
 let voices = [];
+let defaultVoice = null;
+// The model is loaded and the limit known: until then nothing may be opened,
+// since the field's maxLength - what a file is cut to - is not set yet.
+let ready = false;
 let voice = null;
 let abort = null;
 let speed = 1;
@@ -723,7 +727,7 @@ function render() {
   els.saveBtn.disabled = tape.length === 0;
   // What a reading depends on is fixed while it is being made or heard.
   els.text.readOnly = busy;
-  els.openBtn.disabled = busy;
+  els.openBtn.disabled = busy || !ready;
   els.voiceBtn.disabled = busy;
   for (const o of els.speed.children) o.disabled = busy;
   for (const o of els.pron.children) o.disabled = busy;
@@ -1157,13 +1161,14 @@ const MAX_FILE_BYTES = 4 * 1024 * 1024;   // far past 20 000 characters of text
 
 async function openFile(file) {
   if (!file) return;
+  if (!ready) return;
   if (els.text.readOnly) { setStatus('error', 'Dừng đọc trước khi mở file'); return; }
   if (file.size > MAX_FILE_BYTES) { setStatus('error', `${file.name} quá lớn để mở`); return; }
   let value;
   try {
     value = VoiceText.decodeFile(new Uint8Array(await file.arrayBuffer()), file.name);
-  } catch {
-    setStatus('error', `Không đọc được ${file.name}`);
+  } catch (err) {
+    setStatus('error', err.message || `Không đọc được ${file.name}`);
     return;
   }
   const max = els.text.maxLength > 0 ? els.text.maxLength : Infinity;
@@ -1254,6 +1259,10 @@ async function boot() {
   const info = await (await fetch('/api/voices')).json();
   // The backend owns the limit; the field and the counter follow it.
   els.text.maxLength = info.maxChars;
+  // A draft kept from before may be longer than this server takes.
+  if (els.text.value.length > info.maxChars) els.text.value = els.text.value.slice(0, info.maxChars);
+  defaultVoice = info.default;
+  ready = true;
   renderCount();
   voices = info.voices;
   renderVoices();
