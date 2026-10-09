@@ -139,6 +139,8 @@ function closeSheet(st = activeSheet, velocity = 0) {
   st.open = false;
   if (activeSheet === st) activeSheet = null;
   st.cancel();
+  // Its list may have filled in since it opened: leave by its height now.
+  st.height = st.el.offsetHeight;
   // It leaves along the path it came in on.
   st.cancel = spring(st.y, st.height, (y, done) => {
     setSheetY(st, y);
@@ -163,6 +165,7 @@ function draggable(st) {
     if (e.target.closest('.sheet__list, button, input, label')) return;
     st.el.setPointerCapture(e.pointerId);
     st.cancel();
+    st.height = st.el.offsetHeight;
     const grabY = e.clientY, grabAt = st.y;
     const history = [];
 

@@ -322,6 +322,8 @@ button.row:active { background: var(--surface-2); transition: none; }
   transform: translateY(100%);
   touch-action: none;
 }
+/* `display: flex` above would otherwise win over the hidden attribute. */
+.sheet[hidden], .scrim[hidden] { display: none; }
 .sheet__grip {
   width: 36px; height: 5px; margin: 4px auto 12px;
   border-radius: 3px;
