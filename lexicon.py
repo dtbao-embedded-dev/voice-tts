@@ -52,7 +52,7 @@ ENTRIES = (
     ("esp32s3", "i ét pi ba hai ét ba", False),
     ("esp32c3", "i ét pi ba hai xi ba", False),
     ("esp32c6", "i ét pi ba hai xi sáu", False),
-    ("esp32h2", "i ét pi ba hai ếch hai", False),
+    ("esp32h2", "i ét pi ba hai hát hai", False),
 
     # Upper-case words said as words, which respell.py's acronym rule would spell.
     ("OK", "ô kê", True),
@@ -62,9 +62,10 @@ ENTRIES = (
     ("YAML", "yaml", True),
     ("SPIFFS", "spiffs", False),
     ("FATFS", "fat ép ét", False),
-    ("ELF", "elf", True),
+    # ELF and MAC are left to respell.py's letters: measured 2026-10-09, Whisper
+    # large-v3, 5 takes each, "elf" heard ELF 1/5 against "i eo ép" 3/5, "mác" and
+    # "<en>mac</en>" MAC 0/5 (both "Mark") against "em ây xi" 5/5.
     ("TAG", "tag", True),
-    ("MAC", "mác", True),
     ("SHA", "sha", True),
     ("SHA256", "sha hai năm sáu", False),
     ("JTAG", "giây tag", False),
@@ -108,7 +109,7 @@ ENTRIES = (
     ("tty", "ti ti oai", True),
     ("Ctrl+C", "control xi", False),
     ("Ctrl+]", "control ngoặc vuông", False),
-    ("HTTP/1.1", "ếch ti ti pi một chấm một", True),
+    ("HTTP/1.1", "hát ti ti pi một chấm một", True),
     ("802.11", "tám không hai chấm một một", False),
     ("b/g/n", "bi di en", False),
     ("panic'ed", "panic", False),
@@ -138,8 +139,8 @@ ENTRIES = (
     ("SOT-223", "sót hai hai ba", True),
     ("SOT-89", "sót tám chín", True),
     ("LiPo", "li pô", False),
-    # A cell size, not eighteen thousand.
-    ("18650", "một tám sáu năm không", False),
+    # A cell size, not eighteen thousand: heard 18650 5/5, "một tám sáu năm không" 4/5.
+    ("18650", "mười tám sáu năm mươi", False),
 
     # Vietnamese abbreviations, said in full.
     ("VĐK", "vi điều khiển", True),

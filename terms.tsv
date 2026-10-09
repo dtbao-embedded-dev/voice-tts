@@ -674,7 +674,7 @@ RFID	a ép ai đi	acronym	en	on
 EN	i en	acronym	en	on
 ESP32-C3	i ét pi ba hai-xi ba	acronym	en	on
 ESP32-C6	i ét pi ba hai-xi sáu	acronym	en	on
-ESP32-H2	i ét pi ba hai-ếch hai	acronym	en	on
+ESP32-H2	i ét pi ba hai-hát hai	acronym	en	on
 ESP32S3	i ét pi ba hai ét ba	acronym	en	on
 STM32	ét ti em ba hai	acronym	en	on
 STM32F103	ét ti em ba hai ép một không ba	acronym	en	on
@@ -693,18 +693,18 @@ SDMMC	ét đi em em xi	acronym	en	on
 IMU	ai em iu	acronym	en	on
 MPU6050	em pi iu sáu không năm không	acronym	en	on
 BME280	bi em i hai tám không	acronym	en	on
-AHT20	ây ếch ti hai không	acronym	en	on
-DHT22	đi ếch ti hai hai	acronym	en	on
+AHT20	ây hát ti hai không	acronym	en	on
+DHT22	đi hát ti hai hai	acronym	en	on
 DS18B20	đi ét một tám bi hai không	acronym	en	on
-HC-SR04	ếch xi-ét a không bốn	acronym	en	on
+HC-SR04	hát xi-ét a không bốn	acronym	en	on
 MSB	em ét bi	acronym	en	on
 LSB	eo ét bi	acronym	en	on
 ESP-IDF	i ét pi-ai đi ép	acronym	en	on
 IDF	ai đi ép	acronym	en	on
 Arduino IDE	Arduino ai đi i	acronym	en	on
 MCU	em xi iu	acronym	en	on
-CH340	xi ếch ba bốn không	acronym	en	on
-CH340C	xi ếch ba bốn không xi	acronym	en	on
+CH340	xi hát ba bốn không	acronym	en	on
+CH340C	xi hát ba bốn không xi	acronym	en	on
 CP2102	xi pi hai một không hai	acronym	en	on
 FT232	ép ti hai ba hai	acronym	en	on
 FT232RL	ép ti hai ba hai a eo	acronym	en	on
@@ -725,12 +725,12 @@ BSP	bi ét pi	acronym	en	on
 VS Code	vi ét Code	acronym	en	on
 WSL	đắp bờ liu ét eo	acronym	en	on
 CSV	xi ét vi	acronym	en	on
-HTTPS	ếch ti ti pi ét	acronym	en	on
-HTTP	ếch ti ti pi	acronym	en	on
+HTTPS	hát ti ti pi ét	acronym	en	on
+HTTP	hát ti ti pi	acronym	en	on
 MQTT	em kiu ti ti	acronym	en	on
 TCP	ti xi pi	acronym	en	on
 UDP	iu đi pi	acronym	en	on
-DHCP	đi ếch xi pi	acronym	en	on
+DHCP	đi hát xi pi	acronym	en	on
 NTP	en ti pi	acronym	en	on
 SNTP	ét en ti pi	acronym	en	on
 TLS	ti eo ét	acronym	en	on
@@ -794,7 +794,7 @@ BIOS	bios	acronym	en	on
 chân D4	chân đi 4	acronym	mixed	on
 chân A0	chân ây 0	acronym	mixed	on
 chân IO4	chân ai ô 4	acronym	mixed	on
-driver CH340	driver xi ếch ba bốn không	acronym	mixed	on
+driver CH340	driver xi hát ba bốn không	acronym	mixed	on
 đọc ADC	đọc ây đi xi	acronym	mixed	on
 xuất PWM	xuất pi đắp bờ liu em	acronym	mixed	on
 chân EN	chân i en	acronym	mixed	on
@@ -805,7 +805,7 @@ chân GPIO số 4	chân di pi ai ô số 4	acronym	mixed	on
 chip ESP32-C3	chip i ét pi ba hai-xi ba	acronym	mixed	on
 xung PWM	xung pi đắp bờ liu em	acronym	mixed	on
 ADC 12-bit	ây đi xi 12-bit	acronym	mixed	on
-cảm biến DHT22	cảm biến đi ếch ti hai hai	acronym	mixed	on
+cảm biến DHT22	cảm biến đi hát ti hai hai	acronym	mixed	on
 cảm biến BME280	cảm biến bi em i hai tám không	acronym	mixed	on
 SPI và I2C	ét pi ai và ai hai xi	acronym	mixed	on
 chuẩn I2C	chuẩn ai hai xi	acronym	mixed	on
@@ -917,11 +917,11 @@ TaskHandle_t	task handle ti	code	en	on
 QueueHandle_t	queue handle ti	code	en	on
 vTaskDelay	vi task delay	code	en	on
 .c	chấm xi	code	en	on
-.h	chấm ếch	code	en	on
+.h	chấm hát	code	en	on
 main.c	main chấm xi	code	en	on
-main.h	main chấm ếch	code	en	on
+main.h	main chấm hát	code	en	on
 app.cpp	app chấm xi pi pi	code	en	on
-build.sh	build chấm ét ếch	code	en	on
+build.sh	build chấm ét hát	code	en	on
 CMakeLists.txt	xi make lists chấm ti ích ti	code	en	on
 firmware.bin	firmware chấm bin	code	en	on
 sdkconfig.defaults	sdkconfig chấm defaults	code	en	on
@@ -930,15 +930,15 @@ v1.0.2	vi 1.0.2	code	en	on
 IDF v5.3.1	ai đi ép vi 5.3.1	code	en	on
 ESP-IDF v5.3	i ét pi-ai đi ép vi 5.3	code	en	on
 port 8080	port tám không tám không	code	en	on
-https://github.com	ếch ti ti pi ét github.com	code	en	on
-http://192.168.4.1	ếch ti ti pi 192.168.4.1	code	en	on
+https://github.com	hát ti ti pi ét github.com	code	en	on
+http://192.168.4.1	hát ti ti pi 192.168.4.1	code	en	on
 /dev/ttyUSB0	gạch chéo dev gạch chéo ti ti oai iu ét bi không	code	en	on
 components/	components	code	en	on
 x != 0	x khác 0	code	en	on
 stack size 2048	stack size hai không bốn tám	code	en	on
 xTaskCreate(task, "name", 2048, NULL, 5, NULL)	ích task create(task, "name", hai không bốn tám, NULL, năm, NULL)	code	en	on
 ESP_LOGI(TAG, "x")	i ét pi log ai(tag, "x")	code	en	on
-HTTP/1.1	ếch ti ti pi một chấm một	code	en	on
+HTTP/1.1	hát ti ti pi một chấm một	code	en	on
 802.11 b/g/n	tám không hai chấm một một bi di en	code	en	on
 softAP	soft ây pi	code	en	on
 esp32c3	i ét pi ba hai xi ba	code	en	on
@@ -957,9 +957,9 @@ ASCII	ascii	lexicon	en	on
 YAML	yaml	lexicon	en	on
 SPIFFS	spiffs	lexicon	en	on
 FATFS	fat ép ét	lexicon	en	on
-ELF	elf	lexicon	en	on
+ELF	i eo ép	lexicon	en	on
 TAG	tag	lexicon	en	on
-MAC	mác	lexicon	en	on
+MAC	em ây xi	lexicon	en	on
 SHA	sha	lexicon	en	on
 SHA256	sha hai năm sáu	lexicon	en	on
 JTAG	giây tag	lexicon	en	on
@@ -1014,10 +1014,10 @@ mass	mát	lexicon	en	on
 panic'ed	panic	lexicon	en	on
 module cảm biến	mô đun cảm biến	lexicon	mixed	on
 cáp USB-C	cáp iu ét bi xi	lexicon	mixed	on
-địa chỉ MAC	địa chỉ mác	lexicon	mixed	on
+địa chỉ MAC	địa chỉ em ây xi	lexicon	mixed	on
 ic nguồn	i xê nguồn	lexicon	mixed	on
 pin LiPo	pin li pô	lexicon	mixed	on
-pin 18650	pin một tám sáu năm không	lexicon	mixed	on
+pin 18650	pin mười tám sáu năm mươi	lexicon	mixed	on
 chạm mass	chạm mát	lexicon	mixed	on
 dây mass	dây mát	lexicon	mixed	on
 VĐK	vi điều khiển	lexicon	vi	on
@@ -1028,3 +1028,6 @@ CTDL	cấu trúc dữ liệu	lexicon	vi	on
 ĐTDĐ	điện thoại di động	lexicon	vi	on
 KTĐT	kỹ thuật điện tử	lexicon	vi	on
 ĐKTĐ	điều khiển tự động	lexicon	vi	on
+BOM	bi ô em	acronym	en	on
+bảng BOM linh kiện	bảng bi ô em linh kiện	acronym	mixed	on
+file ELF	file i eo ép	acronym	mixed	on

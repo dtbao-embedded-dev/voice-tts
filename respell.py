@@ -49,9 +49,12 @@ DIGITS = ("không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tá
 _NUMBER_WORDS = set(DIGITS) | {"mười", "mươi", "mốt", "lăm", "tư", "trăm", "nghìn", "ngàn", "triệu", "tỷ"}
 
 # English letter names written so sea_g2p reads them in Vietnamese: "gi" would come
-# out as a bare /z/, "kây" as English, "zét" split in two.
+# out as a bare /z/, "kây" as English, "zét" split in two. H is the Vietnamese
+# "hát": measured 2026-10-09 (Whisper large-v3, 5 takes each), "ếch" was heard as X
+# (HAL 0/5 "XAL", DHT22 0/5 "DXT22", HTTP 3/5) and "ết" as S (HAL 0/5, DHT22 0/5),
+# "hát" gave HAL 5/5, DHT22 4/5, HTTP 4/5.
 EN_LETTERS = dict(zip("ABCDEFGHIJKLMNOPQRSTUVWXYZ", (
-    "ây", "bi", "xi", "đi", "i", "ép", "di", "ếch", "ai", "giây", "cây", "eo", "em", "en",
+    "ây", "bi", "xi", "đi", "i", "ép", "di", "hát", "ai", "giây", "cây", "eo", "em", "en",
     "ô", "pi", "kiu", "a", "ét", "ti", "iu", "vi", "đắp bờ liu", "ích", "oai", "dét")))
 
 
@@ -207,8 +210,10 @@ SEA_WORDS = {
     "EBIT", "GINI", "NSAID", "PET", "SELECT", "FROM", "WHERE", "ORDER", "BY", "LIMIT", "OFFSET",
     "GROUP", "HAVING", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AS", "AND", "OR", "NOT",
     "IN", "BETWEEN", "LIKE", "IS", "NULL", "TRUE", "FALSE", "CASE", "WHEN", "THEN", "ELSE", "END",
-    "UNION", "INTERSECT", "EXCEPT", "DESC", "JSON", "NVIDIA", "KI", "BOM",
+    "UNION", "INTERSECT", "EXCEPT", "DESC", "JSON", "NVIDIA", "KI",
 }
+# Not BOM: spelled "bi ô em" it was heard as BOM 5/5, as the word "bom" 0/5. JSON
+# stays with sea_g2p: 4/5, against "giây sơn" 0/5 (Whisper large-v3, 2026-10-09).
 # Upper-case English words in code and logs, read as the word: sea_g2p would spell
 # them with Vietnamese letters (INFO i nờ ép ô).
 CAPS_WORDS = {
