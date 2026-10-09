@@ -103,6 +103,10 @@ def build_parser() -> argparse.ArgumentParser:
                        help="play through the speakers (default: on unless -o is given)")
     speak.add_argument("--raw", action="store_true",
                        help="with -o: raw float32 LE mono 48 kHz instead of a 16-bit WAV")
+    speak.add_argument("--pronunciation", choices=("normal", "special"), default="normal",
+                       help="normal reads the text as typed; special respells words the "
+                            "engine gets wrong first - POST as 'post', AP as 'ây pi', "
+                            "Board as 'bo' (default: %(default)s)")
     speak.add_argument("--verify", action="store_true",
                        help="have Whisper hear the reading back; save or play it only if it "
                             "matches the text, else exit 1 (slower, nothing streams)")
@@ -415,7 +419,8 @@ def cmd_speak(args: argparse.Namespace) -> int:
         if server:
             if not text.strip():
                 raise CliError(2, "no text to read")
-            body = {"text": text, "voice": args.voice, "speed": args.speed}
+            body = {"text": text, "voice": args.voice, "speed": args.speed,
+                    "pronunciation": args.pronunciation}
             if args.verify:
                 body["verify"] = True
                 if args.min_score is not None:
@@ -428,7 +433,8 @@ def cmd_speak(args: argparse.Namespace) -> int:
         else:
             app = local_engine(args.quiet)
             try:
-                voice, samples = app.synthesize(text, args.voice, args.speed)
+                voice, samples = app.synthesize(text, args.voice, args.speed,
+                                                args.pronunciation)
             except ValueError as exc:
                 raise CliError(2, str(exc)) from None
             rate = app.SAMPLE_RATE

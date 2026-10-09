@@ -8,7 +8,7 @@ const els = {
   sheet: $('sheet'), scrim: $('scrim'), speed: $('speed'),
   playBtn: $('playBtn'), playIcon: $('playIcon'), playLabel: $('playLabel'),
   saveBtn: $('saveBtn'), timecode: $('timecode'), meter: $('meter'),
-  verify: $('verify'), verifyHint: $('verifyHint'),
+  verify: $('verify'), verifyHint: $('verifyHint'), pron: $('pron'),
 };
 
 const REGIONS = ['Bắc', 'Trung', 'Nam'];
@@ -20,6 +20,9 @@ let voice = null;
 let speaking = false;
 let abort = null;
 let speed = 1;
+// "normal": the engine reads the text as typed. "special": the backend respells
+// the words it gets wrong first (POST, AP, Board, ESP32).
+let pronunciation = 'normal';
 // Mode 2: Whisper hears the reading back and the server sends it only when it
 // matches. Usable only where /api/status says verify can run.
 let verifyOn = false;
@@ -222,6 +225,13 @@ function applyVerify(state) {
 
 const percent = (score) => `${(Number(score) * 100).toFixed(1)}%`;
 
+els.pron.addEventListener('click', (e) => {
+  const opt = e.target.closest('.speed__opt');
+  if (!opt) return;
+  pronunciation = opt.dataset.pron;
+  for (const o of els.pron.children) o.setAttribute('aria-pressed', String(o === opt));
+});
+
 /* ---- Meter ------------------------------------------------------------- */
 
 const bars = Array.from({ length: METER_BARS }, () => {
@@ -280,6 +290,7 @@ function setSpeaking(on) {
   els.text.readOnly = on;
   // The speed is baked into the request, so it is fixed for the whole read.
   for (const o of els.speed.children) o.disabled = on;
+  for (const o of els.pron.children) o.disabled = on;
   els.verify.disabled = on || !verifyUsable;
   els.meter.dataset.live = on ? '1' : '0';
   if (on) drawMeter(analyser);
@@ -315,7 +326,8 @@ async function speak() {
     res = await fetch('/api/tts/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(checked ? { text, voice, speed, verify: true } : { text, voice, speed }),
+      body: JSON.stringify(checked ? { text, voice, speed, pronunciation, verify: true }
+                                   : { text, voice, speed, pronunciation }),
       signal: abort.signal,
     });
   } catch {

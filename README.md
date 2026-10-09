@@ -38,7 +38,9 @@ it (plus a one-off download for a source install).
 1. Open **Voice TTS** (Start Menu, or the downloaded exe).
 2. Paste or type the text - up to 20 000 characters, Vietnamese and English mixed
    freely in one sentence.
-3. **Giọng đọc** picks the voice (★ = featured); **Tốc độ** picks 0.75×-1.5×.
+3. **Giọng đọc** picks the voice (★ = featured); **Tốc độ** picks 0.75×-1.5×;
+   **Phát âm** is *Thường* (as typed) or *Đặc biệt* (POST read "post", AP "ây pi",
+   Board "bo", ESP32 "i ét pi ba hai").
    **Kiểm tra** has Whisper hear the reading back first and plays it only if it
    matches the text by 95% or more; otherwise the status line says why, with what
    Whisper heard. It starts playing later, since the whole text is read first.
@@ -196,6 +198,7 @@ voice-tts status --wait 600      # exit 0 once the server's model is ready
 | `-o`, `--output` | write to a file, or `-` for stdout; without it the text is played |
 | `--play` / `--no-play` | force playback on or off (default: on unless `-o`) |
 | `--raw` | with `-o`: raw float32 LE mono 48 kHz instead of a 16-bit WAV |
+| `--pronunciation P` | `normal` reads the text as typed (default); `special` respells POST, AP, Board, ESP32... first |
 | `--verify` | Whisper hears the reading back; it is saved or played only if it matches the text, else exit `1` with what Whisper heard |
 | `--min-score X` | with `--verify`: the match needed, `0`-`1` (default `0.95`) |
 | `--server URL`, `--token T` | use a running server instead of loading the model here |
@@ -278,11 +281,13 @@ upgrade: since 3.8.3 `Minh Quân Pro` is `Hải Đăng`, `Anh Khôi` is `Thiện
 `Mạnh Dũng` is `Quốc Tuấn`. The old names (and `Minh Quân`) are still accepted as
 `voice` and read with the renamed voice; they are just no longer listed.
 
-`POST /api/tts/stream` takes `{"text", "voice", "speed", "format", "verify",
-"min_score"}`: `text` up to 20 000 characters, `voice` a name from `/api/voices`
-(omit it for the default), `speed` between `0.5` and `2.0` (default `1.0`), `format`
-either `"f32"` (default) or `"wav"`, `verify` `false` (default) or `true`, and
-`min_score` between `0` and `1` (default `0.95`).
+`POST /api/tts/stream` takes `{"text", "voice", "speed", "format", "pronunciation",
+"verify", "min_score"}`: `text` up to 20 000 characters, `voice` a name from
+`/api/voices` (omit it for the default), `speed` between `0.5` and `2.0` (default
+`1.0`), `format` either `"f32"` (default) or `"wav"`, `pronunciation` either
+`"normal"` (default, the text as typed) or `"special"` (respelled by `lexicon.py`,
+see Notes), `verify` `false` (default) or `true`, and `min_score` between `0` and `1`
+(default `0.95`).
 
 | `format` | Body | `Content-Type` | Starts arriving |
 | --- | --- | --- | --- |
@@ -298,8 +303,8 @@ least `min_score`. It then carries `X-Verify-Score` (`0.9630`) and
 cannot run here (`/api/status` says why).
 
 The answer is `400` for empty or over-long text, an unknown voice, a speed or
-`min_score` out of range, `422` for an unknown `format`, and `401` when the server
-has a token and the request does not carry it. Every `/api` call takes the token as
+`min_score` out of range, `422` for an unknown `format` or `pronunciation`, and
+`401` when the server has a token and the request does not carry it. Every `/api` call takes the token as
 `Authorization: Bearer <token>`; leave the header out for a server without one.
 
 The examples below read one sentence from a LAN server (`<host>` is its address,
@@ -449,13 +454,16 @@ carries on without one: the window closes as before, `serve` keeps serving.
   the duration and leave the pitch where it is, so the voice at 0.75× is the voice at
   1×, only slower. The stream is always 48 kHz and a saved WAV is a plain 48 kHz file
   carrying the speed it was read at.
-- **Some words are respelled before the engine reads them.** Its text front end
-  spells an upper-case word it does not know with Vietnamese letter names (`POST`
-  became *phê ô ét tê*), turns `AP` into the syllable *ap*, and reads `Board` as
-  English. `lexicon.py` rewrites those whole words first: `POST`/`GET`/`PUT`/
-  `PATCH`/`DELETE` as the English words, `AP` as *ây pi*, `board` (any case) as
-  *bo*, `ESP32` (any case, also `ESP 32`) as *i ét pi ba hai*. `POSTMAN`, `APP` and `onboard` are left alone, and so is anything inside
-  `<en>...</en>`. Another word that reads wrong is one more line in `ENTRIES`.
+- **Two pronunciations: `normal` (default) and `special`.** The engine's text front
+  end spells an upper-case word it does not know with Vietnamese letter names
+  (`POST` is *phê ô ét tê*), turns `AP` into the syllable *ap*, and reads `Board` as
+  English. `normal` leaves that as it is: the text is read as typed. `special`
+  (`"pronunciation": "special"`, `--pronunciation special`, *Phát âm → Đặc biệt*)
+  has `lexicon.py` rewrite whole words first: `POST`/`GET`/`PUT`/`PATCH`/`DELETE` as
+  the English words, `AP` as *ây pi*, `board` (any case) as *bo*, `ESP32` (any case,
+  also `ESP 32`) as *i ét pi ba hai*. `POSTMAN`, `APP` and `onboard` are left alone,
+  and so is anything inside `<en>...</en>`. Another word is one more line in
+  `ENTRIES`. The verify score applies the lexicon to both sides in either mode.
 - **Licence.** The model card puts every shipped artifact - weights, ONNX exports and
   the preset-voice assets - under Apache-2.0 and allows commercial use of the audio;
   keep the notices of [pnnbao97/VieNeu-TTS](https://github.com/pnnbao97/VieNeu-TTS)

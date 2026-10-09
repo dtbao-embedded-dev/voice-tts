@@ -425,7 +425,7 @@ def check_icon(base: str, tmp: Path) -> None:
     print("icon: disc + ring + 5 bars, ICO with small sizes, /favicon.svg on the page")
 
 
-def check_lexicon(base: str) -> None:
+def check_lexicon(base: str, tmp: Path) -> None:
     """POST, AP and Board reach the engine in a spelling it reads right."""
     import lexicon
     import verify
@@ -459,10 +459,27 @@ def check_lexicon(base: str) -> None:
         got = phonemes(text)
         assert want in got and wrong not in got, f"{text!r}: {got!r}"
 
-    # The HTTP path rewrites before the engine sees the text.
-    status, _, body = post(base, {"text": "Gửi POST tới AP trên Board"})
-    assert status == 200, f"{status} {body[:200]!r}"
-    assert app._engine.last_text == "Gửi post tới ây pi trên bo", app._engine.last_text
+    # "normal" (the default) hands the engine the text as typed - POST is
+    # spelled as before; "special" respells it first.
+    raw = "Gửi POST tới AP trên Board"
+    for body, want in (({"text": raw}, raw),
+                       ({"text": raw, "pronunciation": "normal"}, raw),
+                       ({"text": raw, "pronunciation": "special"}, "Gửi post tới ây pi trên bo")):
+        status, _, answer = post(base, body)
+        assert status == 200, f"{body}: {status} {answer[:200]!r}"
+        assert app._engine.last_text == want, (body, app._engine.last_text)
+    assert post(base, {"text": raw, "pronunciation": "loud"})[0] == 422, "unknown mode accepted"
+
+    # The CLI, in-process and against the server, sends the same choice.
+    for flags, want in (([], raw), (["--pronunciation", "special"], "Gửi post tới ây pi trên bo")):
+        out = tmp / "pron.wav"
+        assert cli.main(["speak", raw, "-o", str(out), "-q", *flags]) == 0
+        assert app._engine.last_text == want, ("local", flags, app._engine.last_text)
+        code, _, err = run_cli("speak", raw, "-o", str(out), "--server", base, *flags)
+        assert code == 0, err
+        assert app._engine.last_text == want, ("remote", flags, app._engine.last_text)
+    code, _, _ = run_cli("speak", raw, "-o", "-", "--server", base, "--pronunciation", "loud")
+    assert code == 2, "an unknown --pronunciation must be a usage error"
 
     # Whisper writes what it hears its own way; the score compares like for like.
     assert verify.score("Gửi POST tới AP trên Board", "Gửi Post tới AP trên bo") == 1.0
@@ -521,7 +538,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         check_remote(base, Path(tmp))
         check_wav_format(base)
-        check_lexicon(base)
+        check_lexicon(base, Path(tmp))
         check_verify_mode(base, Path(tmp))
         check_local(Path(tmp))
         check_icon(base, Path(tmp))

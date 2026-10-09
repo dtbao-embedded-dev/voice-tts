@@ -28,12 +28,12 @@ the release before it builds.
   limit), so verify works offline. The Linux one-file binary does not carry it and
   reports verify unavailable.
 
-### Fixed
-
-- `POST`, `GET`, `PUT`, `PATCH` and `DELETE` were spelled with Vietnamese letter
-  names (*phê ô ét tê*); they are read as the English words. `AP` is read *ây pi*
-  instead of the syllable *ap*, `Board` as *bo*, and `ESP32` (any case, also
-  `ESP 32`) as *i ét pi ba hai*. Whole words only (`lexicon.py`).
+- A `special` pronunciation (`"pronunciation": "special"`, `speak --pronunciation
+  special`, *Phát âm → Đặc biệt* in the window) respells whole words the engine
+  gets wrong before it reads them (`lexicon.py`): `POST`, `GET`, `PUT`, `PATCH` and
+  `DELETE` as the English words instead of *phê ô ét tê*, `AP` as *ây pi* instead
+  of the syllable *ap*, `Board` as *bo*, and `ESP32` (any case, also `ESP 32`) as
+  *i ét pi ba hai*. The default, `normal`, reads the text as typed, as before.
 
 ## [0.6.1] - 2026-10-08
 
