@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/dtbao-embedded-dev/voice-tts/actions/workflows/ci.yml/badge.svg)](https://github.com/dtbao-embedded-dev/voice-tts/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-0.7.0-blue)](https://github.com/dtbao-embedded-dev/voice-tts/releases)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 Desktop app that reads mixed Vietnamese/English text aloud, powered by
 [VieNeu-TTS v3 Turbo](https://github.com/pnnbao97/VieNeu-TTS).
@@ -505,6 +506,14 @@ python docs/scripts/tool-build.py --smoke-installer dist/VoiceTTS-0.6.0-setup.ex
 python docs/scripts/tool-build.py --release-notes 0.5.0     # the notes a v0.5.0 tag publishes
 ```
 
+## License
+
+Copyright 2026 dtbao. Licensed under the [Apache License, Version 2.0](LICENSE): you
+may use, modify and redistribute this code, including commercially, provided you keep
+the license and copyright notices and state your changes. The model and its preset
+voices are Apache-2.0 too, under their own notices (see *Licence* under
+[Notes](#notes)).
+
 ## Layout
 
 ```
@@ -516,6 +525,7 @@ cli.py                    command line: subcommands and flags, stdlib-only at im
 test_tts.py               assert-based smoke test over the real HTTP path
 test_cli.py               fast checks with a stub engine: CLI (local + remote), token guard
 CHANGELOG.md              user-visible changes per version; a release publishes its section
+LICENSE                   Apache License 2.0
 web/                      index.html, app.css, app.js, tray.html (tray menu) - no build step
 requirements.txt          server + CLI core (what Docker installs)
 requirements-desktop.txt  core + window + tray (what tool-build.py installs)

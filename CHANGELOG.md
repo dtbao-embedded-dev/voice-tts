@@ -10,6 +10,7 @@ the release before it builds.
 
 ### Added
 
+- The project is licensed under the Apache License 2.0 (`LICENSE`).
 - `GET /api/version` answers `{"version": "<version>"}`, the version the server
   runs - `voice-tts --version` only ever told the CLI's own.
 
