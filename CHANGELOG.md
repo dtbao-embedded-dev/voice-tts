@@ -15,6 +15,18 @@ the release before it builds.
   with the audio length, engine time, RTF and time to first audio. The lines go to
   stderr at any `--log-level`. `VOICE_TTS_LOG_TEXT=1` adds the text itself.
 
+### Fixed
+
+- The `special` pronunciation reads units after a number the way engineers say
+  them: `3,3V` *vôn* (was the letter *vê*), `5mW` *mi li oát* (was megawatts),
+  `10µF` *mi cờ rô pha ra* (the µ was dropped), `500mA` *mi li am pe* (was *ma*),
+  `45kΩ` *ki lô ôm* (was *ca ôm*), `22pF`, `100nF`, `20 ns`, `10mH` (were English
+  letters). Ranges (`1-2m` was *một đến haim*, `0~5V` *không khoảng năm*), `5V2A`,
+  `3.3V/500mA`, `1/4W`, resistor codes (`100R`), capacitor codes (`tụ 104` *một
+  không bốn*, was *một trăm lẻ bốn*; `tụ 22p` *pi cô*, was *hai mươi hai phút*),
+  hex (`0x3C`, was *không nhân ba xê*) and `−40°C` (the minus sign was dropped) too.
+  [docs/pronunciation.md](docs/pronunciation.md) has the full table.
+
 ## [0.8.2] - 2026-10-09
 
 ### Changed
