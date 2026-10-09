@@ -1,7 +1,7 @@
 # Voice TTS
 
 [![CI](https://github.com/dtbao-embedded-dev/voice-tts/actions/workflows/ci.yml/badge.svg)](https://github.com/dtbao-embedded-dev/voice-tts/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.8.1-blue)](https://github.com/dtbao-embedded-dev/voice-tts/releases)
+[![Version](https://img.shields.io/badge/version-0.8.2-blue)](https://github.com/dtbao-embedded-dev/voice-tts/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 Desktop app that reads mixed Vietnamese/English text aloud, powered by
@@ -193,7 +193,7 @@ binary to unpack into on every start.
 ```sh
 # on the Linux box; the repo is private, so fetch with gh or copy the file over
 mkdir -p ~/voice-tts-bin/tmp ~/voice-tts-bin/data && cd ~/voice-tts-bin
-gh release download v0.8.1 -R dtbao-embedded-dev/voice-tts -p voice-tts-linux-x86_64 -p SHA256SUMS
+gh release download v0.8.2 -R dtbao-embedded-dev/voice-tts -p voice-tts-linux-x86_64 -p SHA256SUMS
 grep voice-tts-linux-x86_64 SHA256SUMS | sha256sum -c && chmod +x voice-tts-linux-x86_64
 echo "VOICE_TTS_TOKEN=$(openssl rand -hex 16)" > .env && chmod 600 .env
 ```
@@ -327,12 +327,20 @@ static. Without a token the API is open, which is what the loopback-only desktop
 wants - binding anything else without one prints a warning. The token travels over
 plain HTTP: fine on a home LAN, not for the internet.
 
+The engine reads one text at a time. A reading sent while another runs waits its
+turn, in arrival order: a stream answers `200` at once and its audio starts when
+the turn comes; a `wav`/`mp3`/`ogg` request answers once its file is ready. A
+listener who hangs up gives the turn back straight away. On CPU a second reading
+in parallel adds no throughput and only slows both (i5-8500T: RTF 0.79 alone, 1.65
+each for two, 2.5 each for three), so the default is 1. `VOICE_TTS_MAX_STREAMS=<n>`
+in the environment (the systemd `.env`, or `compose.yaml`) lets `n` run at once.
+
 ## HTTP API
 
 | Endpoint | Response |
 | --- | --- |
 | `GET /api/status` | `{"state": "loading" \| "ready" \| "error"}` while the model warms up |
-| `GET /api/version` | `{"version": "0.8.1"}` - the version the server runs (`voice-tts --version` is the CLI's own) |
+| `GET /api/version` | `{"version": "0.8.2"}` - the version the server runs (`voice-tts --version` is the CLI's own) |
 | `GET /api/voices` | the 25 preset voices with region, gender and description, the default voice, `sampleRate` and `maxChars` |
 | `GET /api/lexicon` | `{"builtin": [...], "user": [...]}`, each entry `{"word", "say", "matchCase"}` |
 | `PUT /api/lexicon` | replaces the user's words with `{"user": [...]}`; answers the new state, `400` for an empty, duplicate or over-long entry |
@@ -442,7 +450,7 @@ The other endpoints take the same header:
 ```bash
 curl -H "Authorization: Bearer <token>" http://<host>:8760/api/voices   # names to use as "voice"
 curl -H "Authorization: Bearer <token>" http://<host>:8760/api/status   # {"state": "ready"}
-curl -H "Authorization: Bearer <token>" http://<host>:8760/api/version  # {"version": "0.8.1"}
+curl -H "Authorization: Bearer <token>" http://<host>:8760/api/version  # {"version": "0.8.2"}
 ```
 
 ## Docker (Linux server)

@@ -10,6 +10,7 @@ The real-model path is ``test_tts.py`` itself.
 from __future__ import annotations
 
 import contextlib
+import http.client
 import io
 import json
 import os
@@ -17,10 +18,13 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import urllib.error
 import urllib.request
 import wave
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import numpy as np
 
@@ -59,6 +63,30 @@ class StubEngine:
         t = np.arange(n) / app.SAMPLE_RATE
         tone = (0.3 * np.sin(2 * np.pi * 220 * t)).astype(np.float32)
         yield from np.array_split(tone, 4)
+
+
+class SlowEngine(StubEngine):
+    """The stub, but each chunk takes a while and every reading is recorded, so a
+    check can see how many ran at once and in which order they started."""
+
+    def __init__(self, chunks: int = 4, delay: float = 0.05) -> None:
+        self.chunks, self.delay = chunks, delay
+        self.lock = threading.Lock()
+        self.active = self.peak = 0
+        self.started: list[str] = []
+
+    def infer_stream(self, text, voice=None, max_chars=256):
+        with self.lock:
+            self.active += 1
+            self.peak = max(self.peak, self.active)
+            self.started.append(text)
+        try:
+            for _ in range(self.chunks):
+                time.sleep(self.delay)
+                yield np.zeros(WORD, dtype=np.float32)
+        finally:
+            with self.lock:
+                self.active -= 1
 
 
 def request(url: str, headers: dict | None = None) -> tuple[int, dict, bytes]:
@@ -320,6 +348,49 @@ def check_encode(base: str, tmp: Path) -> None:
     code, _, _ = run_cli("speak", "một", "--raw", "--format", "mp3", "-o", "-", "--server", base)
     assert code == 2, "--raw with --format must be a usage error"
     print("encode: mp3/ogg readings, /api/encode tapes, CLI by extension or --format")
+
+
+def check_turns(base: str) -> None:
+    """One reading at a time, the others wait their turn in arrival order, and a
+    listener who hangs up mid-stream hands the turn on."""
+    stub = app._engine
+    engine = app._engine = SlowEngine()
+    try:
+        names = ("one", "two", "three", "four", "five")
+        results: dict[str, int] = {}
+
+        def read(name: str) -> None:
+            results[name] = post(base, {"text": name, "format": "wav"})[0]
+
+        threads = []
+        for name in names:
+            thread = threading.Thread(target=read, args=(name,))
+            thread.start()
+            threads.append(thread)
+            time.sleep(0.03)  # arrive in this order, all before "one" is done
+        for thread in threads:
+            thread.join(10)
+        assert results == dict.fromkeys(names, 200), results
+        assert engine.peak == 1, f"{engine.peak} readings ran at once"
+        assert engine.started == list(names), f"served out of order: {engine.started}"
+
+        # A 10 s stream, abandoned after its first bytes.
+        engine.chunks, engine.delay = 1000, 0.01
+        conn = http.client.HTTPConnection("127.0.0.1", urlsplit(base).port, timeout=10)
+        conn.request("POST", "/api/tts/stream", json.dumps({"text": "bỏ dở"}),
+                     {"Content-Type": "application/json"})
+        conn.getresponse().read(WORD * 4)
+        engine.chunks = 4  # the next reading is short again
+        conn.close()
+        begun = time.monotonic()
+        status = post(base, {"text": "sau đó", "format": "wav"})[0]
+        waited = time.monotonic() - begun
+        assert status == 200, status
+        assert waited < 3, f"an abandoned stream kept the turn for {waited:.1f} s"
+    finally:
+        app._engine = stub
+    print(f"turns: one reading at a time (VOICE_TTS_MAX_STREAMS={app.MAX_STREAMS}), "
+          "the rest in arrival order, a hang-up hands the turn on")
 
 
 def check_local(tmp: Path) -> None:
@@ -712,6 +783,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         check_remote(base, Path(tmp))
         check_wav_format(base)
+        check_turns(base)
         check_encode(base, Path(tmp))
         check_lexicon(base, Path(tmp))
         check_lexicon_user(base, Path(tmp))

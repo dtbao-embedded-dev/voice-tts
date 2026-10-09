@@ -17,7 +17,8 @@ import socket
 import sys
 import threading
 import wave
-from contextlib import asynccontextmanager
+from collections import deque
+from contextlib import asynccontextmanager, closing, contextmanager
 from pathlib import Path
 from typing import Literal
 
@@ -158,6 +159,45 @@ def engine():
                 _engine_error = f"{type(exc).__name__}: {exc}"
                 raise
         return _engine
+
+
+class Turns:
+    """Let at most ``slots`` readings run at once; the rest wait in arrival order.
+
+    ``threading.Semaphore`` wakes an arbitrary waiter, so a reader who came later
+    could overtake one who has waited longer; the explicit queue cannot.
+    """
+
+    def __init__(self, slots: int) -> None:
+        self.slots = slots
+        self._busy = 0
+        self._waiting: deque[object] = deque()
+        self._cv = threading.Condition()
+
+    @contextmanager
+    def turn(self):
+        me = object()
+        with self._cv:
+            self._waiting.append(me)
+            self._cv.wait_for(lambda: self._waiting[0] is me and self._busy < self.slots)
+            self._waiting.popleft()
+            self._busy += 1
+            self._cv.notify_all()  # with slots > 1, the next in line may fit too
+        try:
+            yield
+        finally:
+            with self._cv:
+                self._busy -= 1
+                self._cv.notify_all()
+
+
+# Readings the engine runs at once. On CPU it takes one ONNX call at a time, so a
+# second reading adds no throughput and only halves everyone's speed: on an
+# i5-8500T, 1 reading ran at RTF 0.79, 2 at 1.65 each, 3 at 2.5 each - the same
+# ~1.2 s of audio per second in total. One at a time keeps the one being heard
+# faster than real time and finishes the queue sooner on average.
+MAX_STREAMS = max(1, int(os.environ.get("VOICE_TTS_MAX_STREAMS", "1")))
+_turns = Turns(MAX_STREAMS)
 
 
 REGIONS = ("Bắc", "Trung", "Nam")
@@ -415,11 +455,34 @@ def synthesize(text: str, voice: str | None = None, speed: float = 1.0,
     spoken = lexicon.apply(text, lexicon.load_user()) if pronunciation == "special" else text
 
     def chunks():
-        for chunk in stretch(tts.infer_stream(spoken, voice=resolved, max_chars=CHUNK_CHARS),
-                             speed):
-            yield np.asarray(chunk, dtype=np.float32)
+        # The turn is taken on the first chunk asked for, not here, so a
+        # request that fails validation never queues; closing the generator
+        # (the listener hung up) gives the turn back.
+        with _turns.turn():
+            for chunk in stretch(tts.infer_stream(spoken, voice=resolved,
+                                                  max_chars=CHUNK_CHARS), speed):
+                yield np.asarray(chunk, dtype=np.float32)
 
     return resolved, chunks()
+
+
+class ClosingStream(StreamingResponse):
+    """A ``StreamingResponse`` that closes its generator however the response ends.
+
+    When the listener hangs up, Starlette stops iterating and skips the
+    background task, leaving the generator open until the garbage collector
+    finds it - and an open reading holds its turn, so the queue behind it stalls.
+    """
+
+    def __init__(self, content, **kwargs) -> None:
+        super().__init__(content, **kwargs)
+        self._source = content
+
+    async def __call__(self, scope, receive, send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            await run_in_threadpool(self._source.close)
 
 
 @app.post("/api/tts/stream")
@@ -454,10 +517,11 @@ def tts_stream(req: SpeakRequest):
     def samples():
         # A failure here lands mid-body, so the client sees a short stream
         # rather than an HTTP error; it reports that as a playback failure.
-        for chunk in chunks:
-            yield chunk.tobytes()
+        with closing(chunks):
+            for chunk in chunks:
+                yield chunk.tobytes()
 
-    return StreamingResponse(
+    return ClosingStream(
         samples(),
         media_type="application/octet-stream",
         headers={"X-Sample-Rate": str(SAMPLE_RATE), "Cache-Control": "no-store"},
