@@ -13,6 +13,12 @@ the release before it builds.
 - `verify.py`: Whisper large-v3-turbo transcribes a reading and scores it against
   its text as `1 - CER` (case, spacing and punctuation ignored). The model loads on
   the first check, not at startup.
+- Verify mode: `voice-tts speak --verify [--min-score X]` and `"verify": true`
+  (`"min_score"`) on `POST /api/tts/stream`. The reading is sent, saved or played
+  only when it scores at least `min_score` (default 0.95), with the score in
+  `X-Verify-Score`; below it the answer is `422` (exit 1 in the CLI) with what
+  Whisper heard, and `503` when Whisper cannot run. `/api/status` reports whether
+  verify is available. Without it nothing changes: the audio still streams.
 
 ### Fixed
 

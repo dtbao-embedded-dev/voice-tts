@@ -193,6 +193,8 @@ voice-tts status --wait 600      # exit 0 once the server's model is ready
 | `-o`, `--output` | write to a file, or `-` for stdout; without it the text is played |
 | `--play` / `--no-play` | force playback on or off (default: on unless `-o`) |
 | `--raw` | with `-o`: raw float32 LE mono 48 kHz instead of a 16-bit WAV |
+| `--verify` | Whisper hears the reading back; it is saved or played only if it matches the text, else exit `1` with what Whisper heard |
+| `--min-score X` | with `--verify`: the match needed, `0`-`1` (default `0.95`) |
 | `--server URL`, `--token T` | use a running server instead of loading the model here |
 | `--local` | ignore `$VOICE_TTS_SERVER` |
 | `--timeout S` | seconds to wait on the server (default 600) |
@@ -201,9 +203,15 @@ voice-tts status --wait 600      # exit 0 once the server's model is ready
 `voices` and `status` take `--server`, `--token`, `--timeout` and `--json` too.
 `$VOICE_TTS_SERVER` and `$VOICE_TTS_TOKEN` are the defaults for `--server` and
 `--token`. Exit codes: `0` done, `1` runtime failure (unreachable server, wrong
-token, model failed), `2` bad input (usage, empty or over-long text, unknown voice,
+token, model failed, a `--verify` reading under the bar or no Whisper), `2` bad input (usage, empty or over-long text, unknown voice,
 speed out of range).
 
+- **Two modes.** Without `--verify` the audio streams as it is generated. With it
+  the whole text is read first, Whisper large-v3-turbo transcribes it, and the
+  score `1 - CER` (case, spacing and punctuation ignored) decides: at or above
+  `--min-score` the audio is written or played and the score shown, below it
+  nothing is written. It costs about 6-7 s per 30 s of audio on a CPU, plus ~10 s
+  to load Whisper the first time.
 - **Without `--server`** the model loads in the CLI process (~30 s); for many short
   reads, start `voice-tts serve` once and point the CLI at it.
 - **With `--server`** `cli.py` imports only the standard library, so it runs on any
@@ -237,7 +245,7 @@ plain HTTP: fine on a home LAN, not for the internet.
 
 | Endpoint | Response |
 | --- | --- |
-| `GET /api/status` | `{"state": "loading" \| "ready" \| "error"}` while the model warms up |
+| `GET /api/status` | `{"state": "loading" \| "ready" \| "error", "verify": {"available", "detail"}}` - the model warming up, and whether verify can run |
 | `GET /api/voices` | the 25 preset voices with region, gender and description, the default voice, `sampleRate` and `maxChars` |
 | `POST /api/tts/stream` | raw float32 LE mono at 48 kHz, streamed as it is generated; or one 16-bit WAV file with `"format": "wav"` |
 
@@ -266,18 +274,27 @@ upgrade: since 3.8.3 `Minh Quân Pro` is `Hải Đăng`, `Anh Khôi` is `Thiện
 `Mạnh Dũng` is `Quốc Tuấn`. The old names (and `Minh Quân`) are still accepted as
 `voice` and read with the renamed voice; they are just no longer listed.
 
-`POST /api/tts/stream` takes `{"text", "voice", "speed", "format"}`: `text` up to
-20 000 characters, `voice` a name from `/api/voices` (omit it for the
-default), `speed` between `0.5` and `2.0` (default `1.0`), `format` either `"f32"`
-(default) or `"wav"`.
+`POST /api/tts/stream` takes `{"text", "voice", "speed", "format", "verify",
+"min_score"}`: `text` up to 20 000 characters, `voice` a name from `/api/voices`
+(omit it for the default), `speed` between `0.5` and `2.0` (default `1.0`), `format`
+either `"f32"` (default) or `"wav"`, `verify` `false` (default) or `true`, and
+`min_score` between `0` and `1` (default `0.95`).
 
 | `format` | Body | `Content-Type` | Starts arriving |
 | --- | --- | --- | --- |
 | `"f32"` | raw float32 LE mono, 48 kHz, no header | `application/octet-stream` | with the first generated chunk - for live playback |
 | `"wav"` | a complete 16-bit mono WAV, 48 kHz, real length in the header and `Content-Length` | `audio/wav` | once the whole text is synthesized - for saving a file |
 
-The answer is `400` for empty or over-long text, an unknown voice or a speed out
-of range, `422` for an unknown `format`, and `401` when the server
+With `"verify": true` nothing streams: the whole text is synthesized, Whisper
+large-v3-turbo transcribes it, and the body (in the requested `format`) is sent only
+if the score - `1 - CER` against `text`, case, spacing and punctuation ignored - is at
+least `min_score`. It then carries `X-Verify-Score` (`0.9630`) and
+`X-Verify-Transcript` (percent-encoded UTF-8). Below the bar the answer is `422` with
+`{"detail", "score", "transcript", "minScore"}` and no audio; `503` means verify
+cannot run here (`/api/status` says why).
+
+The answer is `400` for empty or over-long text, an unknown voice, a speed or
+`min_score` out of range, `422` for an unknown `format`, and `401` when the server
 has a token and the request does not carry it. Every `/api` call takes the token as
 `Authorization: Bearer <token>`; leave the header out for a server without one.
 

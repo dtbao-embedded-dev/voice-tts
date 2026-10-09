@@ -103,6 +103,11 @@ def build_parser() -> argparse.ArgumentParser:
                        help="play through the speakers (default: on unless -o is given)")
     speak.add_argument("--raw", action="store_true",
                        help="with -o: raw float32 LE mono 48 kHz instead of a 16-bit WAV")
+    speak.add_argument("--verify", action="store_true",
+                       help="have Whisper hear the reading back; save or play it only if it "
+                            "matches the text, else exit 1 (slower, nothing streams)")
+    speak.add_argument("--min-score", type=float, metavar="X",
+                       help="with --verify: the match needed, 0-1 (default: 0.95)")
     add_client_flags(speak, local=True)
     speak.add_argument("-q", "--quiet", action="store_true", help="no progress or summary on stderr")
 
@@ -144,6 +149,11 @@ def parse(parser: argparse.ArgumentParser, argv: list[str]) -> argparse.Namespac
     args = parser.parse_args(argv)
     if args.command == "speak" and args.raw and not args.output:
         parser.error("--raw needs -o: it describes the file, not the playback")
+    if args.command == "speak" and args.min_score is not None:
+        if not args.verify:
+            parser.error("--min-score needs --verify")
+        if not 0.0 <= args.min_score <= 1.0:
+            parser.error("--min-score must be between 0 and 1")
     return args
 
 
@@ -173,9 +183,14 @@ def call(args: argparse.Namespace, path: str, body: dict | None = None):
                                       timeout=args.timeout)
     except urllib.error.HTTPError as exc:
         try:
-            detail = json.load(exc).get("detail", exc.reason)
+            body = json.load(exc)
+            detail = body.get("detail", exc.reason)
         except (ValueError, AttributeError):
-            detail = exc.reason
+            body, detail = {}, exc.reason
+        if "transcript" in body:  # a verified reading that missed the bar
+            raise CliError(1, f"{detail} Whisper heard: {body['transcript']}") from None
+        if exc.code == 503:
+            raise CliError(1, str(detail)) from None
         if exc.code == 401:
             raise CliError(1, f"server refused the token ({detail}); "
                               f"pass --token or set {ENV_TOKEN}") from None
@@ -400,9 +415,14 @@ def cmd_speak(args: argparse.Namespace) -> int:
         if server:
             if not text.strip():
                 raise CliError(2, "no text to read")
-            resp = call(args, "/api/tts/stream",
-                        {"text": text, "voice": args.voice, "speed": args.speed})
+            body = {"text": text, "voice": args.voice, "speed": args.speed}
+            if args.verify:
+                body["verify"] = True
+                if args.min_score is not None:
+                    body["min_score"] = args.min_score
+            resp = call(args, "/api/tts/stream", body)
             rate = int(resp.headers.get("X-Sample-Rate", 48000))
+            score = resp.headers.get("X-Verify-Score")
             voice = args.voice or "default voice"
             chunks = remote_samples(resp)
         else:
@@ -413,6 +433,18 @@ def cmd_speak(args: argparse.Namespace) -> int:
                 raise CliError(2, str(exc)) from None
             rate = app.SAMPLE_RATE
             chunks = (chunk.tobytes() for chunk in samples)
+            score = None
+            if args.verify:
+                if not args.quiet:
+                    eprint("reading, then checking it with Whisper ...")
+                min_score = app.verify.MIN_SCORE if args.min_score is None else args.min_score
+                try:
+                    audio, score, _ = app.verified(text, samples, min_score)
+                except app.Rejected as exc:
+                    raise CliError(1, f"{exc} Whisper heard: {exc.transcript}") from None
+                except app.VerifyUnavailable as exc:
+                    raise CliError(1, f"cannot verify: {exc}") from None
+                chunks = [audio.tobytes()]
 
         sinks = []
         try:
@@ -435,7 +467,8 @@ def cmd_speak(args: argparse.Namespace) -> int:
 
     if not args.quiet:
         where = f" -> {args.output}" if args.output and args.output != "-" else ""
-        eprint(f"{voice}: {samples_out / rate:.2f} s at {args.speed}x{where}")
+        checked = f", verified {float(score):.1%}" if score is not None else ""
+        eprint(f"{voice}: {samples_out / rate:.2f} s at {args.speed}x{checked}{where}")
     return 0
 
 

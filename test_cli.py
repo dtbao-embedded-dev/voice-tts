@@ -9,6 +9,7 @@ The real-model path is ``test_tts.py`` itself.
 
 from __future__ import annotations
 
+import contextlib
 import io
 import json
 import os
@@ -17,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 import wave
 from pathlib import Path
@@ -25,6 +27,7 @@ import numpy as np
 
 import app
 import cli
+import verify
 
 TOKEN = "s3cret-token"
 ROOT = Path(__file__).resolve().parent
@@ -189,7 +192,8 @@ def check_remote(base: str, tmp: Path) -> None:
         code, stdout, err = run_cli("status", *remote)
         assert code == 0 and stdout.decode().strip() == "ready", f"status: {code} {stdout!r} {err}"
         code, stdout, _ = run_cli("status", "--json", *remote)
-        assert json.loads(stdout) == {"state": "ready"}, stdout
+        state = json.loads(stdout)
+        assert state["state"] == "ready" and state["verify"]["available"] is True, stdout
         code, _, _ = run_cli("status", "--server", f"http://127.0.0.1:{free_port()}")
         assert code == 1, "status of an unreachable server must fail"
     finally:
@@ -226,6 +230,105 @@ def check_wav_format(base: str) -> None:
     assert post(base, {"text": "xin chào", "format": "mp3"})[0] == 422, "unknown format accepted"
     assert post(base, {"text": " ", "format": "wav"})[0] == 400, "empty text as wav accepted"
     print("format: wav is a whole 16-bit file with its length, raw stays the default")
+
+
+class FakeWhisper:
+    """Stands in for ``verify.available`` / ``verify.check``: no model, set scores."""
+
+    def __init__(self) -> None:
+        self.score, self.ok, self.why, self.fail = 0.97, True, "", None
+        self.calls: list[tuple[int, int, str]] = []
+
+    def available(self):
+        return self.ok, self.why
+
+    def check(self, audio, rate, reference):
+        self.calls.append((len(audio), rate, reference))
+        if self.fail:
+            raise self.fail
+        return self.score, "nghe được"
+
+
+@contextlib.contextmanager
+def fake_whisper():
+    fake = FakeWhisper()
+    saved = verify.available, verify.check
+    verify.available, verify.check = fake.available, fake.check
+    try:
+        yield fake
+    finally:
+        verify.available, verify.check = saved
+
+
+def check_verify_mode(base: str, tmp: Path) -> None:
+    """Mode 2: the reading is heard back and sent only when it scores high enough."""
+    with fake_whisper() as fake:
+        status, headers, body = post(base, {"text": "xin chào", "verify": True, "format": "wav"})
+        assert status == 200, f"verify pass: {status} {body[:200]!r}"
+        assert wav_frames(body) == 2 * WORD, "verified WAV length is off"
+        assert headers["x-verify-score"] == "0.9700", headers
+        assert urllib.parse.unquote(headers["x-verify-transcript"]) == "nghe được", headers
+        assert fake.calls == [(2 * WORD, app.SAMPLE_RATE, "xin chào")], fake.calls
+
+        status, headers, body = post(base, {"text": "xin chào", "verify": True})
+        assert status == 200 and headers["content-type"] == "application/octet-stream"
+        assert len(body) == 2 * WORD * 4, "verified f32 body length is off"
+
+        fake.score = 0.90
+        status, _, body = post(base, {"text": "xin chào", "verify": True, "format": "wav"})
+        answer = json.loads(body)
+        assert status == 422 and answer["score"] == 0.9, (status, answer)
+        assert answer["transcript"] == "nghe được" and "90" in answer["detail"], answer
+        status, _, _ = post(base, {"text": "xin chào", "verify": True, "min_score": 0.85})
+        assert status == 200, "a lower min_score must let 0.90 through"
+        assert post(base, {"text": "xin chào", "verify": True, "min_score": 1.5})[0] == 400
+
+        calls = len(fake.calls)
+        status, headers, body = post(base, {"text": "xin chào"})
+        assert status == 200 and "x-verify-score" not in headers, "mode 1 was verified"
+        assert len(fake.calls) == calls, "mode 1 must not call Whisper"
+
+        fake.ok, fake.why = False, "không có model"
+        status, _, body = post(base, {"text": "xin chào", "verify": True})
+        assert status == 503 and "không có model" in json.loads(body)["detail"], (status, body)
+        assert len(fake.calls) == calls, "an unavailable check must not run"
+        state = json.loads(request(f"{base}/api/status")[2])
+        assert state["verify"] == {"available": False, "detail": "không có model"}, state
+        fake.ok, fake.fail = True, RuntimeError("model.bin hỏng")
+        status, _, body = post(base, {"text": "xin chào", "verify": True})
+        assert status == 503 and "model.bin" in json.loads(body)["detail"], (status, body)
+        fake.fail, fake.score = None, 0.97
+
+        remote = ("--server", base)
+        out = tmp / "verified.wav"
+        code, _, err = run_cli("speak", "xin chào", "--verify", "-o", str(out), *remote)
+        assert code == 0 and wav_frames(out.read_bytes()) == 2 * WORD, f"remote verify: {err}"
+        assert "97.0%" in err, f"the score is not reported: {err!r}"
+        fake.score = 0.5
+        out.unlink()
+        code, _, err = run_cli("speak", "xin chào", "--verify", "-o", str(out), *remote)
+        assert code == 1 and "nghe được" in err and "50" in err, f"remote reject: {code} {err!r}"
+        assert not out.exists(), "a rejected reading must not leave a file"
+        code, _, err = run_cli("speak", "xin chào", "--verify", "--min-score", "0.4",
+                               "-o", str(out), *remote)
+        assert code == 0 and out.exists(), f"--min-score not sent: {err}"
+        code, _, _ = run_cli("speak", "x", "--verify", "--min-score", "1.5", "-o", "-", *remote)
+        assert code == 2, "--min-score above 1 must be a usage error"
+        code, _, _ = run_cli("speak", "x", "--min-score", "0.9", "-o", "-", *remote)
+        assert code == 2, "--min-score without --verify must be a usage error"
+
+        local = tmp / "local-verified.wav"
+        fake.score = 0.97
+        assert cli.main(["speak", "xin chào", "--verify", "-o", str(local), "-q"]) == 0
+        assert wav_frames(local.read_bytes()) == 2 * WORD, "local verified WAV is off"
+        fake.score = 0.5
+        local.unlink()
+        assert cli.main(["speak", "xin chào", "--verify", "-o", str(local), "-q"]) == 1
+        assert not local.exists(), "a rejected local reading must not leave a file"
+        fake.score, fake.ok = 0.97, False
+        assert cli.main(["speak", "xin chào", "--verify", "-o", str(local), "-q"]) == 1
+    print("verify mode: pass -> audio + score, fail -> 422/exit 1 and no file, "
+          "unavailable -> 503, mode 1 untouched")
 
 
 def check_local(tmp: Path) -> None:
@@ -415,6 +518,7 @@ def main() -> int:
         check_remote(base, Path(tmp))
         check_wav_format(base)
         check_lexicon(base)
+        check_verify_mode(base, Path(tmp))
         check_local(Path(tmp))
         check_icon(base, Path(tmp))
     print("OK")
