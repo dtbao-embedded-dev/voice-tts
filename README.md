@@ -191,7 +191,7 @@ release runner's (Ubuntu 24.04 or newer is fine) and about 1.2 GB of disk for th
 binary to unpack into on every start.
 
 ```sh
-# on the Linux box; the repo is private, so fetch with gh or copy the file over
+# on the Linux box; without gh, download both files from the release page
 mkdir -p ~/voice-tts-bin/tmp ~/voice-tts-bin/data && cd ~/voice-tts-bin
 gh release download v0.8.2 -R dtbao-embedded-dev/voice-tts -p voice-tts-linux-x86_64 -p SHA256SUMS
 grep voice-tts-linux-x86_64 SHA256SUMS | sha256sum -c && chmod +x voice-tts-linux-x86_64
