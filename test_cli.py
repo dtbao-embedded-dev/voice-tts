@@ -279,6 +279,28 @@ def check_encode(base: str, tmp: Path) -> None:
     assert encode_status("?format=mp3", b"") == 400, "empty tape accepted"
     assert encode_status("?format=mp3", b"\0\0\0") == 400, "half a sample accepted"
 
+    # A plain-text POST is what another site can send without a preflight.
+    req = urllib.request.Request(f"{base}/api/encode?format=mp3", data=b"\0\0",
+                                 headers={"Content-Type": "text/plain"})
+    try:
+        urllib.request.urlopen(req, timeout=10)
+        raise AssertionError("a text/plain encode was accepted")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 415, exc.code
+
+    # The size cap holds for a chunked body too, which has no Content-Length.
+    import http.client
+
+    saved, app.ENCODE_MAX_BYTES = app.ENCODE_MAX_BYTES, 4000
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", int(base.rsplit(":", 1)[1]), timeout=10)
+        conn.request("POST", "/api/encode?format=mp3", body=iter([b"\0" * 1000] * 8),
+                     headers={"Content-Type": "application/octet-stream"}, encode_chunked=True)
+        assert conn.getresponse().status == 413, "a chunked body past the cap was taken"
+        conn.close()
+    finally:
+        app.ENCODE_MAX_BYTES = saved
+
     # The CLI picks the format from the file name, or from --format; locally it
     # encodes in process, against a server it asks the server to.
     for flags in ([], ["--server", base]):

@@ -469,11 +469,22 @@ async def encode(request: Request, format: str):
     """Encode a tape the client already holds: 16-bit LE mono PCM at 48 kHz in,
     an MP3 or OGG file out. Saving a reading as MP3 then costs no second synthesis.
     """
-    if int(request.headers.get("content-length") or 0) > ENCODE_MAX_BYTES:
-        raise HTTPException(413, "Âm thanh quá dài để mã hoá.")
+    # Octets only: a text/plain POST is one another site may send with no
+    # preflight, and nothing of ours sends that.
+    if request.headers.get("content-type", "").split(";")[0].strip() != "application/octet-stream":
+        raise HTTPException(415, "Cần Content-Type application/octet-stream.")
     # Read the body before any other refusal: answering while the client is
     # still sending makes Windows abort the connection instead of showing a 400.
-    body = await request.body()
+    # Counted as it arrives, since a chunked body has no Content-Length to trust.
+    if int(request.headers.get("content-length") or 0) > ENCODE_MAX_BYTES:
+        raise HTTPException(413, "Âm thanh quá dài để mã hoá.")
+    parts, size = [], 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > ENCODE_MAX_BYTES:
+            raise HTTPException(413, "Âm thanh quá dài để mã hoá.")
+        parts.append(chunk)
+    body = b"".join(parts)
     if format not in ENCODINGS:
         raise HTTPException(400, f"Định dạng phải là {' hoặc '.join(ENCODINGS)}.")
     if not body or len(body) % 2:
