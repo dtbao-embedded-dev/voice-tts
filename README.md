@@ -30,12 +30,13 @@ Desktop app that reads mixed Vietnamese/English text aloud, powered by
 | You want | Get it with | Then |
 | --- | --- | --- |
 | The app on a Windows PC | [Releases](https://github.com/dtbao-embedded-dev/voice-tts/releases): `VoiceTTS-windows-x64-setup.exe`, or `python docs/scripts/tool-install.py` | open *Voice TTS*, type, press **Đọc** |
-| A server for the whole LAN | `python docs/scripts/tool-install.py --remote user@linux-host` | open `http://<host>:8760/?token=<token>` |
+| A server for the whole LAN | the release binary under systemd ([Linux (binary + systemd)](#linux-binary--systemd)), or Docker: `python docs/scripts/tool-install.py --remote user@linux-host` | open `http://<host>:8760/?token=<token>` |
 | Text to audio from a script | `voice-tts speak ... -o out.wav` | see [Command line](#command-line) |
-| A Linux binary, no Docker | Releases: `voice-tts-linux-x86_64` | `./voice-tts-linux-x86_64 serve --host 0.0.0.0` |
+| A Linux binary, no Docker | Releases: `voice-tts-linux-x86_64` | `./voice-tts-linux-x86_64 serve --host 0.0.0.0`; as a service, see [Linux (binary + systemd)](#linux-binary--systemd) |
 
-Every way ships or downloads the same model; the first start takes ~30 s to load
-it (plus a one-off download for a source install).
+Every way ships or downloads the same model. The Windows installer and the Linux
+binary carry it inside and never touch the network; Docker and a source install
+download it once (475 MB of fp32 graphs plus the codec) on the first start.
 
 ### Read text in the window
 
@@ -76,8 +77,10 @@ To have it start with Windows, install with `--autostart`.
 
 ### Use the LAN server
 
-Install once on a Linux box with Docker (see [Linux (Docker)](#linux-docker)); the
-install prints the page URL with its token. From any machine on the LAN:
+Install once on a Linux box - the release binary under systemd (see
+[Linux (binary + systemd)](#linux-binary--systemd)) or Docker (see
+[Linux (Docker)](#linux-docker)) - and open its port in the firewall. From any
+machine on the LAN:
 
 - **Browser:** open `http://<host>:8760/?token=<token>` once; the browser keeps the
   token in a cookie, so `http://<host>:8760/` works from then on.
@@ -95,8 +98,9 @@ install prints the page URL with its token. From any machine on the LAN:
   The CLI talks to a server with the Python standard library only, so a plain
   `python cli.py ...` from a checkout works on any machine with Python 3.10+.
 
-The token is in `~/voice-tts/.env` on the server. To change it, re-run the install
-with `--token <new>`; to see logs, `cd ~/voice-tts && docker compose logs -f`.
+The token is in `~/voice-tts-bin/.env` (binary) or `~/voice-tts/.env` (Docker) on
+the server. Logs: `journalctl --user -u voice-tts -f` (binary) or
+`cd ~/voice-tts && docker compose logs -f` (Docker).
 
 ### Common commands
 
@@ -118,7 +122,8 @@ full table and the exit codes.
 | Symptom | Cause and fix |
 | --- | --- |
 | `server refused the token` | wrong or missing token: `--token`, or `VOICE_TTS_TOKEN` |
-| `cannot reach http://...` | server down or port blocked: `voice-tts status`, `docker ps` on the host |
+| `cannot reach http://...` | server down or port blocked: `voice-tts status` and `systemctl --user status voice-tts` (or `docker ps`) on the host |
+| Answers on the host (`curl 127.0.0.1:8760`) but times out from the LAN | the host firewall: `sudo ufw allow from 192.168.0.0/24 to any port 8760 proto tcp`. Docker never needed this - see [Docker (Linux server)](#docker-linux-server) |
 | Page says *Đang tải model…* for long | first start after install is loading or downloading the model; wait |
 | `Không có giọng '...'` (exit 2) | voice name mistyped: `voice-tts voices` lists the exact names |
 | `voice-tts` not found on Windows | open a new terminal after the install, so it sees the new `PATH` |
@@ -176,6 +181,55 @@ is a windowed build with no console, so it is for the window and `serve --tray` 
 The two live side by side: this one in `%LOCALAPPDATA%\Programs\VoiceTTS` with a
 shortcut for this user, the installer's in `C:\Program Files\Voice TTS` with one for
 every user, so the Start Menu lists *Voice TTS* twice while both are installed.
+
+### Linux (binary + systemd)
+
+No Docker, no Python, no download on first start: the release binary carries the
+runtime and the model, and a systemd user service keeps it running. This is how the
+LAN server at `192.168.0.137` runs. It needs a glibc at least as new as the
+release runner's (Ubuntu 24.04 or newer is fine) and about 1.2 GB of disk for the
+binary to unpack into on every start.
+
+```sh
+# on the Linux box; the repo is private, so fetch with gh or copy the file over
+mkdir -p ~/voice-tts-bin/tmp ~/voice-tts-bin/data && cd ~/voice-tts-bin
+gh release download v0.8.0 -R dtbao-embedded-dev/voice-tts -p voice-tts-linux-x86_64 -p SHA256SUMS
+grep voice-tts-linux-x86_64 SHA256SUMS | sha256sum -c && chmod +x voice-tts-linux-x86_64
+echo "VOICE_TTS_TOKEN=$(openssl rand -hex 16)" > .env && chmod 600 .env
+```
+
+`~/.config/systemd/user/voice-tts.service`:
+
+```ini
+[Unit]
+Description=Voice TTS server (release binary, model inside)
+After=network-online.target
+
+[Service]
+EnvironmentFile=%h/voice-tts-bin/.env
+# The onefile binary unpacks about 1 GB on every start; keep that off a tmpfs /tmp.
+Environment=TMPDIR=%h/voice-tts-bin/tmp
+Environment=VOICE_TTS_DATA=%h/voice-tts-bin/data
+ExecStartPre=/bin/sh -c "rm -rf %h/voice-tts-bin/tmp/_MEI*"
+ExecStart=%h/voice-tts-bin/voice-tts-linux-x86_64 serve --host 0.0.0.0 --port 8760 --log-level warning
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
+
+```sh
+loginctl enable-linger                       # start at boot, without a login
+systemctl --user daemon-reload && systemctl --user enable --now voice-tts
+sudo ufw allow from 192.168.0.0/24 to any port 8760 proto tcp   # if ufw is on
+```
+
+The model is ready a few seconds after start. Your lexicon lives in
+`~/voice-tts-bin/data/lexicon.json`. To update, put the new release's binary in
+place (checksum it) and `systemctl --user restart voice-tts`; to stop,
+`systemctl --user disable --now voice-tts`. `tool-install.py` does not install this
+way yet - it installs Docker.
 
 ### Linux (Docker)
 
@@ -406,6 +460,17 @@ a reboot; the healthcheck turns `healthy` once the model is ready. `.env` holds
 `VOICE_TTS_TOKEN`, and optionally `VOICE_TTS_PORT` (host port, default 8760) and
 `VOICE_TTS_CONTAINER` (default `voice-tts`); it is git-ignored.
 
+**Docker bypasses ufw.** A published port is DNAT-ed to the container in
+`PREROUTING` and passes through `FORWARD`, where Docker allows it; ufw only filters
+`INPUT`. So the container's 8760 is open to anything that can reach the host,
+whatever ufw says, while the same server run as a binary is blocked until ufw allows
+it. Restrict a Docker port with the `DOCKER-USER` chain (or `ufw-docker`), not with
+`ufw allow`.
+
+A rebuild after `requirements.txt` changes downloads every package again
+(`PIP_NO_CACHE_DIR`; the `vieneu` dependencies are ~1 GB installed). On a slow link
+to PyPI that takes a long time; the binary install above has no build at all.
+
 A Linux HuggingFace cache normally links snapshot files to blobs; onnxruntime then
 rejects the backbone's external `.data` file as outside the model directory.
 `app.py` sets `HF_HUB_DISABLE_SYMLINKS=1` so the snapshot holds real files. A cache
@@ -459,9 +524,10 @@ carries on without one: the window closes as before, `serve` keeps serving.
 - **The first launch downloads the model** (HuggingFace cache, `~/.cache/huggingface`).
   The window shows *Đang tải model…* until it is ready. This applies to a source
   checkout only.
-- **The packaged desktop build is a folder** (`dist/VoiceTTS/`, ~760 MB with the
-  int8 graphs, about 310 MB more with the fp32 ones; the NSIS installer around it
-  was ~330 MB with int8): the runtime, the web view, the tray icon and both
+- **The packaged desktop build is a folder** (`dist/VoiceTTS/`; the NSIS
+  installer around it, `VoiceTTS-windows-x64-setup.exe`, is 397 MB in v0.8.0 with
+  the fp32 graphs, against ~330 MB with int8 before, and the one-file Linux binary
+  is 550 MB): the runtime, the web view, the tray icon and both
   model repos (backbone + audio codec) are inside, and `VoiceTTS.exe` takes the same
   subcommands as `app.py` (`VoiceTTS.exe serve --tray`, say) - but, being windowed,
   it prints nothing; the CLI is the installed `voice-tts`. It points `HF_HOME` at its
