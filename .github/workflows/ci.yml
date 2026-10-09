@@ -42,6 +42,9 @@ jobs:
       - name: test_cli.py
         run: python test_cli.py
 
+      - name: test_web.js
+        run: node test_web.js
+
       - name: Every subcommand answers --help
         shell: bash
         run: |

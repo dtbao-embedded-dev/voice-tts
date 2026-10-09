@@ -21,6 +21,9 @@ the release before it builds.
   `lexicon.json` in the data dir (`$VOICE_TTS_DATA`, `%APPDATA%\VoiceTTS`,
   `~/.local/share/voice-tts`; the `voice-tts-data` volume in Docker). A user word
   replaces a built-in one with the same spelling, and the longest word wins.
+- Open a `.txt` or `.md` file in the window: *Mở file…*, `Ctrl+O`, or drop it on the
+  window. Markdown is read for its words (marks, URLs and code blocks left out);
+  past 20 000 characters the rest is cut, and the status line says so.
 - *Lưu dạng* in the window saves a reading as WAV, MP3 or OGG; MP3 and OGG are
   encoded by `/api/encode` from the audio already read.
 - The window remembers the voice, speed, pronunciation, file format and the draft

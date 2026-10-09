@@ -17,12 +17,14 @@
 </header>
 
 <main>
-  <section class="card">
+  <section class="card" id="card">
     <label class="field-label" for="text">Văn bản</label>
     <textarea id="text" spellcheck="false"
       placeholder="Chào bạn, hôm nay chúng ta sẽ deploy một model text-to-speech mới lên production server."></textarea>
     <div class="field-foot">
       <span class="hint">Trộn tiếng Việt và tiếng Anh trong cùng một câu đều đọc được.</span>
+      <button class="link" id="openBtn" type="button" title="Mở file .txt hoặc .md (Ctrl+O), hoặc kéo thả vào đây">Mở file…</button>
+      <input id="fileInput" type="file" accept=".txt,.md,.markdown,text/plain,text/markdown" hidden>
       <span class="count" id="count"></span>
     </div>
   </section>
@@ -90,6 +92,7 @@
   <div class="sheet__list" id="voiceList"></div>
 </section>
 
+<script src="/web/text.js"></script>
 <script src="/web/app.js"></script>
 </body>
 </html>

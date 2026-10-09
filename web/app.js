@@ -9,6 +9,7 @@ const els = {
   playBtn: $('playBtn'), playIcon: $('playIcon'), playLabel: $('playLabel'),
   saveBtn: $('saveBtn'), timecode: $('timecode'), meter: $('meter'),
   pron: $('pron'), stopBtn: $('stopBtn'), seek: $('seek'), format: $('format'),
+  card: $('card'), openBtn: $('openBtn'), fileInput: $('fileInput'),
 };
 
 const REGIONS = ['Bắc', 'Trung', 'Nam'];
@@ -76,6 +77,8 @@ addEventListener('keydown', (e) => {
   if (reload || browserish || k === 'F3' || k === 'F7' || k === 'F11' || k === 'F12') {
     e.preventDefault();
     e.stopPropagation();
+    // Ctrl+O is still "open", only ours: a text file, not a page.
+    if (c && k.toLowerCase() === 'o' && !els.openBtn.disabled) els.fileInput.click();
   }
 }, true);
 
@@ -596,6 +599,7 @@ function render() {
   els.saveBtn.disabled = tape.length === 0;
   // What a reading depends on is fixed while it is being made or heard.
   els.text.readOnly = busy;
+  els.openBtn.disabled = busy;
   els.voiceBtn.disabled = busy;
   for (const o of els.speed.children) o.disabled = busy;
   for (const o of els.pron.children) o.disabled = busy;
@@ -691,6 +695,53 @@ async function saveTape(chunks, rate, fmt) {
 
 els.saveBtn.addEventListener('click', () => {
   if (tape.length) saveTape(tape.chunks, tape.rate, saveFormat);
+});
+
+/* ---- Opening a file: picked, Ctrl+O, or dropped on the window ---------- */
+
+const MAX_FILE_BYTES = 4 * 1024 * 1024;   // far past 20 000 characters of text
+
+async function openFile(file) {
+  if (!file) return;
+  if (els.text.readOnly) { setStatus('error', 'Dừng đọc trước khi mở file'); return; }
+  if (file.size > MAX_FILE_BYTES) { setStatus('error', `${file.name} quá lớn để mở`); return; }
+  let value;
+  try {
+    value = VoiceText.decodeFile(new Uint8Array(await file.arrayBuffer()), file.name);
+  } catch {
+    setStatus('error', `Không đọc được ${file.name}`);
+    return;
+  }
+  const max = els.text.maxLength > 0 ? els.text.maxLength : Infinity;
+  const cut = value.length > max;
+  els.text.value = cut ? value.slice(0, max) : value;
+  renderCount();
+  saveDraft();
+  render();
+  setStatus('ready', cut ? `Đã mở ${file.name} - chỉ giữ ${max} ký tự đầu`
+    : `Đã mở ${file.name}`);
+}
+
+els.openBtn.addEventListener('click', () => els.fileInput.click());
+els.fileInput.addEventListener('change', () => {
+  openFile(els.fileInput.files[0]);
+  els.fileInput.value = '';   // picking the same file again still opens it
+});
+
+// Without these, a file dropped anywhere makes the web view navigate to it.
+const carriesFile = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+addEventListener('dragover', (e) => {
+  if (!carriesFile(e)) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = els.text.readOnly ? 'none' : 'copy';
+  els.card.dataset.drop = '1';
+});
+addEventListener('dragleave', (e) => { if (!e.relatedTarget) els.card.dataset.drop = '0'; });
+addEventListener('drop', (e) => {
+  if (!carriesFile(e)) return;
+  e.preventDefault();
+  els.card.dataset.drop = '0';
+  openFile(e.dataTransfer.files[0]);
 });
 
 /* ---- Wiring ------------------------------------------------------------ */

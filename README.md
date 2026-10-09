@@ -41,7 +41,9 @@ it (plus a one-off download for a source install).
 
 1. Open **Voice TTS** (Start Menu, or the downloaded exe).
 2. Paste or type the text - up to 20 000 characters, Vietnamese and English mixed
-   freely in one sentence.
+   freely in one sentence - or open a `.txt`/`.md` file: **Mở file…**, `Ctrl+O`, or
+   drop it on the window. A Markdown file is read for its words: headings, emphasis
+   and list marks go, links keep their text, code blocks are left out.
 3. **Giọng đọc** picks the voice (★ = featured); **Tốc độ** picks 0.75×-1.5×.
 4. **Phát âm** is *Thường* (the text as typed: `POST` is spelled *phê ô ét tê*) or
    *Đặc biệt* (`POST` read "post", `AP` "ây pi", `Board` "bo", `ESP32` "i ét pi ba
@@ -430,6 +432,7 @@ carries on without one: the window closes as before, `serve` keeps serving.
 | Key | Action |
 | --- | --- |
 | `Ctrl` + `Enter` | read / pause / carry on / play again |
+| `Ctrl` + `O` | open a `.txt` or `.md` file |
 | `Esc` | stop, or close the voice sheet |
 
 ## Notes
@@ -506,7 +509,8 @@ carries on without one: the window closes as before, `serve` keeps serving.
 `.github/workflows/ci.yml` runs on every push to `main`, `developing`, `feat/**` and
 `fix/**` and on pull requests, on `ubuntu-latest` and `windows-latest` with Python
 3.12: `test_cli.py` (CLI, token guard, tray menu, the time-stretcher and the
-pronunciation lexicon, against a stub engine - no model download) and `--help` for every subcommand and the
+pronunciation lexicon, against a stub engine - no model download), `test_web.js`
+(the page's text helpers, under node) and `--help` for every subcommand and the
 installer. The real-model smoke test runs locally (`tool-build.py --check`).
 
 ## Release
@@ -564,9 +568,11 @@ icon.py                   the app icon, one geometry: tray/window/exe .ico and /
 cli.py                    command line: subcommands and flags, stdlib-only at import
 test_tts.py               assert-based smoke test over the real HTTP path
 test_cli.py               fast checks with a stub engine: CLI (local + remote), token guard
+test_web.js               node checks of web/text.js: Markdown stripping, file decoding
 CHANGELOG.md              user-visible changes per version; a release publishes its section
 LICENSE                   Apache License 2.0
-web/                      index.html, app.css, app.js, tray.html (tray menu) - no build step
+web/                      index.html, app.css, app.js, text.js (pure text helpers),
+                          tray.html (tray menu) - no build step
 requirements.txt          server + CLI core (what Docker installs)
 requirements-desktop.txt  core + window + tray (what tool-build.py installs)
 Dockerfile, compose.yaml  Linux server image, token from .env
