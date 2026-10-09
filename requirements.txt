@@ -4,6 +4,10 @@
 # Vietnamese/English TTS engine (v3 Turbo, torch-free ONNX CPU build).
 vieneu>=3.8.3
 
+# MP3/OGG output. Already pulled in by vieneu; named here because app.py imports
+# it, and its wheels bundle a libsndfile with the LAME and Vorbis encoders.
+soundfile>=0.12.1
+
 # HTTP backend.
 fastapi>=0.115
 uvicorn>=0.30

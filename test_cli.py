@@ -9,6 +9,7 @@ The real-model path is ``test_tts.py`` itself.
 
 from __future__ import annotations
 
+import contextlib
 import io
 import json
 import os
@@ -96,6 +97,9 @@ def check_token(base: str) -> None:
         cookie = {"Cookie": f"{app.TOKEN_COOKIE}={TOKEN}"}
         assert request(f"{base}/api/voices", cookie)[0] == 200, "cookie token refused"
         assert request(f"{base}/api/voices", {"Cookie": f"{app.TOKEN_COOKIE}=x"})[0] == 401
+        assert request(f"{base}/api/version")[0] == 401, "version must sit behind the token"
+        status, _, body = request(f"{base}/api/version", good)
+        assert status == 200 and json.loads(body) == {"version": cli.__version__},             f"/api/version: {status} {body!r}"
 
         status, headers, _ = request(f"{base}/?token={TOKEN}")
         assert status == 200, f"/?token= gave {status}"
@@ -107,7 +111,7 @@ def check_token(base: str) -> None:
         assert request(f"{base}/web/app.js")[0] == 200, "static files must stay open"
     finally:
         app.set_token(None)
-    print("token: 401 without, 200 with Bearer or cookie, /?token= sets it")
+    print("token: 401 without, 200 with Bearer or cookie, /?token= sets it; /api/version")
 
 
 def run_cli(*args: str, stdin: bytes = b"") -> tuple[int, bytes, str]:
@@ -223,9 +227,98 @@ def check_wav_format(base: str) -> None:
     assert headers["content-type"] == "application/octet-stream", "default is no longer raw"
     assert len(body) == 2 * WORD * 4, "raw stream length changed"
 
-    assert post(base, {"text": "xin chào", "format": "mp3"})[0] == 422, "unknown format accepted"
+    assert post(base, {"text": "xin chào", "format": "flac"})[0] == 422, "unknown format accepted"
     assert post(base, {"text": " ", "format": "wav"})[0] == 400, "empty text as wav accepted"
     print("format: wav is a whole 16-bit file with its length, raw stays the default")
+
+
+MAGIC = {"mp3": (b"ID3", b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"), "ogg": (b"OggS",)}
+
+
+def decoded_frames(data: bytes, fmt: str) -> int:
+    """Frames in an MP3/OGG file, checked to be 48 kHz mono and not silent."""
+    import soundfile
+
+    assert data.startswith(MAGIC[fmt]), f"{fmt} starts with {data[:4]!r}"
+    audio, rate = soundfile.read(io.BytesIO(data), dtype="float32")
+    assert rate == app.SAMPLE_RATE and audio.ndim == 1, f"{fmt}: {rate} Hz, shape {audio.shape}"
+    assert np.abs(audio).max() > 0.1, f"{fmt} is silent"
+    return len(audio)
+
+
+def check_encode(base: str, tmp: Path) -> None:
+    """MP3 and OGG: whole readings over HTTP, encoded tapes, and the CLI."""
+    # Encoder priming and padding move the length a little; 50 ms is far below
+    # the 100 ms one stub word lasts.
+    slack = app.SAMPLE_RATE // 20
+    for fmt, mime in (("mp3", "audio/mpeg"), ("ogg", "audio/ogg")):
+        status, headers, body = post(base, {"text": "xin chào", "format": fmt})
+        assert status == 200, f"format {fmt}: {status} {body[:200]!r}"
+        assert headers["content-type"] == mime, headers["content-type"]
+        assert abs(decoded_frames(body, fmt) - 2 * WORD) <= slack, f"{fmt} length is off"
+
+        # What the window sends: the 16-bit tape it already holds.
+        tone = (0.3 * np.sin(2 * np.pi * 220 * np.arange(3 * WORD) / app.SAMPLE_RATE))
+        pcm = (tone * 32767).astype("<i2").tobytes()
+        req = urllib.request.Request(f"{base}/api/encode?format={fmt}", data=pcm,
+                                     headers={"Content-Type": "application/octet-stream"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            assert resp.headers["content-type"] == mime, resp.headers["content-type"]
+            assert abs(decoded_frames(resp.read(), fmt) - 3 * WORD) <= slack, f"encode {fmt}"
+
+    def encode_status(query: str, data: bytes) -> int:
+        req = urllib.request.Request(f"{base}/api/encode{query}", data=data,
+                                     headers={"Content-Type": "application/octet-stream"})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return resp.status
+        except urllib.error.HTTPError as exc:
+            return exc.code
+
+    assert encode_status("?format=flac", b"\0\0") == 400, "unknown encode format accepted"
+    assert encode_status("?format=mp3", b"") == 400, "empty tape accepted"
+    assert encode_status("?format=mp3", b"\0\0\0") == 400, "half a sample accepted"
+
+    # A plain-text POST is what another site can send without a preflight.
+    req = urllib.request.Request(f"{base}/api/encode?format=mp3", data=b"\0\0",
+                                 headers={"Content-Type": "text/plain"})
+    try:
+        urllib.request.urlopen(req, timeout=10)
+        raise AssertionError("a text/plain encode was accepted")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 415, exc.code
+
+    # The size cap holds for a chunked body too, which has no Content-Length.
+    import http.client
+
+    saved, app.ENCODE_MAX_BYTES = app.ENCODE_MAX_BYTES, 4000
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", int(base.rsplit(":", 1)[1]), timeout=10)
+        conn.request("POST", "/api/encode?format=mp3", body=iter([b"\0" * 1000] * 8),
+                     headers={"Content-Type": "application/octet-stream"}, encode_chunked=True)
+        assert conn.getresponse().status == 413, "a chunked body past the cap was taken"
+        conn.close()
+    finally:
+        app.ENCODE_MAX_BYTES = saved
+
+    # The CLI picks the format from the file name, or from --format; locally it
+    # encodes in process, against a server it asks the server to.
+    for flags in ([], ["--server", base]):
+        for name, extra, fmt in (("cli.mp3", [], "mp3"), ("cli.ogg", [], "ogg"),
+                                 ("cli.bin", ["--format", "mp3"], "mp3")):
+            out = tmp / name
+            if flags:
+                code, _, err = run_cli("speak", "một hai ba", "-o", str(out), "-q", *flags, *extra)
+                assert code == 0, f"remote {name}: {err}"
+            else:
+                assert cli.main(["speak", "một hai ba", "-o", str(out), "-q", *extra]) == 0
+            assert abs(decoded_frames(out.read_bytes(), fmt) - 3 * WORD) <= slack, (flags, name)
+    code, stdout, err = run_cli("speak", "một hai", "-o", "-", "-q", "--format", "ogg",
+                                "--server", base)
+    assert code == 0 and abs(decoded_frames(stdout, "ogg") - 2 * WORD) <= slack, err
+    code, _, _ = run_cli("speak", "một", "--raw", "--format", "mp3", "-o", "-", "--server", base)
+    assert code == 2, "--raw with --format must be a usage error"
+    print("encode: mp3/ogg readings, /api/encode tapes, CLI by extension or --format")
 
 
 def check_local(tmp: Path) -> None:
@@ -242,6 +335,46 @@ def check_local(tmp: Path) -> None:
     assert cli.main(["speak", "xin chào", "-v", "Không Tồn Tại", "-o", str(out), "-q"]) == 2
     assert cli.main(["speak", " ", "-o", str(out), "-q"]) == 2, "empty text accepted"
     print("local: in-process engine, speed, validation -> 2")
+
+
+def check_gui_host(base: str) -> None:
+    """The window's backend answers its own address only: a page that rebinds
+    a hostname to 127.0.0.1 sends that hostname, and is refused."""
+    port = base.rsplit(":", 1)[1]
+    app.set_gui_hosts(int(port))
+    try:
+        for host, want in ((f"127.0.0.1:{port}", 200), (f"localhost:{port}", 200),
+                           (f"evil.example:{port}", 421), ("127.0.0.1:1", 421)):
+            assert request(f"{base}/api/status", {"Host": host})[0] == want, host
+        assert request(f"{base}/", {"Host": f"evil.example:{port}"})[0] == 421, "page served"
+    finally:
+        app.set_gui_hosts(None)
+    assert request(f"{base}/api/status", {"Host": "evil.example"})[0] == 200, "serve mode refused"
+    print("gui host: only 127.0.0.1/localhost on its port; serve mode takes any")
+
+
+def check_gui_port() -> None:
+    """The window's backend keeps one port, so the page's storage keeps one origin;
+    a port already taken - by another app or a second window - falls back."""
+    assert cli.parse(cli.build_parser(), []).port == cli.GUI_PORT == 8761, \
+        "gui no longer defaults to the fixed port"
+    with socket.socket() as holder:
+        holder.bind(("127.0.0.1", 0))
+        holder.listen(1)
+        taken = holder.getsockname()[1]
+        try:
+            app.start_server(taken)
+        except OSError:
+            pass
+        else:
+            raise AssertionError("a second server bound a port that is in use")
+        server, port, thread = app.start_gui_server(taken)
+        try:
+            assert port != taken and port > 0, f"no fallback from {taken}: {port}"
+        finally:
+            server.should_exit = True
+            thread.join(timeout=5)
+    print("gui port: fixed by default, an occupied port is refused and falls back")
 
 
 def check_tray() -> None:
@@ -340,6 +473,10 @@ def check_lexicon(base: str, tmp: Path) -> None:
     }
     for text, want in cases.items():
         assert lexicon.apply(text) == want, f"{text!r} -> {lexicon.apply(text)!r}"
+    # The regex matches "Wıfı" case-insensitively, but its casefold is not "wifi":
+    # the respelling must come from the alternative that matched, not a lookup.
+    wifi = [{"word": "wifi", "say": "oai phai", "matchCase": False}]
+    assert lexicon.apply("Bật Wıfı và WIFI", wifi) == "Bật oai phai và oai phai"
 
     # What the engine's own front end makes of it, model-free: the spelled-out
     # Vietnamese letters (phê ô ét tê) are the bug being fixed.
@@ -379,6 +516,92 @@ def check_lexicon(base: str, tmp: Path) -> None:
     print("lexicon: POST/GET/... as English words, AP as ây pi, Board as bo, whole words only")
 
 
+def lexicon_call(base: str, method: str, body=None, headers: dict | None = None):
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(f"{base}/api/lexicon", data=data, method=method,
+                                 headers={"Content-Type": "application/json", **(headers or {})})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.status, json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read()
+
+
+def check_lexicon_user(base: str, tmp: Path) -> None:
+    """Words the user adds: stored in the data dir, read in special mode only."""
+    os.environ["VOICE_TTS_DATA"] = str(tmp / "data")
+    try:
+        status, state = lexicon_call(base, "GET")
+        assert status == 200 and state["user"] == [], state
+        assert {"word": "POST", "say": "post", "matchCase": True} in state["builtin"], state
+
+        mine = [{"word": "MQTT", "say": "em kiu ti ti", "matchCase": False},
+                {"word": "AP", "say": "a pê", "matchCase": True},
+                {"word": "ESP32 S3", "say": "i ét pi ba hai ét ba", "matchCase": False}]
+        status, state = lexicon_call(base, "PUT", {"user": mine})
+        assert status == 200 and state["user"] == mine, (status, state)
+        stored = json.loads((tmp / "data" / "lexicon.json").read_text(encoding="utf-8"))
+        assert stored == {"entries": mine}, stored
+
+        # The user's AP replaces the built-in one; the longer ESP32 S3 wins over
+        # the built-in ESP32 at the same place; mqtt matches in any case.
+        raw = "Gửi mqtt qua AP tới ESP32 S3 và ESP32, POST"
+        want = "Gửi em kiu ti ti qua a pê tới i ét pi ba hai ét ba và i ét pi ba hai, post"
+        for body, expect in (({"text": raw, "pronunciation": "special"}, want),
+                             ({"text": raw}, raw)):
+            status, _, answer = post(base, body)
+            assert status == 200, answer[:200]
+            assert app._engine.last_text == expect, (body, app._engine.last_text)
+
+        for bad in ([{"word": "", "say": "x"}], [{"word": "x", "say": " "}],
+                    [{"word": "x" * 65, "say": "x"}], [{"word": "x", "say": "x" * 129}],
+                    [{"word": "Dup", "say": "a"}, {"word": "dup", "say": "b"}]):
+            status, _ = lexicon_call(base, "PUT", {"user": bad})
+            assert status == 400, f"{bad} accepted ({status})"
+        assert lexicon_call(base, "PUT", {"user": "MQTT"})[0] == 422, "a non-list accepted"
+        assert lexicon_call(base, "GET")[1]["user"] == mine, "a rejected PUT changed the list"
+
+        app.set_token(TOKEN)
+        try:
+            assert lexicon_call(base, "GET")[0] == 401, "lexicon open without the token"
+            assert lexicon_call(base, "PUT", {"user": []})[0] == 401, "PUT without the token"
+            good = {"Authorization": f"Bearer {TOKEN}"}
+            assert lexicon_call(base, "GET", headers=good)[0] == 200
+        finally:
+            app.set_token(None)
+
+        # The CLI: in this process it edits the file, with --server the server's.
+        out = io.StringIO()
+        assert cli.main(["lexicon", "add", "UART", "du a ét", "--local"]) == 0
+        assert cli.main(["lexicon", "add", "MQTT", "mờ qui tê tê", "--case", "--local"]) == 0
+        with contextlib.redirect_stdout(out):
+            assert cli.main(["lexicon", "list", "--json", "--local"]) == 0
+        user = json.loads(out.getvalue())["user"]
+        assert {"word": "UART", "say": "du a ét", "matchCase": False} in user, user
+        assert {"word": "MQTT", "say": "mờ qui tê tê", "matchCase": True} in user, user
+        assert len(user) == 4, "add of an existing word must replace it"
+        assert cli.main(["lexicon", "remove", "uart", "--local"]) == 0
+        assert cli.main(["lexicon", "remove", "uart", "--local"]) == 2, "removing a ghost"
+        assert cli.main(["lexicon", "add", "", "x", "--local"]) == 2, "empty word accepted"
+
+        remote = ("--server", base)
+        code, _, err = run_cli("lexicon", "add", "I2C", "i hai xi", *remote)
+        assert code == 0, err
+        assert any(e["word"] == "I2C" for e in lexicon_call(base, "GET")[1]["user"])
+        code, stdout, err = run_cli("lexicon", "list", *remote)
+        table = stdout.decode("utf-8")
+        assert code == 0 and "I2C" in table and "i hai xi" in table and "POST" in table, table
+        code, _, err = run_cli("lexicon", "remove", "I2C", *remote)
+        assert code == 0, err
+        assert not any(e["word"] == "I2C" for e in lexicon_call(base, "GET")[1]["user"])
+        code, _, err = run_cli("lexicon", "add", "x", "y" * 129, *remote)
+        assert code == 2, f"an over-long spelling over HTTP: exit {code}, {err}"
+    finally:
+        lexicon_call(base, "PUT", {"user": []})
+        del os.environ["VOICE_TTS_DATA"]
+    print("lexicon user: data-dir JSON, overrides, longest first, 400/401, CLI local + remote")
+
+
 def check_install_files() -> None:
     """tool-install.py copies every module of ours that the app imports.
 
@@ -414,6 +637,24 @@ def check_install_files() -> None:
     print("install: tool-install.py and the Docker image carry every module the app imports")
 
 
+def check_model_precision() -> None:
+    """The build fetches and ships the ONNX graphs the app loads, and only those.
+
+    tool-build.py runs before the venv exists, so it cannot import app and names
+    the subfolder itself; this keeps the two from drifting apart.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("tool_build", ROOT / "docs/scripts/tool-build.py")
+    tool_build = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool_build)
+    assert app.MODEL_PRECISION == "fp32", f"model precision is {app.MODEL_PRECISION}"
+    want = {"fp32": "onnx_update", "int8": "onnx_int8"}[app.MODEL_PRECISION]
+    assert tool_build.ONNX_SUBFOLDER == want, \
+        f"tool-build.py ships {tool_build.ONNX_SUBFOLDER}, app loads {want}"
+    print(f"model: {app.MODEL_PRECISION} ONNX graphs ({want}) in the app and the build")
+
+
 def check_release_notes() -> None:
     """The release publishes the CHANGELOG section of ``cli.__version__``."""
     def notes(version: str) -> subprocess.CompletedProcess:
@@ -427,7 +668,13 @@ def check_release_notes() -> None:
     assert body.strip() and "## [" not in body, f"section of {cli.__version__} is off: {body!r}"
     proc = notes("9.9.9")
     assert proc.returncode == 1, f"a missing version must fail the release, got {proc.returncode}"
-    print(f"release notes: CHANGELOG section for {cli.__version__}, a missing one fails")
+    # The repo is private, so the README's version badge is static: a release cut
+    # that bumps cli.__version__ has to bump the badge with it.
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    badge = f"https://img.shields.io/badge/version-{cli.__version__}-blue"
+    assert badge in readme, f"README.md has no version badge for {cli.__version__}"
+    print(f"release notes: CHANGELOG section and README badge for {cli.__version__}, "
+          "a missing one fails")
 
 
 def main() -> int:
@@ -438,16 +685,21 @@ def main() -> int:
     app._engine = StubEngine()
     check_parser()
     check_install_files()
+    check_model_precision()
     check_release_notes()
     check_tray()
+    check_gui_port()
 
     _, port, _ = app.start_server(host="127.0.0.1", port=0)
     base = f"http://127.0.0.1:{port}"
     check_token(base)
+    check_gui_host(base)
     with tempfile.TemporaryDirectory() as tmp:
         check_remote(base, Path(tmp))
         check_wav_format(base)
+        check_encode(base, Path(tmp))
         check_lexicon(base, Path(tmp))
+        check_lexicon_user(base, Path(tmp))
         check_local(Path(tmp))
         check_icon(base, Path(tmp))
     print("OK")

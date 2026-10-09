@@ -46,6 +46,11 @@ MODEL_REPOS = (
     "models--OpenMOSS-Team--MOSS-Audio-Tokenizer-Nano-ONNX",
 )
 HF_HUB = Path(os.environ.get("HF_HOME", Path.home() / ".cache/huggingface")) / "hub"
+# The backbone's ONNX graphs app.MODEL_PRECISION loads ("fp32" -> onnx_update,
+# "int8" -> onnx_int8). The cache may hold the other set from an earlier build;
+# only this one is fetched-for and shipped. test_cli.py keeps the two in step.
+ONNX_SUBFOLDER = "onnx_update"
+ONNX_OTHER = "onnx_int8"
 # Staged outside build/ and dist/: PyInstaller's --clean wipes both.
 MODEL_STAGE = VENV / "model-bundle"
 EXE_ICON = VENV / "build-icon" / "voice-tts.ico"
@@ -111,7 +116,9 @@ def ensure_deps(server_only: bool = False) -> None:
 
 def ensure_model() -> None:
     """Pull the weights now, so the first launch is not a silent 30 s wait."""
-    if all((HF_HUB / repo).is_dir() for repo in MODEL_REPOS):
+    backbone = HF_HUB / MODEL_REPOS[0] / "snapshots"
+    graphs = backbone.is_dir() and any((s / ONNX_SUBFOLDER).is_dir() for s in backbone.iterdir())
+    if graphs and all((HF_HUB / repo).is_dir() for repo in MODEL_REPOS):
         print("  model ... cached", flush=True)
         return
     t0 = step("model (first download, this takes a while)")
@@ -144,7 +151,9 @@ def stage_model() -> Path:
         out = MODEL_STAGE / "hub" / repo
         (out / "refs").mkdir(parents=True)
         (out / "refs" / "main").write_text(revision)
-        shutil.copytree(src / "snapshots" / revision, out / "snapshots" / revision)
+        # The other precision's graphs, left from an earlier build, stay behind.
+        shutil.copytree(src / "snapshots" / revision, out / "snapshots" / revision,
+                        ignore=shutil.ignore_patterns(ONNX_OTHER))
     return MODEL_STAGE
 
 

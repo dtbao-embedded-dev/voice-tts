@@ -16,8 +16,12 @@ services:
       VOICE_TTS_TOKEN: ${VOICE_TTS_TOKEN:-}
     volumes:
       - hf-cache:/data/hf
+      - app-data:/data/app
 
 volumes:
   hf-cache:
     # A fixed name, so a reinstall from another directory reuses the model.
     name: voice-tts-hf
+  app-data:
+    # The user's lexicon (lexicon.json); fixed name for the same reason.
+    name: voice-tts-data
