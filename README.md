@@ -336,6 +336,12 @@ in parallel adds no throughput and only slows both (i5-8500T: RTF 0.79 alone, 1.
 each for two, 2.5 each for three), so the default is 1. `VOICE_TTS_MAX_STREAMS=<n>`
 in the environment (the systemd `.env`, or `compose.yaml`) lets `n` run at once.
 
+`VOICE_TTS_THREADS=<n>` sets the CPU threads one reading runs on; unset (or `0`) the
+engine takes about one per physical core, at most 8. More threads than performance
+cores only slow it: on an i5-14600K (6 P + 8 E cores) RTF was 0.341 with 2, 0.285
+with 4, **0.267 with 6**, 0.273 with 8, 0.287 with 14 and 0.296 with 20. A machine
+whose cores are all alike (the i5-8500T) gains nothing from setting it.
+
 Every reading logs three lines on stderr, whatever `--log-level` says - under
 systemd, `journalctl --user -u voice-tts -f` shows them:
 
