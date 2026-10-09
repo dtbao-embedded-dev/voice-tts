@@ -8,7 +8,7 @@ const els = {
   sheet: $('sheet'), scrim: $('scrim'), speed: $('speed'),
   playBtn: $('playBtn'), playIcon: $('playIcon'), playLabel: $('playLabel'),
   saveBtn: $('saveBtn'), timecode: $('timecode'), meter: $('meter'),
-  pron: $('pron'),
+  pron: $('pron'), stopBtn: $('stopBtn'), seek: $('seek'),
 };
 
 const REGIONS = ['Bắc', 'Trung', 'Nam'];
@@ -17,7 +17,6 @@ const METER_BARS = 40;
 
 let voices = [];
 let voice = null;
-let speaking = false;
 let abort = null;
 let speed = 1;
 // "normal": the engine reads the text as typed. "special": the backend respells
@@ -269,7 +268,7 @@ const bars = Array.from({ length: METER_BARS }, () => {
 function drawMeter(analyser) {
   const data = new Uint8Array(analyser.frequencyBinCount);
   const tick = () => {
-    if (!speaking) {
+    if (!player.playing) {
       bars.forEach((b) => { b.style.height = '2px'; });
       return;
     }
@@ -288,12 +287,9 @@ function drawMeter(analyser) {
   requestAnimationFrame(tick);
 }
 
-/* ---- Streaming playback ------------------------------------------------ */
+/* ---- Tape: the reading, kept so it plays again without the backend ------ */
 
 let ctx = null, gain = null, analyser = null;
-let sources = [];
-let recorded = [];
-let recordedRate = 48000;
 
 function audio() {
   if (!ctx) {
@@ -307,42 +303,185 @@ function audio() {
   return ctx;
 }
 
-function setSpeaking(on) {
-  speaking = on;
-  els.playLabel.textContent = on ? 'Dừng' : 'Đọc';
-  els.playIcon.innerHTML = on
-    ? '<rect x="4" y="4" width="8" height="8" rx="1.6" fill="currentColor"/>'
-    : '<path d="M4 2.8v10.4l9-5.2z" fill="currentColor"/>';
-  els.text.readOnly = on;
-  // The speed is baked into the request, so it is fixed for the whole read.
-  for (const o of els.speed.children) o.disabled = on;
-  for (const o of els.pron.children) o.disabled = on;
-  els.meter.dataset.live = on ? '1' : '0';
-  if (on) drawMeter(analyser);
+// The tape is kept as Int16. At the 20 000-character limit this is 20+ minutes
+// of audio; float32 would hold twice as much of it in memory and the WAV is
+// 16-bit either way. `starts[i]` is where `chunks[i]` begins, in samples.
+const tape = { key: '', rate: 48000, chunks: [], starts: [], length: 0, complete: false };
+// True while the backend is still sending this tape.
+let synthesizing = false;
+
+// What a reading depends on. The tape answers for this key only: change the
+// text, the voice, the speed or the pronunciation and the next press reads anew.
+function readingKey() {
+  return JSON.stringify([els.text.value.trim(), voice, speed, pronunciation]);
 }
 
+// A tape that can be played: it matches what is on screen, and it is either
+// whole or still arriving. One stopped half-way is kept for saving only.
+function tapeValid() {
+  return tape.length > 0 && tape.key === readingKey() && (tape.complete || synthesizing);
+}
+
+function resetTape(key, rate = 48000) {
+  Object.assign(tape, { key, rate, chunks: [], starts: [], length: 0, complete: false });
+}
+
+function appendTape(pcm) {
+  tape.starts.push(tape.length);
+  tape.chunks.push(pcm);
+  tape.length += pcm.length;
+}
+
+// `n` samples from `from`, as the float32 an AudioBuffer takes.
+function tapeSlice(from, n) {
+  const out = new Float32Array(Math.max(0, Math.min(n, tape.length - from)));
+  let lo = 0, hi = tape.starts.length - 1;
+  while (lo < hi) {   // the chunk holding `from`
+    const mid = (lo + hi + 1) >> 1;
+    if (tape.starts[mid] <= from) lo = mid; else hi = mid - 1;
+  }
+  for (let i = lo, off = from - tape.starts[lo], w = 0; w < out.length; i++, off = 0) {
+    const chunk = tape.chunks[i];
+    const take = Math.min(chunk.length - off, out.length - w);
+    for (let k = 0; k < take; k++) out[w + k] = chunk[off + k] / 32767;
+    w += take;
+  }
+  return out;
+}
+
+/* ---- Player: schedules the tape a little ahead of the audio clock ------- */
+
+const SLICE = 48000;        // one second per AudioBuffer
+const AHEAD_SECONDS = 2;    // how far ahead of the clock the tape is scheduled
+
+// `sched` is what is queued on the audio clock: [{src, at, from, to}], sample
+// ranges of the tape. `base` is the position before the first entry, `next`
+// the first sample not yet queued, `cursor` where on the clock it would go.
+const player = { playing: false, pos: 0, base: 0, next: 0, cursor: 0, sched: [], timer: 0 };
+
+// Where playback is on the tape, in samples.
+function position() {
+  if (!player.playing) return player.pos;
+  const t = ctx.currentTime;
+  let p = player.base;
+  for (const s of player.sched) {
+    if (t < s.at) return s.from;   // waiting out the head start, or an underrun
+    const end = s.at + (s.to - s.from) / tape.rate;
+    if (t < end) return s.from + Math.floor((t - s.at) * tape.rate);
+    p = s.to;
+  }
+  return p;
+}
+
+function stopSources() {
+  for (const s of player.sched) { try { s.src.stop(); } catch { /* already finished */ } }
+  player.sched = [];
+}
+
+function pump() {
+  if (!player.playing) return;
+  const t = ctx.currentTime;
+  // Forget what has played, keeping the last entry: position() reads from it.
+  while (player.sched.length > 1 && player.sched[0].at
+         + (player.sched[0].to - player.sched[0].from) / tape.rate < t - 0.5) {
+    player.base = player.sched.shift().to;
+  }
+  while (player.next < tape.length && player.cursor - t < AHEAD_SECONDS) {
+    const data = tapeSlice(player.next, SLICE);
+    const buf = ctx.createBuffer(1, data.length, tape.rate);
+    buf.copyToChannel(data, 0);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(gain);
+    // Fell behind (the start, or the backend was slower than real time): leave
+    // a head start so the next slow chunk does not starve playback. A whole
+    // tape is all there already and needs none.
+    const at = player.cursor >= t ? player.cursor
+      : t + (tape.complete ? 0.03 : PRIME_SECONDS);
+    src.start(at);
+    player.sched.push({ src, at, from: player.next, to: player.next + data.length });
+    player.cursor = at + buf.duration;
+    player.next += data.length;
+  }
+  if (!synthesizing && player.next >= tape.length && t >= player.cursor) finished();
+}
+
+function play(from) {
+  stopSources();
+  Object.assign(player, { playing: true, pos: from, base: from, next: from, cursor: 0 });
+  clearInterval(player.timer);
+  player.timer = setInterval(pump, 200);
+  pump();
+  if (player.playing) {   // an empty rest of the tape finishes at once
+    setStatus('speaking', 'Đang đọc…');
+    render();
+    tick();
+  }
+}
+
+function pause() {
+  player.pos = position();
+  stopSources();
+  player.playing = false;
+  clearInterval(player.timer);
+  setStatus('ready', synthesizing ? 'Tạm dừng · vẫn đang tạo phần sau' : 'Tạm dừng');
+  render();
+}
+
+// The end of the tape: back to the start, ready to play it again.
+function finished() {
+  stopSources();
+  Object.assign(player, { playing: false, pos: 0 });
+  clearInterval(player.timer);
+  setStatus('ready', 'Sẵn sàng');
+  render();
+}
+
+function seek(to) {
+  to = Math.max(0, Math.min(Math.floor(to), tape.length));
+  if (player.playing) play(to);
+  else { player.pos = to; render(); }
+}
+
+/* ---- Reading: the backend fills the tape, the player plays it ----------- */
+
+// Stop everything: the request, and the playback. What was read stays on the
+// tape for saving; a tape cut short is not offered for replay.
 function stop() {
   run++;
   if (abort) abort.abort();
-  for (const s of sources) { try { s.stop(); } catch { /* already finished */ } }
-  sources = [];
-  setSpeaking(false);
+  synthesizing = false;
+  if (!tape.complete) tape.key = '';
+  stopSources();
+  Object.assign(player, { playing: false, pos: 0 });
+  clearInterval(player.timer);
   setStatus('ready', 'Sẵn sàng');
+  render();
 }
 
-async function speak() {
+async function read() {
   const text = els.text.value.trim();
   if (!text) { els.text.focus(); return; }
 
-  const myRun = ++run;
+  stop();
+  const myRun = run;
   const ac = audio();
   await ac.resume();
   abort = new AbortController();
-  recorded = [];
-  sources = [];
-  els.saveBtn.disabled = true;
-  setSpeaking(true);
-  setStatus('speaking', 'Đang đọc…');
+  resetTape(readingKey());
+  synthesizing = true;
+  play(0);
+
+  // A failure before any audio leaves nothing to keep.
+  const fail = (message) => {
+    synthesizing = false;
+    tape.key = '';
+    stopSources();
+    Object.assign(player, { playing: false, pos: 0 });
+    clearInterval(player.timer);
+    setStatus('error', message);
+    render();
+  };
 
   let res;
   try {
@@ -353,29 +492,24 @@ async function speak() {
       signal: abort.signal,
     });
   } catch {
-    if (myRun !== run) return;   // aborted by Dừng, not a failure to report
-    setSpeaking(false);
-    setStatus('error', 'Không gọi được backend');
+    if (myRun === run) fail('Không gọi được backend');   // else: aborted by Dừng
     return;
   }
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
-    if (myRun !== run) return;
-    setSpeaking(false);
-    setStatus('error', detail.detail || `Lỗi ${res.status}`);
+    if (myRun === run) fail(detail.detail || `Lỗi ${res.status}`);
     return;
   }
 
-  recordedRate = Number(res.headers.get('X-Sample-Rate')) || 48000;
+  tape.rate = Number(res.headers.get('X-Sample-Rate')) || 48000;
   const reader = res.body.getReader();
   let tail = new Uint8Array(0);
-  let cursor = 0;   // where the next chunk starts on the audio clock
-  let total = 0;
-
+  let broken = false;
   try {
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
+      if (myRun !== run) return;
 
       const joined = new Uint8Array(tail.length + value.length);
       joined.set(tail); joined.set(value, tail.length);
@@ -385,55 +519,96 @@ async function speak() {
 
       // Copy into a fresh buffer: Float32Array needs a 4-byte-aligned offset.
       const samples = new Float32Array(joined.buffer.slice(0, usable));
-      // The tape is kept as Int16. At the 20 000-character limit this is 20+
-      // minutes of audio; float32 would hold twice as much of it in memory
-      // and the WAV is 16-bit either way.
       const pcm = new Int16Array(samples.length);
       for (let i = 0; i < samples.length; i++) {
         pcm[i] = Math.max(-1, Math.min(1, samples[i])) * 32767;
       }
-      recorded.push(pcm);
-      total += samples.length;
-
-      const buf = ac.createBuffer(1, samples.length, recordedRate);
-      buf.copyToChannel(samples, 0);
-      const src = ac.createBufferSource();
-      src.buffer = buf;
-      src.connect(gain);
-      cursor = Math.max(cursor, ac.currentTime + PRIME_SECONDS);
-      src.start(cursor);
-      cursor += buf.duration;
-      sources.push(src);
-
-      els.timecode.textContent = fmt(total / recordedRate);
+      appendTape(pcm);
+      pump();
+      render();
     }
   } catch (err) {
-    if (myRun === run && err.name !== 'AbortError') setStatus('error', 'Luồng âm thanh bị ngắt');
+    broken = err.name !== 'AbortError';
   }
 
   if (myRun !== run) return;   // stopped or superseded: this read owns nothing now
-
-  if (!total) {
-    setSpeaking(false);
-    setStatus('error', 'Không nhận được âm thanh');
-    return;
+  synthesizing = false;
+  if (!tape.length) { fail('Không nhận được âm thanh'); return; }
+  if (broken) {
+    // Keep what arrived for saving; it is not the whole text, so no replay.
+    tape.key = '';
+    setStatus('error', 'Luồng âm thanh bị ngắt');
+  } else {
+    tape.complete = true;
   }
-
-  els.saveBtn.disabled = false;
-  // Generation is done, but audio is still queued: stay "đang đọc" until the
-  // last scheduled buffer has actually played.
-  const remaining = Math.max(0, (cursor - ac.currentTime) * 1000);
-  setTimeout(() => {
-    if (myRun !== run) return;
-    setSpeaking(false);
-    setStatus('ready', 'Sẵn sàng');
-  }, remaining);
+  pump();   // the end of the tape may be what finishes playback
+  render();
 }
 
 function fmt(seconds) {
   const s = Math.floor(seconds);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
+
+/* ---- Controls ------------------------------------------------------------ */
+
+const PLAY_ICON = '<path d="M4 2.8v10.4l9-5.2z" fill="currentColor"/>';
+const PAUSE_ICON = '<rect x="3.5" y="3" width="3" height="10" rx="1" fill="currentColor"/>'
+  + '<rect x="9.5" y="3" width="3" height="10" rx="1" fill="currentColor"/>';
+
+let seeking = false;   // the user is dragging the bar: the clock must not fight it
+
+function renderTime() {
+  const total = tape.length / tape.rate;
+  const at = seeking ? Number(els.seek.value) * total : position() / tape.rate;
+  els.timecode.textContent = tape.length ? `${fmt(at)} / ${fmt(total)}` : '0:00';
+  if (!seeking) els.seek.value = tape.length ? String(position() / tape.length) : '0';
+  els.seek.style.setProperty('--fill-to', `${Number(els.seek.value) * 100}%`);
+}
+
+function render() {
+  const valid = tapeValid();
+  const busy = synthesizing || player.playing;
+  let label = 'Đọc';
+  if (player.playing) label = 'Tạm dừng';
+  else if (valid) label = player.pos > 0 ? 'Tiếp tục' : 'Phát lại';
+  els.playLabel.textContent = label;
+  els.playIcon.innerHTML = player.playing ? PAUSE_ICON : PLAY_ICON;
+  els.stopBtn.disabled = !(busy || player.pos > 0);
+  els.seek.disabled = !valid;
+  els.saveBtn.disabled = tape.length === 0;
+  // What a reading depends on is fixed while it is being made or heard.
+  els.text.readOnly = busy;
+  els.voiceBtn.disabled = busy;
+  for (const o of els.speed.children) o.disabled = busy;
+  for (const o of els.pron.children) o.disabled = busy;
+  const live = player.playing ? '1' : '0';
+  if (els.meter.dataset.live !== live) {
+    els.meter.dataset.live = live;
+    if (player.playing) drawMeter(analyser);
+  }
+  renderTime();
+}
+
+// The time display follows the clock while something plays.
+function tick() {
+  if (!player.playing) return;
+  renderTime();
+  requestAnimationFrame(tick);
+}
+
+// The one button: read, pause, carry on, or play again.
+function primary() {
+  if (player.playing) pause();
+  else if (tapeValid()) play(player.pos >= tape.length ? 0 : player.pos);
+  else read();
+}
+
+els.seek.addEventListener('input', () => { seeking = true; renderTime(); });
+els.seek.addEventListener('change', () => {
+  seeking = false;
+  seek(Number(els.seek.value) * tape.length);
+});
 
 /* ---- WAV export -------------------------------------------------------- */
 
@@ -458,17 +633,17 @@ function toWav(chunks, rate) {
 }
 
 els.saveBtn.addEventListener('click', () => {
-  if (!recorded.length) return;
+  if (!tape.length) return;
   // The samples already carry the speed they were read at, so this is a plain
   // 48 kHz file - no sample-rate trickery for a player to refuse.
-  const url = URL.createObjectURL(toWav(recorded, recordedRate));
+  const url = URL.createObjectURL(toWav(tape.chunks, tape.rate));
   const a = document.createElement('a');
   a.href = url;
   a.download = `voice-tts-${Date.now()}.wav`;
   a.click();
   // The save dialog is native, so the page never hears how it ended; say what
   // was handed over rather than claiming a file exists.
-  setStatus(speaking ? 'speaking' : 'ready', 'Đã gửi file WAV sang hộp thoại lưu');
+  setStatus(player.playing ? 'speaking' : 'ready', 'Đã gửi file WAV sang hộp thoại lưu');
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 });
 
@@ -479,7 +654,8 @@ function setStatus(state, text) {
   els.statusText.textContent = text;
 }
 
-els.playBtn.addEventListener('click', () => (speaking ? stop() : speak()));
+els.playBtn.addEventListener('click', primary);
+els.stopBtn.addEventListener('click', stop);
 
 function renderCount() {
   // The limit arrives with /api/voices; until then report the length alone
@@ -488,15 +664,15 @@ function renderCount() {
   els.count.textContent = max > 0 ? `${els.text.value.length} / ${max}` : `${els.text.value.length}`;
 }
 
-els.text.addEventListener('input', () => { renderCount(); saveDraft(); });
+els.text.addEventListener('input', () => { renderCount(); saveDraft(); render(); });
 
-// Ctrl+Enter is the commit gesture; Escape stops.
+// Ctrl+Enter is the commit gesture: read, pause, carry on. Escape stops.
 addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !els.playBtn.disabled) {
     e.preventDefault();
-    speaking ? stop() : speak();
+    primary();
   }
-  if (e.key === 'Escape' && speaking) stop();
+  if (e.key === 'Escape' && !sheetState.open && !els.stopBtn.disabled) stop();
 });
 
 async function boot() {
@@ -530,6 +706,7 @@ async function boot() {
   const known = voices.some((v) => v.name === prefs.voice);
   pickVoice(known ? prefs.voice : info.default, false);
   els.playBtn.disabled = false;
+  render();
   setStatus('ready', 'Sẵn sàng');
   els.text.focus();
 }

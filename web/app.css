@@ -375,8 +375,37 @@ button.row:active { background: var(--surface-2); transition: none; }
 .btn--primary:active:not(:disabled) { background: var(--accent-press); }
 .btn__icon { width: 15px; height: 15px; }
 
+.btn--icon { padding: 10px 14px; }
+
+/* The scrubber: a thin track that thickens under the finger, iOS-style. */
+.scrub {
+  flex: 1;
+  display: flex; align-items: center; gap: 12px;
+  min-width: 0;
+}
+.scrub__bar {
+  flex: 1; min-width: 0;
+  height: 28px; margin: 0;
+  background: transparent;
+  -webkit-appearance: none; appearance: none;
+  --fill-to: 0%;
+}
+.scrub__bar::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(to right, var(--label) var(--fill-to), var(--fill) var(--fill-to));
+  transition: height 120ms ease-out;
+}
+.scrub__bar:active::-webkit-slider-runnable-track { height: 8px; }
+.scrub__bar::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; margin-top: -5px;
+  border-radius: 50%; background: var(--label);
+  box-shadow: 0 0.5px 4px rgba(0, 0, 0, 0.4);
+}
+.scrub__bar:active::-webkit-slider-thumb { margin-top: -3px; }
+.scrub__bar:disabled { opacity: 0.35; }
+
 .timecode {
-  margin-left: auto;
   font-size: 0.9375rem;
   font-variant-numeric: tabular-nums;
   color: var(--label-2);

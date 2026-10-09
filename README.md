@@ -46,7 +46,11 @@ it (plus a one-off download for a source install).
 4. **Phát âm** is *Thường* (the text as typed: `POST` is spelled *phê ô ét tê*) or
    *Đặc biệt* (`POST` read "post", `AP` "ây pi", `Board` "bo", `ESP32` "i ét pi ba
    hai").
-5. **Đọc** (`Ctrl+Enter`) reads it as it is generated; press again or `Esc` to stop.
+5. **Đọc** (`Ctrl+Enter`) reads it as it is generated. The same button then pauses
+   (*Tạm dừng*), carries on (*Tiếp tục*) and, at the end, plays it again (*Phát
+   lại*); the bar beside it seeks. All of that plays what was already read - the
+   backend is not asked again until the text, voice, speed or pronunciation
+   changes. **■** or `Esc` stops.
 6. **Lưu WAV** saves what was read.
 
 The window remembers the voice, speed and pronunciation you picked and the text you
@@ -423,7 +427,7 @@ carries on without one: the window closes as before, `serve` keeps serving.
 
 | Key | Action |
 | --- | --- |
-| `Ctrl` + `Enter` | read / stop |
+| `Ctrl` + `Enter` | read / pause / carry on / play again |
 | `Esc` | stop, or close the voice sheet |
 
 ## Notes

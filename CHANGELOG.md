@@ -23,6 +23,10 @@ the release before it builds.
   replaces a built-in one with the same spelling, and the longest word wins.
 - The window remembers the voice, speed, pronunciation and the draft across a
   reload and a restart; a browser on the LAN server remembers them per browser.
+- Pause, seek and replay in the window, from what was already read: the main
+  button reads, pauses (*Tạm dừng*), carries on (*Tiếp tục*) and plays again (*Phát
+  lại*), a bar seeks, and **■** stops. The backend is asked again only once the
+  text, voice, speed or pronunciation changes.
 
 ### Changed
 

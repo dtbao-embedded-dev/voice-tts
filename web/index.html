@@ -62,7 +62,14 @@
     <svg class="btn__icon" id="playIcon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.8v10.4l9-5.2z" fill="currentColor"/></svg>
     <span id="playLabel">Đọc</span>
   </button>
-  <span class="timecode" id="timecode">0:00</span>
+  <button class="btn btn--icon" id="stopBtn" type="button" disabled aria-label="Dừng" title="Dừng (Esc)">
+    <svg class="btn__icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1.6" fill="currentColor"/></svg>
+  </button>
+  <div class="scrub">
+    <input class="scrub__bar" id="seek" type="range" min="0" max="1" step="any" value="0"
+      disabled aria-label="Vị trí đang đọc">
+    <span class="timecode" id="timecode">0:00</span>
+  </div>
   <button class="btn" id="saveBtn" type="button" disabled>Lưu WAV</button>
 </footer>
 
