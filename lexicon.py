@@ -35,6 +35,10 @@ ENTRIES = (
     ("DELETE", "delete", True),
     # Vietnamese letter names: "<en>a p</en>" reads right too, but its English
     # vowel was heard as "IP" in listening tests (docs/verify-whisper.md).
+    # Measured 2026-10-09, Whisper large-v3, two sentences: "ây pi" heard AP
+    # 63/70, "ê pi" 61/70, "ế pi" 34/40, "<en>a p</en>" 16/30, "êy pi" 0/30,
+    # "a pi" 6/40 (as "API"). The misses left are the engine's sampling, not
+    # the spelling.
     ("AP", "ây pi", True),
     ("board", "bo", False),
     # ESP32 came out "e ét phê ba hai", esp32 as the syllable "esp" and "ba mươi
@@ -42,6 +46,8 @@ ENTRIES = (
     ("esp32", "i ét pi ba hai", False),
     # Typed with a space it read "e ét phê ba mươi hai".
     ("esp 32", "i ét pi ba hai", False),
+    # On its own ("ESP HTTP client") it read "e ét phê", heard as "ESV" or "es phê".
+    ("esp", "i ét pi", False),
 )
 
 ENV_DATA = "VOICE_TTS_DATA"

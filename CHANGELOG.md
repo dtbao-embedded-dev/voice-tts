@@ -8,6 +8,19 @@ the release before it builds.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-09
+
+### Fixed
+
+- A long text sent to `POST /api/tts/stream` or `voice-tts speak` no longer has a
+  phrase spoken twice ("post bằng ESP HTTP post bằng ESP HTTP client"): the engine
+  now reads it in chunks of about 120 characters instead of 256 (5 of 20 readings
+  looped before, none of 20 after).
+- `ESP` on its own is read *i ét pi* in the `special` pronunciation, like `ESP32`;
+  it was spelled *e ét phê* and heard as "ESV".
+- `POST /api/encode` with a body that is not `application/octet-stream` answers
+  `415` on Windows every time; it sometimes aborted the connection instead.
+
 ## [0.8.0] - 2026-10-09
 
 ### Added
