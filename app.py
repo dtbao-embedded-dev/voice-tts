@@ -115,15 +115,20 @@ async def require_token(request: Request, call_next):
     bearer = auth[7:] if auth.lower().startswith("bearer ") else None
     if _token_ok(bearer) or _token_ok(request.cookies.get(TOKEN_COOKIE)):
         return await call_next(request)
-    # Take in what the client sent before refusing it: closing on an unread body
-    # makes Windows reset the connection, and the client sees an abort, not a 401.
-    # A megabyte is plenty for any honest mistake; past it, the reset is fine.
+    await _drain(request)
+    return JSONResponse({"detail": "Thiếu hoặc sai token."}, status_code=401)
+
+
+async def _drain(request: Request) -> None:
+    """Take in what the client sent before refusing it: closing on an unread body
+    makes Windows reset the connection, and the client sees an abort, not the
+    error. A megabyte is plenty for any honest mistake; past it, the reset is fine.
+    """
     seen = 0
     async for chunk in request.stream():
         seen += len(chunk)
         if seen > 1 << 20:
             break
-    return JSONResponse({"detail": "Thiếu hoặc sai token."}, status_code=401)
 
 # The CPU engine's ONNX graphs: "fp32" (onnx_update, 475 MB, the reference
 # quality) or "int8" (onnx_int8, 165 MB; faster only where the CPU has the int8
@@ -500,6 +505,7 @@ async def encode(request: Request, format: str):
     # Octets only: a text/plain POST is one another site may send with no
     # preflight, and nothing of ours sends that.
     if request.headers.get("content-type", "").split(";")[0].strip() != "application/octet-stream":
+        await _drain(request)
         raise HTTPException(415, "Cần Content-Type application/octet-stream.")
     # Read the body before any other refusal: answering while the client is
     # still sending makes Windows abort the connection instead of showing a 400.

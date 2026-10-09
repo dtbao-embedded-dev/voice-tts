@@ -16,6 +16,8 @@ the release before it builds.
   looped before, none of 20 after).
 - `ESP` on its own is read *i ét pi* in the `special` pronunciation, like `ESP32`;
   it was spelled *e ét phê* and heard as "ESV".
+- `POST /api/encode` with a body that is not `application/octet-stream` answers
+  `415` on Windows every time; it sometimes aborted the connection instead.
 
 ## [0.8.0] - 2026-10-09
 
