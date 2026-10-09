@@ -95,6 +95,14 @@ async def require_token(request: Request, call_next):
     bearer = auth[7:] if auth.lower().startswith("bearer ") else None
     if _token_ok(bearer) or _token_ok(request.cookies.get(TOKEN_COOKIE)):
         return await call_next(request)
+    # Take in what the client sent before refusing it: closing on an unread body
+    # makes Windows reset the connection, and the client sees an abort, not a 401.
+    # A megabyte is plenty for any honest mistake; past it, the reset is fine.
+    seen = 0
+    async for chunk in request.stream():
+        seen += len(chunk)
+        if seen > 1 << 20:
+            break
     return JSONResponse({"detail": "Thiếu hoặc sai token."}, status_code=401)
 
 _engine = None
