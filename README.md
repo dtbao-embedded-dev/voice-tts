@@ -393,7 +393,7 @@ upgrade: since 3.8.3 `Minh Quân Pro` is `Hải Đăng`, `Anh Khôi` is `Thiện
 `text` up to 20 000 characters, `voice` a name from `/api/voices` (omit it for the
 default), `speed` between `0.5` and `2.0` (default `1.0`), `format` one of `"f32"`
 (default), `"wav"`, `"mp3"` or `"ogg"`, `pronunciation` either `"normal"` (default, the text as typed)
-or `"special"` (respelled by `lexicon.py`, see Notes).
+or `"special"` (rewritten by `respell.py`, see Notes).
 
 | `format` | Body | `Content-Type` | Starts arriving |
 | --- | --- | --- | --- |
@@ -401,6 +401,11 @@ or `"special"` (respelled by `lexicon.py`, see Notes).
 | `"wav"` | a complete 16-bit mono WAV, 48 kHz, real length in the header and `Content-Length` | `audio/wav` | once the whole text is synthesized - for saving a file |
 | `"mp3"` | a complete MP3 (LAME through libsndfile), 48 kHz mono | `audio/mpeg` | once the whole text is synthesized |
 | `"ogg"` | a complete Ogg Vorbis file, 48 kHz mono | `audio/ogg` | once the whole text is synthesized |
+
+A file format, and a text of three words or fewer in any format, is read in one
+engine call rather than streamed: only that call runs the engine's babble guard,
+which reads a chunk of three syllables or fewer again (twice at most) when it says
+more than it was given ("Vâng." as "Vâng khi tại.").
 
 `POST /api/encode` answers `400` for an unknown `format` or a body that is empty or
 not whole 16-bit samples, and `413` above 400 MB.
