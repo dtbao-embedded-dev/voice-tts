@@ -379,6 +379,34 @@ def check_lexicon(base: str, tmp: Path) -> None:
     print("lexicon: POST/GET/... as English words, AP as ây pi, Board as bo, whole words only")
 
 
+def check_install_files() -> None:
+    """tool-install.py copies every module of ours that the app imports.
+
+    A new module left off APP_FILES installs fine and then dies on the first
+    import, on the Docker host and in the Windows venv alike.
+    """
+    import ast
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("tool_install",
+                                                  ROOT / "docs/scripts/tool-install.py")
+    tool_install = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool_install)
+    ours = {f.stem for f in ROOT.glob("*.py")}
+    for name in ("app.py", "cli.py", "tray.py", "icon.py"):
+        for node in ast.walk(ast.parse((ROOT / name).read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                mods = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                mods = [node.module]
+            else:
+                continue
+            for mod in mods:
+                if mod in ours:
+                    assert f"{mod}.py" in tool_install.APP_FILES,                         f"{name} imports {mod}, which tool-install.py does not copy"
+    print("install: tool-install.py copies every module the app imports")
+
+
 def check_release_notes() -> None:
     """The release publishes the CHANGELOG section of ``cli.__version__``."""
     def notes(version: str) -> subprocess.CompletedProcess:
@@ -402,6 +430,7 @@ def main() -> int:
     check_stretch()
     app._engine = StubEngine()
     check_parser()
+    check_install_files()
     check_release_notes()
     check_tray()
 
