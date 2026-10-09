@@ -8,6 +8,8 @@ the release before it builds.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-09
+
 ### Fixed
 
 - A long text sent to `POST /api/tts/stream` or `voice-tts speak` no longer has a
