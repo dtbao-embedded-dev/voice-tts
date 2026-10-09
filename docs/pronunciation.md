@@ -275,3 +275,9 @@ has the term. 2026-10-09, on a desktop CPU, never on the LAN server.
 
 RX and RTS stay weak whatever the spelling: a short acronym whose letters are all
 sounds Vietnamese lacks.
+
+**End to end**, the narration of OpenMontage's UART video (7 sections, 36 upper-case
+terms: UART, TX, RX, GND, ESP32 S3...), read whole by the local engine through
+`respell.special()` and transcribed the same way: 31/36 and 30/36 terms heard, against
+18-23/36 for the four takes the 0.8.2 server read. What was still missed: TX (3 of 12),
+GND as *gờ nờ đê* (3 of 4, heard "GN để"), RX (2 of 12), UART (1 of 12), ESP32 S3 once.
