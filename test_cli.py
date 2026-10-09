@@ -50,8 +50,9 @@ class StubEngine:
     def resolve_voice_name(self, name):
         return name if name in self.VOICES else None
 
-    def infer_stream(self, text, voice=None):
+    def infer_stream(self, text, voice=None, max_chars=256):
         self.last_text = text
+        self.last_max_chars = max_chars
         # A 220 Hz tone, 0.1 s per word, in a few chunks - enough to be audible
         # and to be told apart from silence.
         n = int(app.SAMPLE_RATE * 0.1 * max(1, len(text.split())))
@@ -489,9 +490,21 @@ def check_lexicon(base: str, tmp: Path) -> None:
                               ("Gọi GET", "ɡˈɛt", "ɣˈəː2 ˈɛ"),
                               ("Kết nối AP wifi", "ˈəɪ pˈi", "ˈæp"),
                               ("Cắm Board vào", "bˈɔ ", "bˈɔːɹd"),
-                              ("Nạp ESP32 xong", "ˈi ˈɛɜt̪ pˈi bˈaː hˈaːj", "fˈe")):
+                              ("Nạp ESP32 xong", "ˈi ˈɛɜt̪ pˈi bˈaː hˈaːj", "fˈe"),
+                              ("bằng ESP HTTP client", "ˈi ˈɛɜt̪ pˈi ˈeɪtʃ", "fˈe")):
         got = phonemes(text)
         assert want in got and wrong not in got, f"{text!r}: {got!r}"
+
+    # The paragraph that looped: packed at 256 its first three sentences were one
+    # 226-character chunk; at CHUNK_CHARS no chunk holds more than two of them.
+    looped = ("có mạng rồi thì gửi dữ liệu. ESP32 S3 có sẵn cảm biến nhiệt độ bên trong, đo "
+              "nhiệt độ của chính con chip. đọc giá trị, đóng gói thành chuỗi json, rồi gửi "
+              "HTTP post bằng ESP HTTP client. gói tin đi qua router lên server. server trả về "
+              "mã hai trăm, nghĩa là đã nhận. lặp lại vài giây một lần là bạn có dữ liệu theo "
+              "thời gian.")
+    chunks, _ = normalize_to_chunks_v3_with_gaps(lexicon.apply(looped), max_chars=app.CHUNK_CHARS)
+    assert max(len(c) for c in chunks) <= app.CHUNK_CHARS, chunks
+    assert all(c.count(". ") <= 1 for c in chunks), chunks
 
     # "normal" (the default) hands the engine the text as typed - POST is
     # spelled as before; "special" respells it first.
@@ -502,6 +515,7 @@ def check_lexicon(base: str, tmp: Path) -> None:
         status, _, answer = post(base, body)
         assert status == 200, f"{body}: {status} {answer[:200]!r}"
         assert app._engine.last_text == want, (body, app._engine.last_text)
+        assert app._engine.last_max_chars == app.CHUNK_CHARS, app._engine.last_max_chars
     assert post(base, {"text": raw, "pronunciation": "loud"})[0] == 422, "unknown mode accepted"
 
     # The CLI, in-process and against the server, sends the same choice.

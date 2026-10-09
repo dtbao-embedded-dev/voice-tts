@@ -569,7 +569,10 @@ carries on without one: the window closes as before, `serve` keeps serving.
   `POST /api/tts/stream`. That is what tells the page where every sentence sits in
   the audio, for the highlight and click-to-jump. The price: the engine no longer
   sees across a sentence end, and every sentence pays the request's start-up. The
-  CLI and the HTTP API still send the whole text at once.
+  CLI and the HTTP API still send the whole text at once; the server has the engine
+  read it in chunks of about 120 characters (`CHUNK_CHARS` in `app.py`), a sentence
+  or two each. At the engine's default of 256, a chunk of three sentences made it
+  speak a phrase twice in about one reading in four.
 - **What the window remembers lives in its own browser profile.** Settings and the
   draft (`localStorage`) and the history (IndexedDB, audio included - a long
   reading is a few tens of MB, so 20 of them can reach hundreds) are kept by the

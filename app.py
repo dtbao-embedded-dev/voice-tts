@@ -375,6 +375,13 @@ def voices() -> dict:
 
 PRONUNCIATIONS = ("normal", "special")
 
+# The engine packs sentences into chunks of up to 256 characters by default.
+# Three sentences packed into one 226-character chunk made it speak a phrase
+# twice ("post bằng ESP HTTP post bằng ESP HTTP client") in 5 of 20 readings,
+# about as often once ESP was respelled; at 120 none of 20 did. A sentence longer than
+# this is still split at its commas, as before.
+CHUNK_CHARS = 120
+
 
 def synthesize(text: str, voice: str | None = None, speed: float = 1.0,
                pronunciation: str = "normal"):
@@ -403,7 +410,8 @@ def synthesize(text: str, voice: str | None = None, speed: float = 1.0,
     spoken = lexicon.apply(text, lexicon.load_user()) if pronunciation == "special" else text
 
     def chunks():
-        for chunk in stretch(tts.infer_stream(spoken, voice=resolved), speed):
+        for chunk in stretch(tts.infer_stream(spoken, voice=resolved, max_chars=CHUNK_CHARS),
+                             speed):
             yield np.asarray(chunk, dtype=np.float32)
 
     return resolved, chunks()
