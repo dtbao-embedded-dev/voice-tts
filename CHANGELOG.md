@@ -8,6 +8,22 @@ the release before it builds.
 
 ## [Unreleased]
 
+### Added
+
+- Voice cloning: **Nhân bản giọng** in the voice sheet makes a voice from a 5-8 s
+  sample - recorded from the microphone in the window while reading a passage
+  shown on screen, or a WAV, MP3, FLAC or OGG file. It is listed under *Của bạn*, reads like a
+  preset and can be removed. Only the speaker embedding and reference codes are
+  kept, in `voices.json` in the data dir - never the recording. HTTP:
+  `POST /api/voices/clone`, `DELETE /api/voices/<name>`; `voice-tts voices` marks
+  cloned voices with `~`.
+
+### Changed
+
+- The server reads up to two texts at once by default (was one), so a second
+  listener starts without waiting. On a slow CPU both then fall behind real time
+  (i5-8500T: RTF 1.65 each for two); `VOICE_TTS_MAX_STREAMS=1` keeps the old limit.
+
 ## [0.9.0] - 2026-10-09
 
 ### Added
