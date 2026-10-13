@@ -926,6 +926,59 @@ def window_icon() -> str | None:
         return None
 
 
+def allow_microphone(origin: str) -> None:
+    """Let the page at ``origin`` record from the microphone (voice cloning).
+
+    pywebview leaves WebView2's ``PermissionRequested`` unhandled, and the request
+    then fails or prompts depending on the runtime. Our own page is the only one
+    the window shows, so its microphone request is granted - nothing else is: no
+    other origin, no camera, no location. Windows' own privacy switch for desktop
+    apps still applies on top. Must run before the first window is created.
+
+    The profile is kept across runs and remembers a decision per origin: once a
+    run without this answered "deny", WebView2 applied that and never raised
+    ``PermissionRequested`` again. So the grant is also written to the profile
+    itself, on every start.
+    """
+    try:
+        # edgechromium loads the WebView2 interop assembly; only then can its
+        # .NET types be imported.
+        from webview.platforms import edgechromium
+        from Microsoft.Web.WebView2.Core import (
+            CoreWebView2PermissionKind,
+            CoreWebView2PermissionState,
+        )
+    except Exception:
+        return  # not WebView2 (no runtime, another platform): its own rules apply
+
+    ready = edgechromium.EdgeChrome.on_webview_ready
+    if getattr(ready, "allows_microphone", False):
+        return
+
+    def on_permission(_sender, args) -> None:
+        if (args.PermissionKind == CoreWebView2PermissionKind.Microphone
+                and str(args.Uri).startswith(origin)):
+            args.State = CoreWebView2PermissionState.Allow
+
+    def on_webview_ready(self, sender, args):
+        if args.IsSuccess:
+            core = sender.CoreWebView2
+            core.PermissionRequested += on_permission
+            try:
+                # Before the page loads, so it is in place by the first click.
+                core.Profile.SetPermissionStateAsync(
+                    CoreWebView2PermissionKind.Microphone, origin.rstrip("/"),
+                    CoreWebView2PermissionState.Allow)
+            except Exception:
+                pass  # a runtime older than the API: the handler above still asks
+        ready(self, sender, args)
+
+    on_webview_ready.allows_microphone = True
+    # EdgeChrome subscribes ``self.on_webview_ready`` per window as it is built,
+    # so patching the class covers every window created after this.
+    edgechromium.EdgeChrome.on_webview_ready = on_webview_ready
+
+
 def run_gui(port: int = 0, tray: bool = True) -> None:
     """The desktop app: the backend on loopback plus a native window over it.
 
@@ -949,6 +1002,8 @@ def run_gui(port: int = 0, tray: bool = True) -> None:
     _, port, _ = start_gui_server(port)
     set_gui_hosts(port)
     url = f"http://127.0.0.1:{port}/"
+    if sys.platform == "win32":
+        allow_microphone(url)
     # pywebview asks WinForms for FormStartPosition.CenterScreen, but it does so
     # after the form handle exists, so the window lands at 78,78 instead. Passing
     # a screen takes the branch that computes the position itself.
