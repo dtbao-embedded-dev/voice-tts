@@ -64,6 +64,22 @@ download it once (475 MB of fp32 graphs plus the codec) on the first start.
    read. MP3 and OGG are about a tenth of the WAV; the backend encodes the audio the
    window already holds, so nothing is read twice.
 
+**Nhân bản giọng** in the *Giọng đọc* sheet makes a voice of your own: a name,
+a recording, and a tick that you may use that voice. **Ghi âm** records from the
+microphone while you read the passage shown (*Đoạn khác* gives another), with a
+timer and a level bar; *Nghe lại* plays it back. Or **Chọn file…** takes a WAV,
+MP3, FLAC or OGG of one person speaking clearly with no music. 5 to 8 seconds is
+right: at least 3, and the engine uses the first 8 (recording stops itself at 12).
+The window grants its own page the microphone (and nothing else) without asking;
+Windows must still allow desktop apps to use it (Settings › Privacy › Microphone). A browser gets the
+microphone only on the machine itself or over HTTPS, so on the LAN server over
+plain HTTP *Ghi âm* is off and *Chọn file…* is the way. Enrolling takes a few seconds and waits its
+turn like a reading. The voice then sits under *Của bạn* in the list and reads
+like any other; *Xoá* forgets it. Only the voice's fingerprint (speaker embedding
+and reference codes) is kept, in `voices.json` in the data dir (see
+[Notes](#notes)), never the recording. Use only your own voice, or the voice of
+someone who agreed to it.
+
 **Lịch sử** at the top keeps the last 20 readings - text, settings and audio - in
 this machine's browser storage. Click one to hear it again, seek or save it, with
 no synthesis; a reading stopped half-way is kept too, marked *một phần*.
@@ -366,7 +382,9 @@ listener left) or `error ... error=<exception>`. The text is not logged unless
 | --- | --- |
 | `GET /api/status` | `{"state": "loading" \| "ready" \| "error"}` while the model warms up |
 | `GET /api/version` | `{"version": "0.9.0"}` - the version the server runs (`voice-tts --version` is the CLI's own) |
-| `GET /api/voices` | the 25 preset voices with region, gender and description, the default voice, `sampleRate` and `maxChars` |
+| `GET /api/voices` | the 25 preset voices with region, gender and description, then the cloned ones (`"cloned": true`), the default voice, `sampleRate` and `maxChars` |
+| `POST /api/voices/clone?name=<name>&filename=<file>` | clones a voice from the body (an audio file, `application/octet-stream`, at most 20 MB, at least 3 s); `filename` lends only its extension. Answers the new voice entry; `400` for a taken name, a short or unreadable clip |
+| `DELETE /api/voices/<name>` | forgets a cloned voice; `404` for a preset or an unknown name |
 | `GET /api/lexicon` | `{"builtin": [...], "user": [...]}`, each entry `{"word", "say", "matchCase"}` |
 | `PUT /api/lexicon` | replaces the user's words with `{"user": [...]}`; answers the new state, `400` for an empty, duplicate or over-long entry |
 | `POST /api/tts/stream` | raw float32 LE mono at 48 kHz, streamed as it is generated; or one WAV, MP3 or OGG file with `"format"` |
@@ -720,6 +738,7 @@ voices are Apache-2.0 too, under their own notices (see *Licence* under
 app.py                    FastAPI backend + native window entry point
 tray.py                   system tray icon, its native menu (pystray) and the popup menu
 lexicon.py                whole-word respellings for the special pronunciation
+clones.py                 cloned voices: speaker embedding + codes in voices.json
 icon.py                   the app icon, one geometry: tray/window/exe .ico and /favicon.svg
 cli.py                    command line: subcommands and flags, stdlib-only at import
 test_tts.py               assert-based smoke test over the real HTTP path
