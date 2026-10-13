@@ -370,8 +370,15 @@ def check_encode(base: str, tmp: Path) -> None:
 
 
 def check_turns(base: str) -> None:
-    """One reading at a time, the others wait their turn in arrival order, and a
-    listener who hangs up mid-stream hands the turn on."""
+    """At most VOICE_TTS_MAX_STREAMS readings at once (2 unless set), the others wait
+    their turn in arrival order, and a listener who hangs up mid-stream hands the
+    turn on."""
+    env = {k: v for k, v in os.environ.items() if k != "VOICE_TTS_MAX_STREAMS"}
+    out = subprocess.run([sys.executable, "-c", "import app; print(app.MAX_STREAMS)"],
+                         cwd=ROOT, env=env, capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.split()[-1] == "2", f"unset must run 2 at once, got {out.stdout!r}"
+
     stub = app._engine
     engine = app._engine = SlowEngine()
     try:
@@ -390,18 +397,23 @@ def check_turns(base: str) -> None:
         for thread in threads:
             thread.join(10)
         assert results == dict.fromkeys(names, 200), results
-        assert engine.peak == 1, f"{engine.peak} readings ran at once"
+        peak = min(app.MAX_STREAMS, len(names))
+        assert engine.peak == peak, f"{engine.peak} readings ran at once, not {peak}"
         assert engine.started == list(names), f"served out of order: {engine.started}"
 
-        # A 10 s stream, abandoned after its first bytes (over SHORT_WORDS words,
-        # or the engine reads it in one call and nothing streams).
+        # Every turn held by a 10 s stream, abandoned after its first bytes (over
+        # SHORT_WORDS words, or the engine reads it in one call and nothing streams).
         engine.chunks, engine.delay = 1000, 0.01
-        conn = http.client.HTTPConnection("127.0.0.1", urlsplit(base).port, timeout=10)
-        conn.request("POST", "/api/tts/stream", json.dumps({"text": "đọc dở rồi bỏ đi"}),
-                     {"Content-Type": "application/json"})
-        conn.getresponse().read(WORD * 4)
+        conns = []
+        for _ in range(app.MAX_STREAMS):
+            conn = http.client.HTTPConnection("127.0.0.1", urlsplit(base).port, timeout=10)
+            conn.request("POST", "/api/tts/stream", json.dumps({"text": "đọc dở rồi bỏ đi"}),
+                         {"Content-Type": "application/json"})
+            conn.getresponse().read(WORD * 4)
+            conns.append(conn)
         engine.chunks = 4  # the next reading is short again
-        conn.close()
+        for conn in conns:
+            conn.close()
         begun = time.monotonic()
         status = post(base, {"text": "sau đó", "format": "wav"})[0]
         waited = time.monotonic() - begun
@@ -409,7 +421,7 @@ def check_turns(base: str) -> None:
         assert waited < 3, f"an abandoned stream kept the turn for {waited:.1f} s"
     finally:
         app._engine = stub
-    print(f"turns: one reading at a time (VOICE_TTS_MAX_STREAMS={app.MAX_STREAMS}), "
+    print(f"turns: at most {app.MAX_STREAMS} at once (VOICE_TTS_MAX_STREAMS, 2 unless set), "
           "the rest in arrival order, a hang-up hands the turn on")
 
 
@@ -419,6 +431,8 @@ def check_reading_log(base: str) -> None:
     stub = app._engine
     engine = app._engine = SlowEngine(chunks=8, delay=0.05)
     err = io.StringIO()
+    # One turn, so "bí mật" queues behind "trước" whatever VOICE_TTS_MAX_STREAMS says.
+    slots, app._turns.slots = app._turns.slots, 1
     try:
         with contextlib.redirect_stderr(err):
             first = threading.Thread(target=post, args=(base, {"text": "trước", "format": "wav"}))
@@ -443,6 +457,7 @@ def check_reading_log(base: str) -> None:
     finally:
         app.LOG_TEXT = False
         app._engine = stub
+        app._turns.slots = slots
     lines = [line for line in err.getvalue().splitlines() if line.startswith("reading #")]
 
     def of(rid: str) -> list[str]:

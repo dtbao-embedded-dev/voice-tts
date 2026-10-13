@@ -202,9 +202,10 @@ class Turns:
 # Readings the engine runs at once. On CPU it takes one ONNX call at a time, so a
 # second reading adds no throughput and only halves everyone's speed: on an
 # i5-8500T, 1 reading ran at RTF 0.79, 2 at 1.65 each, 3 at 2.5 each - the same
-# ~1.2 s of audio per second in total. One at a time keeps the one being heard
-# faster than real time and finishes the queue sooner on average.
-MAX_STREAMS = max(1, int(os.environ.get("VOICE_TTS_MAX_STREAMS", "1")))
+# ~1.2 s of audio per second in total. Two at once lets a second listener start
+# without waiting; on a CPU as slow as that one both then fall behind real time,
+# so set VOICE_TTS_MAX_STREAMS=1 there to keep the one being heard ahead of it.
+MAX_STREAMS = max(1, int(os.environ.get("VOICE_TTS_MAX_STREAMS", "2")))
 _turns = Turns(MAX_STREAMS)
 
 # CPU threads one reading runs on. 0 leaves it to the engine: about one per physical
