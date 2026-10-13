@@ -8,6 +8,8 @@ the release before it builds.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-13
+
 ### Added
 
 - Voice cloning: **Nhân bản giọng** in the voice sheet makes a voice from a 5-8 s
