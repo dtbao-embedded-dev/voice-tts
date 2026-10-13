@@ -14,6 +14,12 @@ const els = {
   lexSay: $('lexSay'), lexCase: $('lexCase'), lexTry: $('lexTry'), lexError: $('lexError'),
   lexList: $('lexList'), histBtn: $('histBtn'), histSheet: $('histSheet'),
   histList: $('histList'), histClear: $('histClear'),
+  cloneBtn: $('cloneBtn'), clonePanel: $('clonePanel'), cloneForm: $('cloneForm'),
+  cloneName: $('cloneName'), cloneFile: $('cloneFile'), cloneInput: $('cloneInput'),
+  cloneConsent: $('cloneConsent'), cloneSubmit: $('cloneSubmit'), cloneError: $('cloneError'),
+  cloneScript: $('cloneScript'), cloneNext: $('cloneNext'), cloneClip: $('cloneClip'),
+  recBtn: $('recBtn'), recLabel: $('recLabel'), recLevel: $('recLevel'), recTime: $('recTime'),
+  recPlay: $('recPlay'),
 };
 
 const REGIONS = ['Bắc', 'Trung', 'Nam'];
@@ -225,25 +231,36 @@ function pickVoice(name, remember = true) {
   }
 }
 
+// The voices the user cloned come last, under a group of their own.
+const MINE = 'Của bạn';
+
 function renderVoices() {
   const groups = new Map();
   for (const v of voices) {
-    const key = REGIONS.includes(v.region) ? v.region : 'Khác';
+    const key = v.cloned ? MINE : REGIONS.includes(v.region) ? v.region : 'Khác';
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(v);
   }
-  const order = [...REGIONS, 'Khác'].filter((r) => groups.has(r));
+  const order = [...REGIONS, 'Khác', MINE].filter((r) => groups.has(r));
   els.voiceList.replaceChildren();
   for (const region of order) {
     const h = document.createElement('div');
     h.className = 'voice-group';
-    h.textContent = region === 'Khác' ? 'Khác' : `Miền ${region}`;
+    h.textContent = region === 'Khác' || region === MINE ? region : `Miền ${region}`;
     els.voiceList.append(h);
     for (const v of groups.get(region)) {
-      const b = document.createElement('button');
-      b.type = 'button';
+      // A cloned voice holds a Xoá button, and a button may not sit inside
+      // another, so its row is a div that acts as one.
+      const b = document.createElement(v.cloned ? 'div' : 'button');
+      if (v.cloned) {
+        b.setAttribute('role', 'button');
+        b.tabIndex = 0;
+      } else {
+        b.type = 'button';
+      }
       b.className = 'voice-item';
       b.dataset.name = v.name;
+      b.setAttribute('aria-selected', String(v.name === voice));
       const title = document.createElement('span');
       title.className = 'voice-item__name';
       title.textContent = v.featured ? `★ ${v.name}` : v.name;
@@ -251,10 +268,233 @@ function renderVoices() {
       sub.className = 'voice-item__sub';
       sub.textContent = v.description;
       b.append(title, sub);
-      b.addEventListener('click', () => { pickVoice(v.name); closeSheet(voiceSheet); });
+      const choose = () => { pickVoice(v.name); closeSheet(voiceSheet); };
+      b.addEventListener('click', choose);
+      if (v.cloned) {
+        b.addEventListener('keydown', (e) => {
+          if (e.target === b && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); choose(); }
+        });
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'link link--danger';
+        del.textContent = 'Xoá';
+        del.addEventListener('click', (e) => { e.stopPropagation(); deleteVoice(v.name); });
+        b.append(del);
+      }
       els.voiceList.append(b);
     }
   }
+}
+
+/* ---- Voice cloning: a voice of the user's own, from a short clip --------- */
+
+// Passages to read aloud while recording: everyday sentences, every tone, about
+// eight seconds each at a natural pace. The engine needs no transcript of the
+// clip; a passage only gives the reader something natural to say.
+const CLONE_SCRIPTS = [
+  'Hôm nay trời trong xanh, gió nhẹ thổi qua hàng cây. Tôi pha một ấm trà nóng, mở cửa sổ và bắt đầu một ngày làm việc thật vui vẻ.',
+  'Xin chào các bạn, chào mừng đến với kênh của mình. Hôm nay chúng ta sẽ cùng tìm hiểu cách lập trình vi điều khiển từ những bước đầu tiên.',
+  'Mỗi buổi sáng, tôi thường đi bộ quanh hồ, nghe tiếng chim hót và ngắm mặt nước lấp lánh. Đó là lúc tôi thấy lòng mình bình yên nhất.',
+  'Quê tôi có một con sông nhỏ chảy hiền hoà. Mùa hè, lũ trẻ rủ nhau ra bến tắm mát, tiếng cười vang cả một khúc sông.',
+  'Cảm ơn bạn đã gọi điện. Tôi đã nhận được tin nhắn và sẽ gửi lại tài liệu trước năm giờ chiều nay, nhớ kiểm tra hộp thư nhé.',
+];
+const REC_MIN_SECONDS = 3;    // the backend refuses less
+const REC_MAX_SECONDS = 12;   // the engine uses the first 8 s once the edges are trimmed
+
+let scriptIndex = Math.floor(Math.random() * CLONE_SCRIPTS.length);
+// The clip to clone from: the last recording or the last file chosen, whichever
+// came later. {blob, filename, recorded, label}
+let cloneClip = null;
+let rec = null;               // the recording in progress
+let recAudio = null;          // "Nghe lại"
+
+function cloneError(message) {
+  els.cloneError.textContent = message;
+  els.cloneError.hidden = !message;
+}
+
+function showScript() {
+  els.cloneScript.textContent = CLONE_SCRIPTS[scriptIndex];
+}
+
+function setClip(clip) {
+  cloneClip = clip;
+  els.cloneClip.textContent = clip ? `Mẫu giọng: ${clip.label}` : 'Chưa có mẫu giọng.';
+  els.recPlay.hidden = !(clip && clip.recorded);
+  els.cloneFile.textContent = clip && !clip.recorded ? clip.filename : 'Chọn file…';
+  els.cloneFile.title = clip && !clip.recorded ? clip.filename : '';
+}
+
+const fmtSeconds = (s) => `${s.toFixed(1).replace('.', ',')} s`;
+
+// Only a secure context gets a microphone: the desktop window (loopback) and
+// HTTPS. A LAN server over plain HTTP has none - say so instead of failing.
+const canRecord = !!(window.isSecureContext && navigator.mediaDevices
+  && navigator.mediaDevices.getUserMedia);
+
+function showClone(open) {
+  els.clonePanel.hidden = !open;
+  els.cloneBtn.setAttribute('aria-expanded', String(open));
+  if (!open && rec) stopRecording(false);
+  if (open) {
+    showScript();
+    els.cloneName.focus();
+  }
+}
+
+function resetClone() {
+  els.cloneForm.reset();
+  setClip(null);
+  els.recTime.textContent = fmtSeconds(0);
+  cloneError('');
+}
+
+async function startRecording() {
+  cloneError('');
+  // The speakers would end up in the clip: hush whatever this window plays.
+  if (player.playing) pause();
+  if (tryAudio) tryAudio.pause();
+  if (recAudio) recAudio.pause();
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      // The engine denoises the clip itself; the browser's own cleanup and echo
+      // cancellation only colour the voice it is meant to copy.
+      audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false },
+    });
+  } catch (e) {
+    cloneError(e && e.name === 'NotAllowedError'
+      ? 'Chưa được phép dùng micro - cho phép trong hộp thoại, hoặc Cài đặt Windows › Quyền riêng tư › Micro.'
+      : 'Không mở được micro - kiểm tra micro đã cắm và không bị app khác giữ.');
+    return;
+  }
+  const actx = new AudioContext();
+  const source = actx.createMediaStreamSource(stream);
+  // ScriptProcessor rather than an AudioWorklet: no module file to serve, and a
+  // few seconds of 4096-sample blocks is no load for the main thread.
+  const node = actx.createScriptProcessor(4096, 1, 1);
+  const mute = actx.createGain();
+  mute.gain.value = 0;   // the node only runs when connected to the output
+  rec = { stream, actx, node, chunks: [], samples: 0, rate: actx.sampleRate };
+  node.onaudioprocess = (e) => {
+    if (!rec) return;
+    const input = e.inputBuffer.getChannelData(0);
+    const pcm = new Int16Array(input.length);
+    let sum = 0;
+    for (let i = 0; i < input.length; i++) {
+      const v = Math.max(-1, Math.min(1, input[i]));
+      pcm[i] = v * 32767;
+      sum += v * v;
+    }
+    rec.chunks.push(pcm);
+    rec.samples += pcm.length;
+    const seconds = rec.samples / rec.rate;
+    els.recTime.textContent = fmtSeconds(seconds);
+    els.recLevel.style.width = `${Math.min(100, Math.sqrt(sum / input.length) * 400)}%`;
+    if (seconds >= REC_MAX_SECONDS) stopRecording(true);
+  };
+  source.connect(node);
+  node.connect(mute);
+  mute.connect(actx.destination);
+  els.recBtn.setAttribute('aria-pressed', 'true');
+  els.recLabel.textContent = 'Dừng';
+  els.recTime.textContent = fmtSeconds(0);
+}
+
+function stopRecording(keep) {
+  const r = rec;
+  rec = null;
+  if (!r) return;
+  r.node.onaudioprocess = null;
+  r.stream.getTracks().forEach((t) => t.stop());
+  r.actx.close();
+  els.recBtn.setAttribute('aria-pressed', 'false');
+  els.recLabel.textContent = 'Ghi âm';
+  els.recLevel.style.width = '0';
+  if (!keep) return;
+  const seconds = r.samples / r.rate;
+  if (seconds < REC_MIN_SECONDS) {
+    cloneError(`Ghi ít nhất ${REC_MIN_SECONDS} giây - đọc hết đoạn mẫu rồi bấm Dừng.`);
+    return;
+  }
+  setClip({ blob: toWav(r.chunks, r.rate), filename: 'ghi-am.wav', recorded: true,
+    label: `ghi âm ${fmtSeconds(seconds)}` });
+}
+
+els.recBtn.addEventListener('click', () => (rec ? stopRecording(true) : startRecording()));
+els.recPlay.addEventListener('click', () => {
+  if (!cloneClip) return;
+  if (recAudio) { recAudio.pause(); URL.revokeObjectURL(recAudio.src); }
+  recAudio = new Audio(URL.createObjectURL(cloneClip.blob));
+  recAudio.play();
+});
+els.cloneNext.addEventListener('click', () => {
+  scriptIndex = (scriptIndex + 1) % CLONE_SCRIPTS.length;
+  showScript();
+});
+if (!canRecord) {
+  els.recBtn.disabled = true;
+  els.recBtn.title = 'Micro chỉ dùng được trong app trên máy này hoặc qua HTTPS. Ghi âm ở nơi khác rồi chọn file.';
+}
+
+els.cloneBtn.addEventListener('click', () => showClone(els.clonePanel.hidden));
+els.cloneFile.addEventListener('click', () => els.cloneInput.click());
+els.cloneInput.addEventListener('change', () => {
+  const file = els.cloneInput.files[0];
+  if (file) setClip({ blob: file, filename: file.name, recorded: false, label: file.name });
+  els.cloneInput.value = '';   // the same file again still fires change
+  cloneError('');
+});
+
+els.cloneForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = els.cloneName.value.trim();
+  if (!name) return;
+  if (rec) stopRecording(true);
+  if (!cloneClip) { cloneError('Ghi âm hoặc chọn một file mẫu giọng.'); return; }
+  if (!els.cloneConsent.checked) { cloneError('Xác nhận bạn có quyền dùng giọng này.'); return; }
+  els.cloneSubmit.disabled = true;
+  els.cloneSubmit.textContent = 'Đang nhân bản…';
+  try {
+    const query = new URLSearchParams({ name, filename: cloneClip.filename });
+    const res = await fetch(`/api/voices/clone?${query}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: cloneClip.blob,
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) { cloneError(detailOf(body, res)); return; }
+    voices = [...voices.filter((v) => v.name !== body.name), body];
+    resetClone();
+    showClone(false);
+    renderVoices();
+    pickVoice(body.name);
+  } catch {
+    cloneError('Không gọi được backend');
+  } finally {
+    els.cloneSubmit.disabled = false;
+    els.cloneSubmit.textContent = 'Nhân bản';
+  }
+});
+
+async function deleteVoice(name) {
+  if (!confirm(`Xoá giọng "${name}"? Muốn có lại phải nhân bản lại từ file.`)) return;
+  try {
+    const res = await fetch(`/api/voices/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    // Already gone (another browser on the LAN server removed it) is as good.
+    if (!res.ok && res.status !== 404) {
+      showClone(true);
+      cloneError(detailOf(await res.json().catch(() => ({})), res));
+      return;
+    }
+  } catch {
+    showClone(true);
+    cloneError('Không gọi được backend');
+    return;
+  }
+  voices = voices.filter((v) => v.name !== name);
+  renderVoices();
+  if (voice === name) pickVoice(defaultVoice);
 }
 
 /* ---- Reading speed ----------------------------------------------------- */

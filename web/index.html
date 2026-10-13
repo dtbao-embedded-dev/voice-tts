@@ -93,7 +93,38 @@
 <div class="scrim" id="scrim" hidden></div>
 <section class="sheet" id="sheet" hidden aria-label="Chọn giọng đọc">
   <div class="sheet__grip"></div>
-  <h2 class="sheet__title">Giọng đọc</h2>
+  <div class="sheet__head">
+    <h2 class="sheet__title">Giọng đọc</h2>
+    <button class="link" id="cloneBtn" type="button" aria-expanded="false" aria-controls="clonePanel"
+      title="Tạo một giọng mới từ file ghi âm giọng nói">Nhân bản giọng</button>
+  </div>
+  <div class="clone" id="clonePanel" hidden>
+    <p class="sheet__hint">Ghi âm <b>5-8 giây</b> đọc đoạn mẫu dưới đây ở nơi yên tĩnh, giọng tự nhiên -
+      hoặc chọn một file (WAV, MP3, FLAC, OGG) một người nói rõ, không nhạc nền.
+      Chỉ dùng giọng của bạn, hoặc của người đã đồng ý.</p>
+    <form class="clone-form" id="cloneForm" autocomplete="off">
+      <input class="field clone-form__wide" id="cloneName" placeholder="Tên giọng, ví dụ Giọng tôi" maxlength="40" required aria-label="Tên giọng">
+      <figure class="clone-script clone-form__wide">
+        <blockquote id="cloneScript"></blockquote>
+        <figcaption><button class="link" id="cloneNext" type="button">Đoạn khác</button></figcaption>
+      </figure>
+      <div class="clone-rec clone-form__wide">
+        <button class="btn btn--small" id="recBtn" type="button">
+          <span class="clone-rec__dot" aria-hidden="true"></span><span id="recLabel">Ghi âm</span></button>
+        <span class="clone-rec__level" aria-hidden="true"><span id="recLevel"></span></span>
+        <span class="timecode" id="recTime">0,0 s</span>
+        <button class="link" id="recPlay" type="button" hidden>Nghe lại</button>
+        <span class="clone-rec__or">hoặc</span>
+        <button class="btn btn--small" id="cloneFile" type="button">Chọn file…</button>
+        <input id="cloneInput" type="file" accept=".wav,.mp3,.flac,.ogg,audio/wav,audio/mpeg,audio/flac,audio/ogg" hidden>
+      </div>
+      <p class="clone-clip clone-form__wide" id="cloneClip">Chưa có mẫu giọng.</p>
+      <label class="lex-form__case clone-form__consent"><input type="checkbox" id="cloneConsent">
+        Tôi có quyền dùng giọng này</label>
+      <button class="btn btn--small btn--primary" id="cloneSubmit" type="submit">Nhân bản</button>
+    </form>
+    <p class="sheet__error" id="cloneError" role="alert" hidden></p>
+  </div>
   <div class="sheet__list" id="voiceList"></div>
 </section>
 

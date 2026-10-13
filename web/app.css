@@ -383,6 +383,61 @@ button.row:active { background: var(--surface-2); transition: none; }
 }
 .lex-form__case input { accent-color: var(--accent); }
 
+/* ---- Voice cloning (in the voice sheet) --------------------------------- */
+
+.clone { margin-bottom: 4px; }
+.clone-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  align-items: center;
+  gap: 8px;
+}
+.clone-form__wide { grid-column: 1 / -1; }
+.clone-form__consent { grid-column: 1; }
+.clone-form .btn--primary { grid-column: 2; }
+
+/* The passage to read aloud while recording: large enough to read off the screen. */
+.clone-script {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: var(--r-ctl);
+  background: var(--surface-2);
+}
+.clone-script blockquote {
+  margin: 0;
+  font-size: 1.0625rem; line-height: 1.5;
+  color: var(--label);
+  user-select: text; -webkit-user-select: text;
+}
+.clone-script figcaption { margin-top: 6px; text-align: right; }
+
+.clone-rec { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.clone-rec__dot {
+  display: inline-block;
+  width: 10px; height: 10px; margin-right: 6px;
+  border-radius: 50%;
+  background: var(--red);
+}
+#recBtn[aria-pressed="true"] .clone-rec__dot { border-radius: 2px; animation: rec-blink 1s steps(2) infinite; }
+@keyframes rec-blink { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) {
+  #recBtn[aria-pressed="true"] .clone-rec__dot { animation: none; }
+}
+.clone-rec__level {
+  width: 72px; height: 6px;
+  border-radius: 3px;
+  background: var(--fill);
+  overflow: hidden;
+}
+.clone-rec__level span {
+  display: block; height: 100%; width: 0;
+  background: var(--accent);
+  transform-origin: left;
+}
+.clone-rec__or { font-size: 0.8125rem; color: var(--label-3); }
+#cloneFile { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 220px; }
+.clone-clip { margin: 0; font-size: 0.8125rem; color: var(--label-2); }
+
 .lex-item {
   position: relative;
   display: grid;
@@ -481,6 +536,10 @@ button.row:active { background: var(--surface-2); transition: none; }
   background: var(--separator);
 }
 .voice-item:active { background: #3a3a3c; }
+/* A cloned voice carries its own Xoá, after the checkmark. */
+.voice-item:has(.link--danger) { grid-template-columns: 1fr auto auto; column-gap: 14px; }
+.voice-item .link--danger { grid-column: 3; grid-row: 1 / span 2; }
+.voice-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .voice-item__name { font-size: 1.0625rem; letter-spacing: -0.0255em; }
 .voice-item__sub {
   grid-column: 1;
