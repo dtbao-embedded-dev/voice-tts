@@ -1,6 +1,7 @@
 *
 !app.py
 !cli.py
+!clones.py
 !icon.py
 !lexicon.py
 !respell.py

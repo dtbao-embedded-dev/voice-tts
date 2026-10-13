@@ -121,7 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_client_flags(speak, local=True)
     speak.add_argument("-q", "--quiet", action="store_true", help="no progress or summary on stderr")
 
-    voices = sub.add_parser("voices", help="list the preset voices")
+    voices = sub.add_parser("voices", help="list the preset and cloned voices")
     voices.add_argument("--json", action="store_true", help="print the /api/voices JSON")
     add_client_flags(voices, local=True)
 
@@ -541,7 +541,7 @@ def cmd_voices(args: argparse.Namespace) -> int:
     else:
         app = local_engine(quiet=args.json)
         with contextlib.redirect_stdout(sys.stderr):
-            info = {"voices": app.preset_voices(), "default": app.default_voice(),
+            info = {"voices": app.all_voices(), "default": app.default_voice(),
                     "sampleRate": app.SAMPLE_RATE, "maxChars": app.MAX_CHARS}
     if args.json:
         print(json.dumps(info, ensure_ascii=False, indent=2))
@@ -550,10 +550,10 @@ def cmd_voices(args: argparse.Namespace) -> int:
     gender = max(len(v["gender"]) for v in info["voices"])
     for v in info["voices"]:
         mark = "*" if v["name"] == info["default"] else " "
-        star = "+" if v.get("featured") else " "
+        star = "+" if v.get("featured") else "~" if v.get("cloned") else " "
         print(f"{mark}{star} {v['name']:<{width}}  {v['region']:<5}  {v['gender']:<{gender}}  "
               f"{v['description']}")
-    print("\n* default   + featured")
+    print("\n* default   + featured   ~ cloned")
     return 0
 
 

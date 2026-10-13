@@ -55,8 +55,17 @@ class StubEngine:
     def resolve_voice_name(self, name):
         return name if name in self.VOICES else None
 
+    def encode_reference(self, ref_audio):
+        # The clip's length stands in for the voice it carries.
+        import soundfile
+
+        seconds = soundfile.info(ref_audio).duration
+        # Codes are frames x codebooks, as the real engine's are.
+        return np.full(192, seconds, dtype=np.float32), np.arange(32, dtype=np.int64).reshape(2, 16)
+
     def infer_stream(self, text, voice=None, max_chars=256):
         self.last_text = text
+        self.last_voice = voice
         self.last_max_chars = max_chars
         self.last_call = "infer_stream"
         # A 220 Hz tone, 0.1 s per word, in a few chunks - enough to be audible
@@ -825,6 +834,104 @@ def check_lexicon_user(base: str, tmp: Path) -> None:
     print("lexicon user: data-dir JSON, overrides, longest first, 400/401, CLI local + remote")
 
 
+def clip(seconds: float, rate: int = 16_000) -> bytes:
+    """A WAV of a 180 Hz tone, ``seconds`` long - a stand-in for a voice sample."""
+    t = np.arange(int(rate * seconds)) / rate
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(rate)
+        out.writeframes((0.3 * np.sin(2 * np.pi * 180 * t) * 32767).astype("<i2").tobytes())
+    return buf.getvalue()
+
+
+def clone_call(base: str, method: str, path: str, data: bytes | None = None,
+               content_type: str = "application/octet-stream") -> tuple[int, dict]:
+    req = urllib.request.Request(f"{base}{path}", data=data, method=method,
+                                 headers={"Content-Type": content_type})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.status, json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        return exc.code, json.loads(exc.read() or b"{}")
+
+
+def check_clones(base: str, tmp: Path) -> None:
+    """A voice cloned from a clip: enrolled once, kept in the data dir as its
+    embedding (not the clip), listed, read with, and removed."""
+    from urllib.parse import quote
+
+    os.environ["VOICE_TTS_DATA"] = str(tmp / "clone-data")
+    name = "Giọng tôi"
+    add = f"/api/voices/clone?name={quote(name)}&filename=me.wav"
+    try:
+        status, entry = clone_call(base, "POST", add, clip(5))
+        assert status == 200, entry
+        assert entry == {"name": name, "region": "", "gender": "", "featured": False,
+                         "cloned": True, "description": "Giọng của bạn · mẫu 5 giây"}, entry
+
+        listed = json.loads(request(f"{base}/api/voices")[2])["voices"]
+        assert listed[-1] == entry and listed[0]["name"] == "Stub A", listed
+
+        stored = (tmp / "clone-data" / "voices.json").read_text(encoding="utf-8")
+        voice = json.loads(stored)["voices"][0]
+        assert voice["name"] == name and len(voice["speaker_emb"]) == 192, voice
+        assert len(stored) < 10_000, "the clip itself must not be stored"
+
+        # Read with it: the engine gets the enrolled pair, not a name.
+        for fmt in ("wav", "f32"):
+            status, _, answer = post(base, {"text": "xin chào các bạn nhé", "voice": name,
+                                            "format": fmt})
+            assert status == 200, answer[:200]
+            got = app._engine.last_voice
+            assert isinstance(got, dict) and float(got["speaker_emb"][0]) == 5.0, got
+            assert np.array_equal(got["codes"], np.arange(32).reshape(2, 16)), got["codes"]
+        post(base, {"text": "chào", "voice": "Stub B", "format": "wav"})
+        assert app._engine.last_voice == "Stub B", "a preset must still go by name"
+
+        refusals = [
+            (f"/api/voices/clone?name={quote('giọng TÔI')}&filename=a.wav", clip(5), 400),
+            ("/api/voices/clone?name=Stub%20A&filename=a.wav", clip(5), 400),
+            ("/api/voices/clone?name=Ngan&filename=a.wav", clip(1.5), 400),
+            ("/api/voices/clone?name=Rac&filename=a.wav", b"not audio at all" * 100, 400),
+            ("/api/voices/clone?name=Rong&filename=a.wav", b"", 400),
+            ("/api/voices/clone?name=%20&filename=a.wav", clip(5), 400),
+            ("/api/voices/clone?name=a%2Fb&filename=a.wav", clip(5), 400),
+            (f"/api/voices/clone?name={'x' * 41}&filename=a.wav", clip(5), 400),
+            ("/api/voices/clone?filename=a.wav", clip(5), 422),
+        ]
+        for path, data, want in refusals:
+            status, body = clone_call(base, "POST", path, data)
+            assert status == want, (path, status, body)
+        status, _ = clone_call(base, "POST", "/api/voices/clone?name=Text", b"x",
+                               content_type="text/plain")
+        assert status == 415, "a text/plain clone needs no preflight from another site"
+        assert len(json.loads(stored)["voices"]) == 1
+
+        app.set_token(TOKEN)
+        try:
+            assert clone_call(base, "POST", add, clip(5))[0] == 401, "clone without the token"
+            assert clone_call(base, "DELETE", f"/api/voices/{quote(name)}")[0] == 401
+        finally:
+            app.set_token(None)
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            assert cli.main(["voices", "--local"]) == 0
+        assert any(line.startswith(" ~ Giọng tôi") for line in out.getvalue().splitlines()),             out.getvalue()
+
+        assert clone_call(base, "DELETE", f"/api/voices/{quote(name)}") == (200, {"removed": name})
+        assert clone_call(base, "DELETE", f"/api/voices/{quote(name)}")[0] == 404
+        assert clone_call(base, "DELETE", "/api/voices/Stub%20A")[0] == 404, "a preset removed"
+        status, _, answer = post(base, {"text": "chào", "voice": name, "format": "wav"})
+        assert status == 400, "a removed voice still reads"
+    finally:
+        del os.environ["VOICE_TTS_DATA"]
+    print("clones: enrolled into the data dir (no clip kept), listed, read with, "
+          "400/401/415, removed")
+
+
 def check_install_files() -> None:
     """tool-install.py copies every module of ours that the app imports.
 
@@ -962,6 +1069,7 @@ def main() -> int:
         check_encode(base, Path(tmp))
         check_lexicon(base, Path(tmp))
         check_lexicon_user(base, Path(tmp))
+        check_clones(base, Path(tmp))
         check_local(Path(tmp))
         check_icon(base, Path(tmp))
     print("OK")

@@ -33,6 +33,7 @@ from starlette.concurrency import run_in_threadpool
 from numpy.lib.stride_tricks import sliding_window_view
 from pydantic import BaseModel
 
+import clones
 import lexicon
 import respell
 
@@ -261,6 +262,16 @@ def preset_voices() -> list[dict]:
     return voices
 
 
+def _clone_entry(record: dict) -> dict:
+    return {"name": record["name"], "region": "", "gender": "",
+            "description": record["description"], "featured": False, "cloned": True}
+
+
+def all_voices() -> list[dict]:
+    """The built-in voices, then the ones the user cloned (``cloned: true``)."""
+    return preset_voices() + [_clone_entry(v) for v in clones.load()]
+
+
 def default_voice() -> str:
     tts = engine()
     # The engine only exposes its own default as a private attribute; route it
@@ -437,8 +448,12 @@ def version() -> dict:
 
 @app.get("/api/voices")
 def voices() -> dict:
+    try:
+        listed = all_voices()
+    except ValueError as exc:  # a broken voices.json
+        raise HTTPException(500, str(exc)) from None
     return {
-        "voices": preset_voices(),
+        "voices": listed,
         "default": default_voice(),
         "sampleRate": SAMPLE_RATE,
         "maxChars": MAX_CHARS,
@@ -487,7 +502,14 @@ def synthesize(text: str, voice: str | None = None, speed: float = 1.0,
         raise ValueError(f"Tốc độ phải trong khoảng {SPEED_MIN}-{SPEED_MAX}.")
 
     tts = engine()
-    resolved = tts.resolve_voice_name(voice) or (None if voice else default_voice())
+    # A cloned voice travels to the engine as its enrolled pair; like a word in
+    # the user's lexicon, it wins over a preset that later takes the same name.
+    clone = clones.find(voice)
+    if clone is not None:
+        resolved = clone["name"]
+        ref = {"speaker_emb": clone["speaker_emb"], "codes": clone["codes"]}
+    else:
+        resolved = ref = tts.resolve_voice_name(voice) or (None if voice else default_voice())
     if resolved is None:
         raise ValueError(f"Không có giọng '{voice}'.")
 
@@ -495,9 +517,9 @@ def synthesize(text: str, voice: str | None = None, speed: float = 1.0,
 
     def generate():
         if whole or len(spoken.split()) <= SHORT_WORDS:
-            source = iter([tts.infer(spoken, voice=resolved, max_chars=CHUNK_CHARS)])
+            source = iter([tts.infer(spoken, voice=ref, max_chars=CHUNK_CHARS)])
         else:
-            source = tts.infer_stream(spoken, voice=resolved, max_chars=CHUNK_CHARS)
+            source = tts.infer_stream(spoken, voice=ref, max_chars=CHUNK_CHARS)
         for chunk in stretch(source, speed):
             yield np.asarray(chunk, dtype=np.float32)
 
@@ -693,6 +715,75 @@ async def encode(request: Request, format: str):
     return Response(data, media_type=ENCODINGS[format][2],
                     headers={"Cache-Control": "no-store",
                              "Content-Disposition": f'inline; filename="speech.{format}"'})
+
+
+# A clip to clone from. The engine enrolls the first 8 s once its edges are
+# trimmed; under 3 s it has too little of the voice to go on.
+CLONE_MAX_BYTES = 20 * 1024 * 1024
+CLONE_MIN_SECONDS = 3.0
+CLONE_SUFFIXES = (".wav", ".mp3", ".flac", ".ogg")
+
+
+def _enroll_clip(body: bytes, name: str, suffix: str) -> dict:
+    """Enroll ``body`` (an audio file) and store it as the voice ``name``."""
+    import tempfile
+
+    import soundfile
+
+    tts = engine()
+    taken = lambda n: tts.resolve_voice_name(n) is not None  # noqa: E731
+    clones.check_new(name, taken)
+    fd, tmp = tempfile.mkstemp(prefix="voice-tts-clone-", suffix=suffix)
+    try:
+        with os.fdopen(fd, "wb") as out:
+            out.write(body)
+        try:
+            seconds = soundfile.info(tmp).duration
+        except Exception:
+            raise ValueError("Không đọc được file âm thanh - dùng WAV, MP3, FLAC hoặc OGG.") from None
+        if seconds < CLONE_MIN_SECONDS:
+            raise ValueError(f"Mẫu giọng cần ít nhất {CLONE_MIN_SECONDS:.0f} giây "
+                             f"(file này {seconds:.1f} giây).")
+        # Enrolling runs the engine for a few seconds of CPU: it waits its turn
+        # like a reading, rather than slowing the ones being heard.
+        with _turns.turn():
+            speaker_emb, codes = tts.encode_reference(tmp)
+    finally:
+        os.remove(tmp)
+    used = min(seconds, 8.0)
+    return clones.add(name, speaker_emb, codes, f"Giọng của bạn · mẫu {used:.0f} giây", taken)
+
+
+@app.post("/api/voices/clone")
+async def voice_clone(request: Request, name: str, filename: str = "") -> dict:
+    """Clone a voice from an audio file in the body (``application/octet-stream``).
+
+    ``filename`` only lends its extension, so the decoder knows an MP3 when it
+    sees one. The clip is enrolled once and dropped; what is kept is the speaker
+    embedding and reference codes, in ``voices.json`` in the data dir.
+    """
+    body = await _read_octets(request, CLONE_MAX_BYTES, "File mẫu giọng quá lớn (tối đa 20 MB).")
+    if not body:
+        raise HTTPException(400, "Chưa có file mẫu giọng.")
+    suffix = Path(filename).suffix.lower()
+    try:
+        record = await run_in_threadpool(_enroll_clip, body, name,
+                                         suffix if suffix in CLONE_SUFFIXES else "")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
+    return _clone_entry(record)
+
+
+@app.delete("/api/voices/{name}")
+def voice_delete(name: str) -> dict:
+    """Forget a cloned voice. A built-in one cannot be removed."""
+    try:
+        removed = clones.remove(name)
+    except ValueError as exc:
+        raise HTTPException(500, str(exc)) from None
+    if not removed:
+        raise HTTPException(404, f"Không có giọng của bạn tên '{name}'.")
+    return {"removed": name}
 
 
 @app.get("/")

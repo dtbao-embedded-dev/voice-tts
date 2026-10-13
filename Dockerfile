@@ -4,7 +4,7 @@
 #
 # The model is not baked in: the first start downloads it into the /data/hf
 # volume (needs internet once), later starts load it from there. The user's
-# lexicon lives in the /data/app volume, so a rebuild keeps it.
+# lexicon and cloned voices live in the /data/app volume, so a rebuild keeps them.
 
 FROM python:3.12-slim
 
@@ -21,7 +21,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-COPY app.py cli.py icon.py lexicon.py respell.py ./
+COPY app.py cli.py clones.py icon.py lexicon.py respell.py ./
 COPY web ./web
 
 # Run unprivileged; the volume mount point must already belong to that user,
