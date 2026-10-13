@@ -759,9 +759,28 @@ def lexicon_call(base: str, method: str, body=None, headers: dict | None = None)
         return exc.code, exc.read()
 
 
+@contextlib.contextmanager
+def data_dir(path: Path):
+    """Point ``VOICE_TTS_DATA`` at ``path`` for the block, then put it back."""
+    saved = os.environ.get("VOICE_TTS_DATA")
+    os.environ["VOICE_TTS_DATA"] = str(path)
+    try:
+        yield
+    finally:
+        if saved is None:
+            del os.environ["VOICE_TTS_DATA"]
+        else:
+            os.environ["VOICE_TTS_DATA"] = saved
+
+
 def check_lexicon_user(base: str, tmp: Path) -> None:
     """Words the user adds: stored in the data dir, read in special mode only."""
-    os.environ["VOICE_TTS_DATA"] = str(tmp / "data")
+    with data_dir(tmp / "data"):
+        check_lexicon_user_in(base, tmp)
+    print("lexicon user: data-dir JSON, overrides, longest first, 400/401, CLI local + remote")
+
+
+def check_lexicon_user_in(base: str, tmp: Path) -> None:
     try:
         status, state = lexicon_call(base, "GET")
         assert status == 200 and state["user"] == [], state
@@ -830,8 +849,6 @@ def check_lexicon_user(base: str, tmp: Path) -> None:
         assert code == 2, f"an over-long spelling over HTTP: exit {code}, {err}"
     finally:
         lexicon_call(base, "PUT", {"user": []})
-        del os.environ["VOICE_TTS_DATA"]
-    print("lexicon user: data-dir JSON, overrides, longest first, 400/401, CLI local + remote")
 
 
 def clip(seconds: float, rate: int = 16_000) -> bytes:
@@ -862,10 +879,9 @@ def check_clones(base: str, tmp: Path) -> None:
     embedding (not the clip), listed, read with, and removed."""
     from urllib.parse import quote
 
-    os.environ["VOICE_TTS_DATA"] = str(tmp / "clone-data")
     name = "Giọng tôi"
     add = f"/api/voices/clone?name={quote(name)}&filename=me.wav"
-    try:
+    with data_dir(tmp / "clone-data"):
         status, entry = clone_call(base, "POST", add, clip(5))
         assert status == 200, entry
         assert entry == {"name": name, "region": "", "gender": "", "featured": False,
@@ -926,8 +942,6 @@ def check_clones(base: str, tmp: Path) -> None:
         assert clone_call(base, "DELETE", "/api/voices/Stub%20A")[0] == 404, "a preset removed"
         status, _, answer = post(base, {"text": "chào", "voice": name, "format": "wav"})
         assert status == 400, "a removed voice still reads"
-    finally:
-        del os.environ["VOICE_TTS_DATA"]
     print("clones: enrolled into the data dir (no clip kept), listed, read with, "
           "400/401/415, removed")
 
@@ -1048,6 +1062,13 @@ def main() -> int:
 
     check_stretch()
     app._engine = StubEngine()
+    # The user's own lexicon and cloned voices must not leak into the checks:
+    # every one of them runs against an empty data dir unless it sets its own.
+    with tempfile.TemporaryDirectory() as empty, data_dir(Path(empty)):
+        return run_checks()
+
+
+def run_checks() -> int:
     check_parser()
     check_install_files()
     check_terms()
