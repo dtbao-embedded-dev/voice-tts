@@ -1107,6 +1107,66 @@ def check_install_files() -> None:
     print("install: tool-install.py and the Docker image carry every module the app imports")
 
 
+def file_version_string(path: Path, field: str) -> str:
+    """``field`` (FileDescription, ProductName, ...) from the file's version resource."""
+    import ctypes
+    from ctypes import wintypes
+
+    ver = ctypes.WinDLL("version")
+    size = ver.GetFileVersionInfoSizeW(str(path), None)
+    assert size, f"{path.name} has no version resource"
+    data = ctypes.create_string_buffer(size)
+    assert ver.GetFileVersionInfoW(str(path), 0, size, data)
+    value, length = ctypes.c_void_p(), wintypes.UINT()
+    assert ver.VerQueryValueW(data, rf"\StringFileInfo\040904B0\{field}",
+                              ctypes.byref(value), ctypes.byref(length)), field
+    return ctypes.wstring_at(value, length.value).rstrip("\0")
+
+
+def check_named_exe() -> None:
+    """Windows: the install runs as voice-tts.exe, "Voice TTS" in Task Manager and
+    in Startup apps, not as a pythonw.exe that starts the base Python's."""
+    if sys.platform != "win32":
+        print("named exe: Windows only, skipped")
+        return
+    import ctypes
+    import importlib.util
+
+    import icon
+
+    spec = importlib.util.spec_from_file_location("tool_install",
+                                                  ROOT / "docs/scripts/tool-install.py")
+    tool_install = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool_install)
+    with tempfile.TemporaryDirectory() as tmp:
+        target = tool_install.Windows(Path(tmp) / "prefix")
+        subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(target.venv)],
+                       check=True, timeout=120)
+        target.prefix.mkdir(exist_ok=True)
+        icon.save_ico(target.icon)
+        assert target.launcher() == target.pyw, "no exe yet: the shortcuts keep pythonw"
+
+        for _ in range(2):  # re-running an install replaces it in place
+            assert target.make_exe(), "voice-tts.exe was not made"
+        exe = target.venv / "Scripts" / "voice-tts.exe"
+        assert target.launcher() == exe, "the shortcuts do not run voice-tts.exe"
+        for field in ("FileDescription", "ProductName"):
+            assert file_version_string(exe, field) == "Voice TTS", field
+        assert file_version_string(exe, "ProductVersion") == cli.__version__
+        assert file_version_string(exe, "OriginalFilename") == "voice-tts.exe"
+        icons = ctypes.windll.shell32.ExtractIconExW(str(exe), -1, None, None, 0)
+        assert icons == 1, f"{icons} icons in voice-tts.exe, want the app's one"
+
+        # It is this venv's interpreter, running in-process: no base Python child.
+        out = Path(tmp) / "prefix.txt"
+        subprocess.run([str(exe), "-c", "import sys; open(sys.argv[1], 'w').write("
+                        "f'{sys.prefix}|{sys.executable}')", str(out)], check=True, timeout=60)
+        prefix, executable = out.read_text().split("|")
+        assert os.path.samefile(prefix, target.venv), f"runs outside the venv: {prefix}"
+        assert os.path.samefile(executable, exe), f"a child interpreter ran: {executable}"
+    print("named exe: voice-tts.exe, 'Voice TTS' + app icon, the venv in-process, rebuilt in place")
+
+
 def check_engine_threads() -> None:
     """VOICE_TTS_THREADS sets the engine's CPU threads; unset, the engine picks."""
     import types
@@ -1197,6 +1257,7 @@ def main() -> int:
 def run_checks() -> int:
     check_parser()
     check_install_files()
+    check_named_exe()
     check_terms()
     check_engine_threads()
     check_model_precision()

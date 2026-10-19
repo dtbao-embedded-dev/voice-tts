@@ -29,6 +29,10 @@ the release before it builds.
 
 ### Fixed
 
+- Task Manager and Startup apps listed the Windows install as *Python*: its
+  shortcuts ran the venv's `pythonw.exe`, which only starts the base Python's.
+  `tool-install.py` now makes `voice-tts.exe` in the venv - that interpreter under
+  the app's name, icon and version, running in-process - and the shortcuts run it.
 - Recording a voice sample on a machine with no microphone (a Remote Desktop
   session without mic redirection, say) said the microphone was held by another
   app. The message now names the cause: no microphone, no permission, or busy;

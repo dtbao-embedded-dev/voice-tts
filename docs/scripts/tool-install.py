@@ -24,7 +24,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import re
 import shutil
+import struct
 import subprocess
 import sys
 from pathlib import Path
@@ -58,6 +60,7 @@ class Windows:
         self.bin = self.prefix / "bin"
         self.py = self.venv / "Scripts" / "python.exe"
         self.pyw = self.venv / "Scripts" / "pythonw.exe"
+        self.exe = self.venv / "Scripts" / "voice-tts.exe"
         self.icon = self.prefix / "voice-tts.ico"
         programs = Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs"
         self.start_menu = programs / f"{NAME}.lnk"
@@ -74,6 +77,8 @@ class Windows:
         self.write_shim()
         self.add_to_path()
         self.make_icon()
+        if self.make_exe():
+            say(f"launcher: {self.exe.name}")
         self.shortcut(self.start_menu, "gui", "Đọc văn bản tiếng Việt/Anh")
         say(f"Start Menu: {self.start_menu.name}")
         if autostart:
@@ -144,6 +149,45 @@ class Windows:
         run([self.py, "-c", "import sys, icon; icon.save_ico(sys.argv[1])", self.icon],
             cwd=self.app)
 
+    def make_exe(self) -> bool:
+        """Make ``voice-tts.exe``: this venv's interpreter under the app's own name.
+
+        The venv's pythonw.exe is only a launcher that starts the base install's
+        pythonw.exe, so the process that runs - in Task Manager and in Startup
+        apps - is "Python". A copy of the base pythonw.exe in Scripts, with the
+        Python DLLs beside it, runs in-process instead: it finds pyvenv.cfg one
+        level up, so it is this venv's interpreter. Its version resource and
+        icon are then rewritten to the app's. False when it cannot be made (no
+        base pythonw.exe, a locked file); the shortcuts then keep pythonw.exe.
+        """
+        try:
+            base = Path(subprocess.run(
+                [self.py, "-c", "import sys; print(sys._base_executable)"],
+                check=True, capture_output=True, text=True).stdout.strip()).parent
+            source = base / "pythonw.exe"
+            if not source.is_file():
+                say(f"launcher: no {source}, the shortcuts keep pythonw.exe")
+                return False
+            scripts = self.exe.parent
+            # The DLL a running voice-tts.exe holds cannot be replaced, and an
+            # unchanged one need not be.
+            for dll in [*base.glob("python3*.dll"), *base.glob("vcruntime140*.dll")]:
+                if not _same_file(dll, scripts / dll.name):
+                    shutil.copy2(dll, scripts / dll.name)
+            staged = self.exe.with_suffix(".new")
+            shutil.copy2(source, staged)
+            set_exe_resources(staged, app_version(), self.icon, self.exe.name)
+            os.replace(staged, self.exe)
+            return True
+        except (OSError, subprocess.CalledProcessError) as exc:
+            say(f"launcher: not made ({exc}); the shortcuts keep pythonw.exe "
+                f"- quit Voice TTS and re-run to retry")
+            return False
+
+    def launcher(self) -> Path:
+        """What the shortcuts run: voice-tts.exe once made, else pythonw.exe."""
+        return self.exe if self.exe.exists() else self.pyw
+
     def shortcut(self, link: Path, args: str, description: str) -> None:
         link.parent.mkdir(parents=True, exist_ok=True)
 
@@ -152,7 +196,7 @@ class Windows:
 
         arguments = f'"{self.app / "cli.py"}" {args}'
         script = (f"$s = (New-Object -ComObject WScript.Shell).CreateShortcut({q(link)}); "
-                  f"$s.TargetPath = {q(self.pyw)}; "
+                  f"$s.TargetPath = {q(self.launcher())}; "
                   f"$s.Arguments = {q(arguments)}; "
                   f"$s.WorkingDirectory = {q(self.app)}; "
                   f"$s.IconLocation = {q(self.icon)}; "
@@ -221,6 +265,155 @@ class Windows:
                          f"and run --uninstall again")
             say(f"removed {self.prefix}")
         print("Done. The model cache (~/.cache/huggingface) was left in place.")
+
+
+def _same_file(a: Path, b: Path) -> bool:
+    if not b.exists():
+        return False
+    sa, sb = a.stat(), b.stat()
+    return sa.st_size == sb.st_size and int(sa.st_mtime) == int(sb.st_mtime)
+
+
+def app_version() -> str:
+    """``cli.__version__``, read from the source: this script imports nothing of the app."""
+    found = re.search(r'^__version__ = "([^"]+)"', (ROOT / "cli.py").read_text(encoding="utf-8"),
+                      re.MULTILINE)
+    return found.group(1) if found else "0.0.0"
+
+
+# Win32 resource types and the language the strings are written in (en-US, Unicode).
+RT_ICON, RT_GROUP_ICON, RT_VERSION = 3, 14, 16
+LANG_EN_US, CODEPAGE_UNICODE = 0x0409, 0x04B0
+
+
+def _version_node(key: str, value: bytes = b"", children: list[bytes] = (),
+                  text: bool = False) -> bytes:
+    """One VS_VERSIONINFO-style block: header, key, value, then its children,
+    each part starting on a 4-byte boundary counted from the block's start."""
+    def pad(data: bytes) -> bytes:
+        return data + b"\0" * (-len(data) % 4)
+
+    body = pad(b"\0" * 6 + (key + "\0").encode("utf-16-le"))  # room for the header
+    if value:
+        body += pad(value)
+    for child in children:
+        body += pad(child)
+    value_length = len(value) // 2 if text else len(value)  # text counts WCHARs
+    return struct.pack("<HHH", len(body), value_length, 1 if text else 0) + body[6:]
+
+
+def version_resource(version: str, strings: dict[str, str]) -> bytes:
+    """A VS_VERSIONINFO resource: the fixed numbers plus ``strings``."""
+    parts = [int(p) for p in re.findall(r"\d+", version)[:4]] + [0, 0, 0, 0]
+    ms, ls = (parts[0] << 16) | parts[1], (parts[2] << 16) | parts[3]
+    fixed = struct.pack("<13I", 0xFEEF04BD, 0x00010000, ms, ls, ms, ls,
+                        0x3F, 0, 0x00040004, 1, 0, 0, 0)  # VOS_NT_WINDOWS32, VFT_APP
+    table = _version_node(f"{LANG_EN_US:04X}{CODEPAGE_UNICODE:04X}", children=[
+        _version_node(k, (v + "\0").encode("utf-16-le"), text=True) for k, v in strings.items()],
+        text=True)
+    string_info = _version_node("StringFileInfo", children=[table], text=True)
+    translation = _version_node("Translation", struct.pack("<HH", LANG_EN_US, CODEPAGE_UNICODE))
+    var_info = _version_node("VarFileInfo", children=[translation], text=True)
+    return _version_node("VS_VERSION_INFO", fixed, [string_info, var_info])
+
+
+def icon_resources(ico: bytes) -> tuple[list[bytes], bytes]:
+    """An ``.ico`` file as RT_ICON images (ids 1..n) and their RT_GROUP_ICON."""
+    _, _, count = struct.unpack_from("<HHH", ico, 0)
+    images, group = [], struct.pack("<HHH", 0, 1, count)
+    for i in range(count):
+        w, h, colors, reserved, planes, bits, size, offset = \
+            struct.unpack_from("<BBBBHHII", ico, 6 + 16 * i)
+        images.append(ico[offset:offset + size])
+        group += struct.pack("<BBBBHHIH", w, h, colors, reserved, planes, bits, size, i + 1)
+    return images, group
+
+
+def set_exe_resources(exe: Path, version: str, ico: Path, filename: str) -> None:
+    """Give ``exe`` the app's version strings and icon in place of its own;
+    ``filename`` is the name it will run under.
+
+    The existing icons and version are deleted first, so Explorer and Task
+    Manager find only ours; every other resource (the manifest) is kept.
+    Rewriting the file voids any signature it carried.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.LoadLibraryExW.restype = wintypes.HMODULE
+    k32.LoadLibraryExW.argtypes = [wintypes.LPCWSTR, wintypes.HANDLE, wintypes.DWORD]
+    k32.FreeLibrary.argtypes = [wintypes.HMODULE]
+    k32.BeginUpdateResourceW.restype = wintypes.HANDLE
+    k32.BeginUpdateResourceW.argtypes = [wintypes.LPCWSTR, wintypes.BOOL]
+    k32.UpdateResourceW.argtypes = [wintypes.HANDLE, ctypes.c_void_p, ctypes.c_void_p,
+                                    wintypes.WORD, ctypes.c_void_p, wintypes.DWORD]
+    k32.EndUpdateResourceW.argtypes = [wintypes.HANDLE, wintypes.BOOL]
+    on_name = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HMODULE, ctypes.c_void_p,
+                                 ctypes.c_void_p, wintypes.LPARAM)
+    on_lang = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HMODULE, ctypes.c_void_p,
+                                 ctypes.c_void_p, wintypes.WORD, wintypes.LPARAM)
+    k32.EnumResourceNamesW.argtypes = [wintypes.HMODULE, ctypes.c_void_p, on_name,
+                                       wintypes.LPARAM]
+    k32.EnumResourceLanguagesW.argtypes = [wintypes.HMODULE, ctypes.c_void_p, ctypes.c_void_p,
+                                           on_lang, wintypes.LPARAM]
+
+    def fail(what: str):
+        return OSError(ctypes.get_last_error(), f"{what} failed on {exe.name}")
+
+    # What to delete: every (type, name, language) of the kinds we replace.
+    # A name is a number or a string; a string must be copied out while the
+    # module is still loaded.
+    old: list[tuple[int, int | str, int]] = []
+    module = k32.LoadLibraryExW(str(exe), None, 0x2)  # LOAD_LIBRARY_AS_DATAFILE
+    if not module:
+        raise fail("LoadLibraryExW")
+    try:
+        for kind in (RT_ICON, RT_GROUP_ICON, RT_VERSION):
+            def each_name(_mod, _type, name, _param, kind=kind):
+                ident = name if name < 0x10000 else ctypes.wstring_at(name)
+
+                def each_lang(_mod, _type, _name, lang, _param):
+                    old.append((kind, ident, lang))
+                    return True
+
+                k32.EnumResourceLanguagesW(module, kind, name, on_lang(each_lang), 0)
+                return True
+
+            k32.EnumResourceNamesW(module, kind, on_name(each_name), 0)
+    finally:
+        k32.FreeLibrary(module)
+
+    images, group = icon_resources(ico.read_bytes())
+    product = "Voice TTS"
+    info = version_resource(version, {
+        "CompanyName": product, "FileDescription": product, "FileVersion": version,
+        "InternalName": "voice-tts", "OriginalFilename": filename,
+        "ProductName": product, "ProductVersion": version})
+    keep = []  # the buffers must outlive EndUpdateResource
+
+    def put(kind: int, name: int | str, lang: int, data: bytes | None) -> None:
+        ref = ctypes.c_wchar_p(name) if isinstance(name, str) else ctypes.c_void_p(name)
+        buf = ctypes.create_string_buffer(data, len(data)) if data else None
+        keep.append((ref, buf))
+        if not k32.UpdateResourceW(handle, kind, ref, lang, buf, len(data) if data else 0):
+            raise fail("UpdateResourceW")
+
+    handle = k32.BeginUpdateResourceW(str(exe), False)
+    if not handle:
+        raise fail("BeginUpdateResourceW")
+    try:
+        for kind, name, lang in old:
+            put(kind, name, lang, None)
+        for i, image in enumerate(images, 1):
+            put(RT_ICON, i, LANG_EN_US, image)
+        put(RT_GROUP_ICON, 1, LANG_EN_US, group)
+        put(RT_VERSION, 1, LANG_EN_US, info)
+    except BaseException:
+        k32.EndUpdateResourceW(handle, True)  # discard: the file stays as it was
+        raise
+    if not k32.EndUpdateResourceW(handle, False):
+        raise fail("EndUpdateResourceW")
 
 
 # --------------------------------------------------------------------- Linux

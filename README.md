@@ -190,7 +190,11 @@ python docs/scripts/tool-install.py --uninstall
 The app goes to `%LOCALAPPDATA%\Programs\VoiceTTS` with its own venv (Python 3.12
 through the `py` launcher when present). `voice-tts` is added to the user `PATH` -
 open a new terminal to see it - and a *Voice TTS* Start Menu shortcut opens the
-window through `pythonw`, so no console comes with it. Re-running updates the app
+window through `voice-tts.exe`, so no console comes with it. That exe is the base
+Python's `pythonw.exe` copied into the venv's `Scripts` with the app's name, icon
+and version, so Task Manager and Startup apps list *Voice TTS*, not *Python*;
+should it fail to build, the shortcuts use `pythonw.exe` and say so. A Python
+upgrade leaves it pointing at the old DLLs: re-run the install. Re-running updates the app
 files in place and reinstalls packages only when the requirements changed;
 `--prefix DIR` installs elsewhere. Uninstall removes the folder, the shortcuts and
 the `PATH` entry, and leaves the HuggingFace model cache alone.
