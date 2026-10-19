@@ -87,6 +87,15 @@ h1 {
   letter-spacing: -0.0255em;    /* SF tracking at 17pt */
 }
 
+h1 .version {
+  margin-left: 4px;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--label-3);
+  font-variant-numeric: tabular-nums;
+}
+
 .tools { display: flex; gap: 18px; margin-left: 12px; font-size: 0.9375rem; }
 .tools .link { margin-left: 0; }
 

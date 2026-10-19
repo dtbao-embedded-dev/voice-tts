@@ -2,7 +2,7 @@
 
 const $ = (id) => document.getElementById(id);
 const els = {
-  status: $('status'), statusText: $('statusText'),
+  status: $('status'), statusText: $('statusText'), appVersion: $('appVersion'),
   text: $('text'), count: $('count'),
   voiceBtn: $('voiceBtn'), voiceName: $('voiceName'), voiceList: $('voiceList'),
   sheet: $('sheet'), scrim: $('scrim'), speed: $('speed'),
@@ -1491,7 +1491,17 @@ addEventListener('keydown', (e) => {
   }
 });
 
+// The version this server runs, beside the name. It needs no model, so it shows
+// while the model is still loading; a server too old to say leaves it blank.
+async function showVersion() {
+  try {
+    const res = await fetch('/api/version');
+    if (res.ok) els.appVersion.textContent = `v${(await res.json()).version}`;
+  } catch { /* offline for now: the name alone is fine */ }
+}
+
 async function boot() {
+  showVersion();
   const prefs = loadPrefs();
   setSpeed(prefs.speed);
   setPronunciation(prefs.pronunciation);
