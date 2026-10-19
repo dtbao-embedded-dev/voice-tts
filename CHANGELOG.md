@@ -8,6 +8,8 @@ the release before it builds.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-19
+
 ### Added
 
 - The model is dropped after 5 minutes with nothing read, handing back about
@@ -19,7 +21,7 @@ the release before it builds.
   `--api-port <port>` serves the HTTP API on that loopback port too, from the
   same process. A second `voice-tts gui` brings the running window up and exits
   instead of loading the model again.
-- The header shows the server's version next to the app name (`v0.10.0`).
+- The header shows the server's version next to the app name (`v0.11.0`).
 
 ### Changed
 
