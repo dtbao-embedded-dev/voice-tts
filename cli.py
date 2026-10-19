@@ -80,6 +80,12 @@ def build_parser() -> argparse.ArgumentParser:
     gui.add_argument("--tray", action=argparse.BooleanOptionalAction, default=True,
                      help="minimize and close hide the window into the system tray; "
                           "--no-tray makes close quit (default: on)")
+    gui.add_argument("--background", action="store_true",
+                     help="start hidden in the tray, as autostart at login does; a click "
+                          "on the tray icon shows the window")
+    gui.add_argument("--api-port", type=int, metavar="PORT",
+                     help=f"also answer the HTTP API on 127.0.0.1:PORT, for scripts that "
+                          f"expect `serve` there (autostart: {DEFAULT_PORT})")
 
     serve = sub.add_parser("serve", help="run the HTTP backend without a window")
     serve.add_argument("--host", default="127.0.0.1",
@@ -631,10 +637,41 @@ def cmd_lexicon(args: argparse.Namespace) -> int:
     return 0
 
 
+def running_window(port: int, show: bool) -> bool:
+    """Whether a Voice TTS window already serves ``port``; ``show`` brings it up.
+
+    One app per user: a second launch (the Start Menu, a pinned taskbar button)
+    shows the running window instead of starting a process with another copy of
+    the model. The header is what keeps another site's page from doing the same.
+    """
+    if not port:
+        return False
+    url = f"http://127.0.0.1:{port}"
+    if show:
+        if sys.platform == "win32":
+            import ctypes
+
+            # ASFW_ANY: this launch holds the foreground; let the window take it.
+            ctypes.windll.user32.AllowSetForegroundWindow(-1)
+        req = urllib.request.Request(f"{url}/api/window/show", data=b"", method="POST",
+                                     headers={"X-Voice-TTS": "show"})
+    else:
+        req = urllib.request.Request(f"{url}/api/status")
+    try:
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            return resp.status == 200
+    except (urllib.error.URLError, OSError):  # nobody there, or not us
+        return False
+
+
 def cmd_gui(args: argparse.Namespace) -> int:
+    # Autostart finding the app already up has nothing to do; anyone else wants
+    # to see the window.
+    if running_window(args.port, show=not args.background):
+        return 0
     import app
 
-    app.run_gui(args.port, tray=args.tray)
+    app.run_gui(args.port, tray=args.tray, background=args.background, api_port=args.api_port)
     return 0
 
 

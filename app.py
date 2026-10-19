@@ -96,10 +96,12 @@ def _token_ok(candidate: str | None) -> bool:
 _gui_hosts: frozenset[str] | None = None
 
 
-def set_gui_hosts(port: int | None) -> None:
+def set_gui_hosts(*ports: int | None) -> None:
+    """Accept only 127.0.0.1/localhost on ``ports`` from now on; none (or None): any Host."""
     global _gui_hosts
-    _gui_hosts = None if port is None else frozenset(
-        {f"127.0.0.1:{port}", f"localhost:{port}"})
+    ports = [p for p in ports if p is not None]
+    _gui_hosts = frozenset(f"{name}:{p}" for p in ports
+                           for name in ("127.0.0.1", "localhost")) or None
 
 
 @app.middleware("http")
@@ -870,6 +872,26 @@ def voice_delete(name: str) -> dict:
     return {"removed": name}
 
 
+# Set by run_gui: brings its window up. A second `voice-tts gui` asks for this
+# instead of starting another process with another copy of the model.
+_show_window = None
+
+
+@app.post("/api/window/show")
+def window_show(request: Request) -> dict:
+    """Show the desktop window - what a second launch asks of the running app.
+
+    The custom header makes a browser preflight the request, and this server
+    answers no preflight, so a page on another site cannot pop the window up.
+    """
+    if _show_window is None:
+        raise HTTPException(404, "Không có cửa sổ để mở.")
+    if request.headers.get("x-voice-tts") != "show":
+        raise HTTPException(400, "Thiếu header X-Voice-TTS: show.")
+    _show_window()
+    return {"shown": True}
+
+
 @app.get("/")
 def index(token: str | None = None) -> FileResponse:
     """The page; ``?token=`` hands the web UI its cookie for a guarded server."""
@@ -894,13 +916,29 @@ app.mount("/web", StaticFiles(directory=WEB_DIR), name="web")
 
 def start_server(port: int = 0, host: str = "127.0.0.1",
                  log_level: str = "warning") -> tuple[uvicorn.Server, int, threading.Thread]:
-    """Bind a socket, serve on it in a daemon thread, return the bound port.
+    """Bind a socket, serve on it in a daemon thread, return the bound port."""
+    sock = bind(port, host)
+    server, thread = serve_sockets([sock], log_level)
+    return server, sock.getsockname()[1], thread
+
+
+def serve_sockets(socks: list[socket.socket],
+                  log_level: str = "warning") -> tuple[uvicorn.Server, threading.Thread]:
+    """One uvicorn server answering on every socket in ``socks``, in a daemon thread."""
+    server = uvicorn.Server(uvicorn.Config(app, log_level=log_level))
+    thread = threading.Thread(target=server.run, kwargs={"sockets": socks}, daemon=True)
+    thread.start()
+    return server, thread
+
+
+def bind(port: int = 0, host: str = "127.0.0.1") -> socket.socket:
+    """A socket listening on ``host:port``; OSError if the port is taken.
 
     Binding before handing the socket to uvicorn avoids the race of picking a
     free port and then losing it to another process. Listening here too means a
-    request made the moment this returns waits in the backlog instead of being
-    refused while uvicorn is still starting - Linux refuses at once, Windows
-    only hides it by retrying the connect for a second or two.
+    request made the moment the server starts waits in the backlog instead of
+    being refused while uvicorn is still starting - Linux refuses at once,
+    Windows only hides it by retrying the connect for a second or two.
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     if sys.platform == "win32":
@@ -915,29 +953,38 @@ def start_server(port: int = 0, host: str = "127.0.0.1",
         sock.close()
         raise
     sock.listen(2048)  # uvicorn's default backlog; its own listen() is then a no-op
-    bound_port = sock.getsockname()[1]
-
-    server = uvicorn.Server(uvicorn.Config(app, log_level=log_level))
-    thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]}, daemon=True)
-    thread.start()
-    return server, bound_port, thread
+    return sock
 
 
-def start_gui_server(port: int) -> tuple[uvicorn.Server, int, threading.Thread]:
-    """``start_server`` on ``port``, or on any free port if that one is taken.
+def start_gui_server(port: int, api_port: int | None = None
+                     ) -> tuple[uvicorn.Server, int, threading.Thread]:
+    """Serve on ``port``, or on any free port if that one is taken.
 
     The window asks for a fixed port so its page keeps one origin - the settings
     and history it stores belong to that origin. A second window, or another
     program on the port, still gets a working app, just without those.
+
+    ``api_port``: the same server answers there too (loopback), so scripts that
+    expect ``serve`` on that port share this process and its one model. Taken,
+    it is skipped with a warning.
     """
     try:
-        return start_server(port)
+        sock = bind(port)
     except OSError:
         if not port:
             raise
         print(f"voice-tts: port {port} is taken; this window will not see saved "
               "settings or history", file=sys.stderr)
-        return start_server(0)
+        sock = bind(0)
+    socks = [sock]
+    if api_port:
+        try:
+            socks.append(bind(api_port))
+        except OSError:
+            print(f"voice-tts: port {api_port} is taken; the API is not served there",
+                  file=sys.stderr)
+    server, thread = serve_sockets(socks)
+    return server, sock.getsockname()[1], thread
 
 
 def lan_address() -> str:
@@ -1063,11 +1110,15 @@ def allow_microphone(origin: str) -> None:
     edgechromium.EdgeChrome.on_webview_ready = on_webview_ready
 
 
-def run_gui(port: int = 0, tray: bool = True) -> None:
+def run_gui(port: int = 0, tray: bool = True, background: bool = False,
+            api_port: int | None = None) -> None:
     """The desktop app: the backend on loopback plus a native window over it.
 
     With ``tray`` the window hides into the system tray when minimized or
     closed, and the server keeps running; "Thoát" in the tray menu ends it.
+    ``background`` starts with the window already hidden there (autostart at
+    login); with no tray to hide in, it is shown anyway. ``api_port``: see
+    ``start_gui_server``.
     """
     import webview
 
@@ -1083,11 +1134,35 @@ def run_gui(port: int = 0, tray: bool = True) -> None:
 
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("VoiceTTS.Desktop")
 
-    _, port, _ = start_gui_server(port)
-    set_gui_hosts(port)
+    global _show_window
+
+    _, port, _ = start_gui_server(port, api_port)
+    set_gui_hosts(port, api_port)
     url = f"http://127.0.0.1:{port}/"
     if sys.platform == "win32":
         allow_microphone(url)
+
+    window = None  # made below, once it is known whether it starts hidden
+    quitting = threading.Event()
+
+    def show() -> None:
+        if window is not None:
+            window.show()
+            window.restore()
+
+    def quit_app() -> None:
+        quitting.set()
+        window.destroy()
+
+    # The tray comes first: only once it is up may the window start hidden in it.
+    icon = None
+    if tray:
+        from tray import Tray
+
+        icon = Tray(url, on_quit=quit_app, on_show=show)
+        if not icon.start():
+            icon = None  # no tray here: closing the window quits, as before
+
     # pywebview asks WinForms for FormStartPosition.CenterScreen, but it does so
     # after the form handle exists, so the window lands at 78,78 instead. Passing
     # a screen takes the branch that computes the position itself.
@@ -1101,22 +1176,11 @@ def run_gui(port: int = 0, tray: bool = True) -> None:
         resizable=False,   # drops the maximize box too; minimize and close stay
         screen=webview.screens[0],
         background_color="#000000",
+        hidden=background and icon is not None,
     )
+    _show_window = show
 
-    icon = None
-    if tray:
-        from tray import Tray
-
-        quitting = threading.Event()
-
-        def show() -> None:
-            window.show()
-            window.restore()
-
-        def quit_app() -> None:
-            quitting.set()
-            window.destroy()
-
+    if icon is not None:
         def on_closing():
             if quitting.is_set():
                 return True
@@ -1125,17 +1189,13 @@ def run_gui(port: int = 0, tray: bool = True) -> None:
             threading.Thread(target=window.hide, daemon=True).start()
             return False  # cancel the close: the app lives on in the tray
 
-        icon = Tray(url, on_quit=quit_app, on_show=show)
-        if icon.start():
-            window.events.closing += on_closing
-            window.events.minimized += window.hide
-            if sys.platform == "win32":
-                from tray import PopupMenu
+        window.events.closing += on_closing
+        window.events.minimized += window.hide
+        if sys.platform == "win32":
+            from tray import PopupMenu
 
-                # Right-click opens the app's own dark menu, not the native one.
-                icon.popup = PopupMenu(icon, url)
-        else:
-            icon = None  # no tray here: closing the window quits, as before
+            # Right-click opens the app's own dark menu, not the native one.
+            icon.popup = PopupMenu(icon, url)
 
     # Returns when the window is destroyed; daemon threads go with it. pywebview
     # defaults to a private profile, wiped on exit; a profile kept in the data dir

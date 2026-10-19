@@ -15,6 +15,17 @@ the release before it builds.
   reading loads it again in about 7 s. `/api/status` stays `ready` and gains
   `"loaded": false` while it is dropped; opening the page does not reload it.
   `VOICE_TTS_IDLE_UNLOAD=<seconds>` sets the wait, `0` turns it off.
+- `voice-tts gui --background` starts with the window hidden in the tray, and
+  `--api-port <port>` serves the HTTP API on that loopback port too, from the
+  same process. A second `voice-tts gui` brings the running window up and exits
+  instead of loading the model again.
+
+### Changed
+
+- `tool-install.py --autostart` starts the app itself at login,
+  `gui --background --api-port 8760`, instead of `serve --tray`: a click on the
+  tray icon now opens the app window, not the browser, and scripts still reach the
+  API on `127.0.0.1:8760`. Re-run the installer with `--autostart` to switch.
 
 ### Fixed
 

@@ -125,7 +125,11 @@ def check_parser() -> None:
     assert (args.command, args.host, args.port, args.token) == ("serve", "0.0.0.0", 9000, "x")
     args = cli.parse(p, ["serve"])
     assert (args.host, args.port) == ("127.0.0.1", 8760), "serve defaults moved"
-    print("parser: gui default, --no-window alias, serve options")
+    args = cli.parse(p, [])
+    assert (args.background, args.api_port) == (False, None), "gui must show its window"
+    args = cli.parse(p, ["gui", "--background", "--api-port", "8760"])
+    assert (args.background, args.api_port) == (True, 8760), "gui --background --api-port"
+    print("parser: gui default, --no-window alias, serve options, gui --background --api-port")
 
 
 def check_token(base: str) -> None:
@@ -605,6 +609,69 @@ def check_gui_port() -> None:
             server.should_exit = True
             thread.join(timeout=5)
     print("gui port: fixed by default, an occupied port is refused and falls back")
+
+
+def check_gui_api_port() -> None:
+    """``gui --api-port`` answers the API on a second port from the same server -
+    scripts that expect ``serve`` on 8760 reach the window's process and its one
+    model. A port already taken costs only that second address."""
+    api = free_port()
+    server, port, thread = app.start_gui_server(0, api_port=api)
+    try:
+        for p in (port, api):
+            assert request(f"http://127.0.0.1:{p}/api/status")[0] == 200, f"port {p} silent"
+        app.set_gui_hosts(port, api)
+        try:
+            for host, want in ((f"127.0.0.1:{api}", 200), (f"localhost:{port}", 200),
+                               (f"evil.example:{api}", 421)):
+                assert request(f"http://127.0.0.1:{api}/api/status", {"Host": host})[0] == want, host
+        finally:
+            app.set_gui_hosts(None)
+        # A second window on the same API port: it starts anyway, on its own port.
+        second, port2, thread2 = app.start_gui_server(0, api_port=api)
+        second.should_exit = True
+        thread2.join(timeout=5)
+        assert port2 not in (port, api), port2
+    finally:
+        server.should_exit = True
+        thread.join(timeout=5)
+    print("gui api port: one server on both ports, both behind the host check, taken is fine")
+
+
+def check_window_show(base: str) -> None:
+    """A second ``voice-tts gui`` shows the running window and exits instead of
+    starting another process with another copy of the model."""
+    port = int(base.rsplit(":", 1)[1])
+
+    def show(headers: dict) -> int:
+        req = urllib.request.Request(f"{base}/api/window/show", data=b"", method="POST",
+                                     headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                return resp.status
+        except urllib.error.HTTPError as exc:
+            return exc.code
+
+    calls = []
+    assert show({"X-Voice-TTS": "show"}) == 404, "serve has no window to show"
+    run_gui = app.run_gui
+    app._show_window = lambda: calls.append("show")
+    app.run_gui = lambda *a, **k: calls.append("started")
+    try:
+        # Without the header a page on another site could send it with no preflight.
+        assert show({}) == 400 and not calls, calls
+        assert show({"X-Voice-TTS": "show"}) == 200 and calls == ["show"], calls
+        assert cli.main(["gui", "--port", str(port)]) == 0
+        assert calls == ["show", "show"], f"a second launch did not hand over: {calls}"
+        # Autostart while the app already runs: nothing to do, nothing to show.
+        assert cli.main(["gui", "--background", "--port", str(port)]) == 0
+        assert calls == ["show", "show"], f"--background with one running: {calls}"
+        assert cli.main(["gui", "--port", str(free_port())]) == 0
+        assert calls[-1] == "started", "nobody on the port, yet no window started"
+    finally:
+        app._show_window = None
+        app.run_gui = run_gui
+    print("window show: a second gui shows the first and exits, header required, 404 in serve")
 
 
 def check_tray() -> None:
@@ -1136,11 +1203,13 @@ def run_checks() -> int:
     check_release_notes()
     check_tray()
     check_gui_port()
+    check_gui_api_port()
 
     _, port, _ = app.start_server(host="127.0.0.1", port=0)
     base = f"http://127.0.0.1:{port}"
     check_token(base)
     check_gui_host(base)
+    check_window_show(base)
     with tempfile.TemporaryDirectory() as tmp:
         check_remote(base, Path(tmp))
         check_wav_format(base)

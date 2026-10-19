@@ -90,7 +90,9 @@ browser.
 
 Minimizing or closing the window hides it in the system tray and the app keeps
 running; click the tray icon to bring it back, right-click → *Thoát* to quit.
-To have it start with Windows, install with `--autostart`.
+To have it start with Windows, install with `--autostart`: it then waits in the
+tray from login, and opening *Voice TTS* shows that window instead of starting a
+second copy.
 
 ### Use the LAN server
 
@@ -181,7 +183,7 @@ Running `app.py` directly works too:
 
 ```
 python docs/scripts/tool-install.py              # install for this user
-python docs/scripts/tool-install.py --autostart  # ... and run `serve --tray` at login
+python docs/scripts/tool-install.py --autostart  # ... and start it in the tray at login
 python docs/scripts/tool-install.py --uninstall
 ```
 
@@ -545,6 +547,18 @@ The window lives in the system tray: **minimize or close hides it there and the
 server keeps running**. A click on the tray icon brings the window back; its menu
 has *Mở cửa sổ*, *Mở trong trình duyệt*, *Sao chép URL* and *Thoát* - only *Thoát*
 ends the app. `--no-tray` restores the old behaviour, close = quit.
+
+There is one app per user. `voice-tts gui` while one already runs on its port
+(8761) brings that window up and exits, so the model is never loaded twice.
+
+```
+voice-tts gui --background --api-port 8760   # what --autostart runs at login
+```
+
+`--background` starts with the window hidden in the tray (shown anyway if there is
+no tray); a click on the icon opens it. `--api-port 8760` answers the HTTP API on
+`127.0.0.1:8760` as well, from the same process, so scripts written for `serve`
+keep working. A port already taken is skipped with a warning on stderr.
 
 On Windows the right-click menu is the app's own (`web/tray.html`, shown by
 `tray.PopupMenu`): the status and the address *Sao chép URL* copies on top, an icon

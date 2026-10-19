@@ -2,7 +2,7 @@
 """Install Voice TTS for the current user. Standard library only.
 
     python docs/scripts/tool-install.py               # install on this machine
-    python docs/scripts/tool-install.py --autostart   # Windows: also `serve --tray` at login
+    python docs/scripts/tool-install.py --autostart   # Windows: also start in the tray at login
     python docs/scripts/tool-install.py --uninstall   # remove what the install made
     python docs/scripts/tool-install.py --remote panboy@192.168.0.137   # Linux box over ssh
 
@@ -36,6 +36,7 @@ APP_DIRS = ("web",)
 DOCKER_FILES = ("Dockerfile", "compose.yaml", ".dockerignore")
 SELF = Path("docs/scripts/tool-install.py")
 NAME = "Voice TTS"
+API_PORT = 8760  # cli.DEFAULT_PORT: where `serve`, and scripts, expect the API
 
 
 def run(cmd: list, **kw) -> subprocess.CompletedProcess:
@@ -76,8 +77,11 @@ class Windows:
         self.shortcut(self.start_menu, "gui", "Đọc văn bản tiếng Việt/Anh")
         say(f"Start Menu: {self.start_menu.name}")
         if autostart:
-            self.shortcut(self.startup, "serve --tray", "Voice TTS server in the tray")
-            say("autostart: `serve --tray` at login")
+            # The app itself, hidden in the tray: a click there opens its window,
+            # and scripts still find the API on 8760, all on one loaded model.
+            self.shortcut(self.startup, f"gui --background --api-port {API_PORT}",
+                          "Voice TTS in the tray")
+            say(f"autostart: the app, hidden in the tray, at login (API on {API_PORT})")
         elif self.startup.exists():
             self.startup.unlink()
             say("autostart: removed (re-run with --autostart to keep it)")
@@ -330,7 +334,8 @@ def main() -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--uninstall", action="store_true", help="remove the install")
     ap.add_argument("--autostart", action="store_true",
-                    help="Windows: start `serve --tray` at login")
+                    help="Windows: start the app hidden in the tray at login "
+                         f"(`gui --background --api-port {API_PORT}`)")
     ap.add_argument("--prefix", type=Path,
                     help="install directory (default: %%LOCALAPPDATA%%/Programs/VoiceTTS, "
                          "or ~/voice-tts on Linux)")
