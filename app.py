@@ -10,6 +10,7 @@ The UI is a web view hosted in a native window; this module is the HTTP backend
 
 from __future__ import annotations
 
+import gc
 import hmac
 import io
 import itertools
@@ -62,8 +63,10 @@ os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS", "1")
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    """Load the model in the background so the window can paint immediately."""
+    """Load the model in the background so the window can paint immediately,
+    and start the watch that drops it again once nobody uses it."""
     threading.Thread(target=_warm, name="warm-engine", daemon=True).start()
+    _start_reaper()
     yield
 
 
@@ -144,24 +147,34 @@ MODEL_PRECISION = "fp32"
 _engine = None
 _engine_error: str | None = None
 _engine_lock = threading.Lock()
+_engine_used = 0.0  # time.monotonic() of the last engine() call
+_engine_loaded_once = False
+
+
+def _load_engine():
+    from vieneu import Vieneu
+
+    return Vieneu(precision=MODEL_PRECISION, threads=ENGINE_THREADS)
 
 
 def engine():
     """Return the shared VieNeu engine, loading it on first use.
 
     Loading pulls the v3 Turbo weights from the HuggingFace cache (downloading
-    them on a cold machine), so it happens once and is shared by all requests.
+    them on a cold machine), so it happens once and is shared by all requests -
+    until ``unload_if_idle`` drops it, and then once more on the next use.
     """
-    global _engine, _engine_error
+    global _engine, _engine_error, _engine_used, _engine_loaded_once
     with _engine_lock:
         if _engine is None:
-            from vieneu import Vieneu
-
             try:
-                _engine = Vieneu(precision=MODEL_PRECISION, threads=ENGINE_THREADS)
+                _engine = _load_engine()
             except Exception as exc:  # surfaced to the UI via /api/status
                 _engine_error = f"{type(exc).__name__}: {exc}"
                 raise
+            _engine_error = None
+            _engine_loaded_once = True
+        _engine_used = time.monotonic()
         return _engine
 
 
@@ -177,6 +190,7 @@ class Turns:
         self._busy = 0
         self._waiting: deque[object] = deque()
         self._cv = threading.Condition()
+        self._idle_since = time.monotonic()
 
     @contextmanager
     def turn(self):
@@ -192,12 +206,19 @@ class Turns:
         finally:
             with self._cv:
                 self._busy -= 1
+                if not self._busy and not self._waiting:
+                    self._idle_since = time.monotonic()
                 self._cv.notify_all()
 
     def load(self) -> tuple[int, int]:
         """``(reading, waiting)`` right now."""
         with self._cv:
             return self._busy, len(self._waiting)
+
+    def idle_since(self) -> float | None:
+        """When the last turn ended (``time.monotonic()``); None while one runs or waits."""
+        with self._cv:
+            return None if self._busy or self._waiting else self._idle_since
 
 
 # Readings the engine runs at once. On CPU it takes one ONNX call at a time, so a
@@ -214,6 +235,49 @@ _turns = Turns(MAX_STREAMS)
 # i5-14600K (6 P + 8 E cores), fp32, RTF was 0.341 with 2 threads, 0.285 with 4,
 # 0.267 with 6, 0.273 with 8, 0.284 with 12, 0.287 with 14 and 0.296 with 20.
 ENGINE_THREADS = max(0, int(os.environ.get("VOICE_TTS_THREADS", "0")))
+
+# Seconds with nothing read before the model is dropped; 0 keeps it for good.
+# The weights are most of what the process holds - fp32 on an i5-14600K: 1.2 GB
+# working set loaded, 0.13 GB once dropped - and load again in about 7 s, which
+# the first reading after a quiet spell then waits.
+IDLE_UNLOAD = max(0.0, float(os.environ.get("VOICE_TTS_IDLE_UNLOAD", "300")))
+_reaper_started = False
+
+
+def unload_if_idle() -> bool:
+    """Drop the engine if nothing has used it for ``IDLE_UNLOAD`` seconds.
+
+    A reading holds a turn for as long as it streams, so one that is running or
+    waiting keeps the model however long it takes. The check runs under the
+    engine lock, so a request that has just fetched the engine is seen as use.
+    """
+    global _engine
+    if not IDLE_UNLOAD:
+        return False
+    with _engine_lock:
+        since = _turns.idle_since()
+        if _engine is None or since is None:
+            return False
+        idle = time.monotonic() - max(since, _engine_used)
+        if idle < IDLE_UNLOAD:
+            return False
+        _engine = None
+    gc.collect()  # the ONNX sessions hand their memory back when collected
+    print(f"model unloaded after {idle:.0f}s idle", file=sys.stderr, flush=True)
+    return True
+
+
+def _reap() -> None:
+    while True:
+        time.sleep(min(30.0, IDLE_UNLOAD / 4) if IDLE_UNLOAD else 30.0)
+        unload_if_idle()
+
+
+def _start_reaper() -> None:
+    global _reaper_started
+    if not _reaper_started:
+        _reaper_started = True
+        threading.Thread(target=_reap, name="idle-unload", daemon=True).start()
 
 # What each reading logs carries no text unless this is set: the text is what a
 # listener typed, and the journal keeps it long after the reading is gone.
@@ -240,12 +304,21 @@ def _region_of(meta: dict) -> str:
     return parts[1] if len(parts) > 1 and parts[1] in REGIONS else ""
 
 
+# The built-in voices and the default never change while the process runs. Kept
+# once read, so opening the page after the model was dropped does not load it.
+_presets: list[dict] | None = None
+_default: str | None = None
+
+
 def preset_voices() -> list[dict]:
     """The built-in voices, already ordered with the editors' picks first.
 
     ``list_preset_voices()`` yields ``(label, name)``; the per-voice record adds
     the region/gender the UI groups by.
     """
+    global _presets
+    if _presets is not None:
+        return _presets
     tts = engine()
     voices = []
     for _label, name in tts.list_preset_voices():
@@ -259,6 +332,7 @@ def preset_voices() -> list[dict]:
                 "featured": meta.get("featured") is not None,
             }
         )
+    _presets = voices
     return voices
 
 
@@ -273,11 +347,15 @@ def all_voices() -> list[dict]:
 
 
 def default_voice() -> str:
+    global _default
+    if _default is not None:
+        return _default
     tts = engine()
     # The engine only exposes its own default as a private attribute; route it
     # through the public resolver so a rename degrades instead of breaking.
     name = tts.resolve_voice_name(getattr(tts, "_default_voice", None))
-    return name or preset_voices()[0]["name"]
+    _default = name or preset_voices()[0]["name"]
+    return _default
 
 
 SPEED_MIN, SPEED_MAX = 0.5, 2.0
@@ -425,14 +503,20 @@ def encode_audio(audio: np.ndarray, fmt: str) -> bytes:
 def _warm() -> None:
     try:
         engine()
+        # Read the voice list now, while the model is loaded: a page opened
+        # after it was dropped for being idle then lists them without a reload.
+        preset_voices()
+        default_voice()
     except Exception:
         pass  # /api/status reports _engine_error
 
 
 @app.get("/api/status")
 def status() -> dict:
-    if _engine is not None:
-        return {"state": "ready"}
+    """``ready`` once the model has loaded; ``loaded`` is false while it is
+    dropped for being idle - still ready, the next reading loads it again."""
+    if _engine is not None or (_engine_loaded_once and _engine_error is None):
+        return {"state": "ready", "loaded": _engine is not None}
     if _engine_error is not None:
         return {"state": "error", "detail": _engine_error}
     return {"state": "loading"}

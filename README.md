@@ -360,6 +360,12 @@ cores only slow it: on an i5-14600K (6 P + 8 E cores) RTF was 0.341 with 2, 0.28
 with 4, **0.267 with 6**, 0.273 with 8, 0.287 with 14 and 0.296 with 20. A machine
 whose cores are all alike (the i5-8500T) gains nothing from setting it.
 
+After 5 minutes with nothing read, the server drops the model and hands its
+memory back (i5-14600K, fp32: 1.2 GB working set loaded, 0.14 GB dropped); the
+next reading loads it again, which takes about 7 s. `/api/status` stays `ready`
+meanwhile, with `"loaded": false`, and the voice list is still served.
+`VOICE_TTS_IDLE_UNLOAD=<seconds>` changes the wait; `0` keeps the model loaded.
+
 Every reading logs three lines on stderr, whatever `--log-level` says - under
 systemd, `journalctl --user -u voice-tts -f` shows them:
 
@@ -497,7 +503,7 @@ voice-tts speak -f text.txt -v "Mai Anh" -s 1.25 -o speech.wav \
 The other endpoints take the same header:
 ```bash
 curl -H "Authorization: Bearer <token>" http://<host>:8760/api/voices   # names to use as "voice"
-curl -H "Authorization: Bearer <token>" http://<host>:8760/api/status   # {"state": "ready"}
+curl -H "Authorization: Bearer <token>" http://<host>:8760/api/status   # {"state": "ready", "loaded": true}
 curl -H "Authorization: Bearer <token>" http://<host>:8760/api/version  # {"version": "0.10.0"}
 ```
 

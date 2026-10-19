@@ -238,7 +238,7 @@ def check_remote(base: str, tmp: Path) -> None:
         code, stdout, err = run_cli("status", *remote)
         assert code == 0 and stdout.decode().strip() == "ready", f"status: {code} {stdout!r} {err}"
         code, stdout, _ = run_cli("status", "--json", *remote)
-        assert json.loads(stdout) == {"state": "ready"}, stdout
+        assert json.loads(stdout) == {"state": "ready", "loaded": True}, stdout
         code, _, _ = run_cli("status", "--server", f"http://127.0.0.1:{free_port()}")
         assert code == 1, "status of an unreachable server must fail"
     finally:
@@ -432,6 +432,65 @@ def check_turns(base: str) -> None:
         app._engine = stub
     print(f"turns: at most {app.MAX_STREAMS} at once (VOICE_TTS_MAX_STREAMS, 2 unless set), "
           "the rest in arrival order, a hang-up hands the turn on")
+
+
+def check_idle_unload(base: str) -> None:
+    """Nobody reading for IDLE_UNLOAD seconds drops the model and hands its RAM
+    back; the next reading loads it again. Neither /api/status nor opening the
+    page notices: the status stays ready and the voice list is kept."""
+    stub, loader, idle = app._engine, app._load_engine, app.IDLE_UNLOAD
+    loads = []
+
+    def load():
+        loads.append(1)
+        return StubEngine()
+
+    app._load_engine = load
+    app.IDLE_UNLOAD = 0.3
+    presets, default = app._presets, app._default
+    # As the server starts: the warm-up loads the model, then only readings come
+    # (a script on the API) - nobody has asked for the voice list yet.
+    app._engine = app._presets = app._default = None
+    try:
+        app._warm()
+        loads.clear()
+        assert post(base, {"text": "xin chào", "format": "wav"})[0] == 200
+        assert not app.unload_if_idle(), "unloaded right after a reading"
+        time.sleep(0.4)
+        # The server's own reaper may have got there first; either way it is gone.
+        assert app.unload_if_idle() or app._engine is None, "an idle model was kept"
+        assert app._engine is None
+        assert json.loads(request(f"{base}/api/status")[2]) == {"state": "ready", "loaded": False}
+        status, _, body = request(f"{base}/api/voices")
+        assert status == 200 and "Stub A" in body.decode(), body
+        assert not loads, "opening the page loaded the model again"
+
+        assert post(base, {"text": "xin chào", "format": "wav"})[0] == 200
+        assert len(loads) == 1, f"the next reading loaded {len(loads)} models"
+        assert json.loads(request(f"{base}/api/status")[2]) == {"state": "ready", "loaded": True}
+
+        # However long a reading runs, the model stays under it.
+        app._engine = SlowEngine(chunks=10, delay=0.06)
+        reading = threading.Thread(target=post, args=(base, {"text": "đọc lâu", "format": "wav"}))
+        reading.start()
+        time.sleep(0.45)
+        assert not app.unload_if_idle(), "unloaded under a reading"
+        reading.join(10)
+
+        app.IDLE_UNLOAD = 0
+        time.sleep(0.4)
+        assert not app.unload_if_idle(), "VOICE_TTS_IDLE_UNLOAD=0 must keep the model"
+    finally:
+        app._engine, app._load_engine, app.IDLE_UNLOAD = stub, loader, idle
+        app._presets, app._default = presets, default
+
+    env = {k: v for k, v in os.environ.items() if k != "VOICE_TTS_IDLE_UNLOAD"}
+    out = subprocess.run([sys.executable, "-c", "import app; print(app.IDLE_UNLOAD)"],
+                         cwd=ROOT, env=env, capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0 and float(out.stdout.split()[-1]) == 300, out
+    assert "idle-unload" in {t.name for t in threading.enumerate()}, "no idle reaper running"
+    print("idle unload: after VOICE_TTS_IDLE_UNLOAD s (300 unless set, 0 never), never "
+          "under a reading; status and voice list unaffected, the next reading reloads")
 
 
 def check_reading_log(base: str) -> None:
@@ -1087,6 +1146,7 @@ def run_checks() -> int:
         check_wav_format(base)
         check_turns(base)
         check_reading_log(base)
+        check_idle_unload(base)
         check_encode(base, Path(tmp))
         check_lexicon(base, Path(tmp))
         check_lexicon_user(base, Path(tmp))

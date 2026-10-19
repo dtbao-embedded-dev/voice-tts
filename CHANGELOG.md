@@ -8,6 +8,14 @@ the release before it builds.
 
 ## [Unreleased]
 
+### Added
+
+- The model is dropped after 5 minutes with nothing read, handing back about
+  1 GB of RAM (1.2 GB working set down to 0.14 GB on an i5-14600K); the next
+  reading loads it again in about 7 s. `/api/status` stays `ready` and gains
+  `"loaded": false` while it is dropped; opening the page does not reload it.
+  `VOICE_TTS_IDLE_UNLOAD=<seconds>` sets the wait, `0` turns it off.
+
 ## [0.10.0] - 2026-10-13
 
 ### Added
