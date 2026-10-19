@@ -136,7 +136,26 @@
     return out;
   }
 
-  const api = { stripMarkdown, decodeFile, splitSentences };
+  // What to tell the user when getUserMedia fails, by the error's name. The
+  // names are the browser's own; DevicesNotFoundError and TrackStartError are
+  // older Chromium spellings of NotFoundError and NotReadableError.
+  const MIC_PROBLEMS = {
+    none: 'Không tìm thấy micro nào trên máy này - cắm micro (qua Remote Desktop thì bật chuyển tiếp micro), hoặc chọn file ghi sẵn.',
+    denied: 'Chưa được phép dùng micro - cho phép trong hộp thoại, hoặc Cài đặt Windows › Quyền riêng tư › Micro.',
+    busy: 'Micro đang bị app khác giữ hoặc driver lỗi - đóng app đang dùng micro rồi thử lại.',
+  };
+  const MIC_CAUSES = {
+    NotFoundError: 'none', DevicesNotFoundError: 'none', OverconstrainedError: 'none',
+    NotAllowedError: 'denied', SecurityError: 'denied',
+    NotReadableError: 'busy', TrackStartError: 'busy', AbortError: 'busy',
+  };
+
+  function micProblem(name) {
+    const cause = MIC_CAUSES[name];
+    return cause ? MIC_PROBLEMS[cause] : `Không mở được micro (${name || 'lỗi không rõ'}).`;
+  }
+
+  const api = { stripMarkdown, decodeFile, splitSentences, micProblem };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.VoiceText = api;
 })(this);

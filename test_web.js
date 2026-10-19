@@ -86,7 +86,31 @@ function checkSplit() {
   console.log('sentences: ends, abbreviations, decimals, line breaks, <en> spans, offsets');
 }
 
+function checkMicProblem() {
+  const { micProblem } = text;
+  // Each getUserMedia failure names its own cause: a machine with no microphone
+  // at all (a Remote Desktop session without mic redirection) is not "held by
+  // another app".
+  const cases = [
+    ['NotFoundError', /Không tìm thấy micro/],
+    ['DevicesNotFoundError', /Không tìm thấy micro/],
+    ['OverconstrainedError', /Không tìm thấy micro/],
+    ['NotAllowedError', /Chưa được phép/],
+    ['SecurityError', /Chưa được phép/],
+    ['NotReadableError', /app khác/],
+    ['AbortError', /app khác/],
+    ['TypeError', /Không mở được micro \(TypeError\)/],
+    ['', /Không mở được micro \(lỗi không rõ\)/],
+  ];
+  for (const [name, want] of cases) assert.match(micProblem(name), want, name);
+  for (const name of ['NotFoundError', 'NotAllowedError', 'TypeError']) {
+    assert.doesNotMatch(micProblem(name), /app khác/, `${name} blamed on another app`);
+  }
+  console.log('mic: no device, no permission, busy and anything else say so apart');
+}
+
 checkStripMarkdown();
 checkDecode();
 checkSplit();
+checkMicProblem();
 console.log('OK');

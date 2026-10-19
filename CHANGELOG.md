@@ -16,6 +16,14 @@ the release before it builds.
   `"loaded": false` while it is dropped; opening the page does not reload it.
   `VOICE_TTS_IDLE_UNLOAD=<seconds>` sets the wait, `0` turns it off.
 
+### Fixed
+
+- Recording a voice sample on a machine with no microphone (a Remote Desktop
+  session without mic redirection, say) said the microphone was held by another
+  app. The message now names the cause: no microphone, no permission, or busy;
+  anything else shows the browser's error name. A microphone that cannot meet the
+  requested settings records with its own instead of failing.
+
 ## [0.10.0] - 2026-10-13
 
 ### Added

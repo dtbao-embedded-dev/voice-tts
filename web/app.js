@@ -357,15 +357,19 @@ async function startRecording() {
   if (recAudio) recAudio.pause();
   let stream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      // The engine denoises the clip itself; the browser's own cleanup and echo
-      // cancellation only colour the voice it is meant to copy.
-      audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false },
-    });
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        // The engine denoises the clip itself; the browser's own cleanup and echo
+        // cancellation only colour the voice it is meant to copy.
+        audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false },
+      });
+    } catch (e) {
+      // A device that cannot meet those settings still records with its own.
+      if (!e || e.name !== 'OverconstrainedError') throw e;
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
   } catch (e) {
-    cloneError(e && e.name === 'NotAllowedError'
-      ? 'Chưa được phép dùng micro - cho phép trong hộp thoại, hoặc Cài đặt Windows › Quyền riêng tư › Micro.'
-      : 'Không mở được micro - kiểm tra micro đã cắm và không bị app khác giữ.');
+    cloneError(VoiceText.micProblem(e && e.name));
     return;
   }
   const actx = new AudioContext();
