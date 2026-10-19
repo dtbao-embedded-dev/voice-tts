@@ -129,6 +129,19 @@ async def require_token(request: Request, call_next):
     return JSONResponse({"detail": "Thiếu hoặc sai token."}, status_code=401)
 
 
+@app.middleware("http")
+async def revalidate_page(request: Request, call_next):
+    """The page and its files carry an ETag but no Cache-Control, so a browser
+    - the window's WebView2 too - kept them for as long as it judged fresh
+    from their age, and ran the old page after an update. Revalidating costs a
+    304 on loopback."""
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.startswith("/web/"):
+        response.headers.setdefault("Cache-Control", "no-cache")
+    return response
+
+
 async def _drain(request: Request) -> None:
     """Take in what the client sent before refusing it: closing on an unread body
     makes Windows reset the connection, and the client sees an abort, not the

@@ -30,6 +30,9 @@ the release before it builds.
 
 ### Fixed
 
+- After an update the window, or a browser, could keep running the old page:
+  `/` and `/web/*` had no `Cache-Control`, so they were reused for as long as the
+  browser judged them fresh. They are now revalidated on every load (`no-cache`).
 - Task Manager and Startup apps listed the Windows install as *Python*: its
   shortcuts ran the venv's `pythonw.exe`, which only starts the base Python's.
   `tool-install.py` now makes `voice-tts.exe` in the venv - that interpreter under

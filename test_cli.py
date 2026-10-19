@@ -715,6 +715,21 @@ def check_tray() -> None:
     print("tray: menu, headless menu, backend failure falls back")
 
 
+def check_page_fresh(base: str) -> None:
+    """After an update the window runs the new page: the page and /web/* are
+    revalidated on every load (a 304 when unchanged), never taken from a cache
+    the browser judged fresh on its own."""
+    for path in ("/", "/web/app.js", "/web/app.css", "/web/index.html"):
+        status, headers, _ = request(f"{base}{path}")
+        headers = {k.lower(): v for k, v in headers.items()}
+        assert status == 200, f"{path}: {status}"
+        assert headers.get("cache-control") == "no-cache", f"{path}: {headers.get('cache-control')}"
+        assert headers.get("etag"), f"{path} has no ETag to revalidate with"
+    status, headers, body = request(f"{base}/")
+    assert 'id="appVersion"' in body.decode(), "the header has no place for the version"
+    print("page: / and /web/* revalidate on every load; the header shows the version")
+
+
 def check_icon(base: str, tmp: Path) -> None:
     """One design everywhere: a black disc, a white ring and five white bars."""
     import icon
@@ -1283,6 +1298,7 @@ def run_checks() -> int:
         check_clones(base, Path(tmp))
         check_local(Path(tmp))
         check_icon(base, Path(tmp))
+        check_page_fresh(base)
     print("OK")
     return 0
 
